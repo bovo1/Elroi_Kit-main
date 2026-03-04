@@ -344,6 +344,7 @@ if __name__ == "__main__":
     font = QtGui.QFont(QtGui.QFontDatabase.applicationFontFamilies(fontID)[0])
     font.setHintingPreference(QtGui.QFont.HintingPreference.PreferFullHinting) # Set hinting preference to full hinting
     font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias) # Set style strategy to prefer antialiasing
+    #
     #font = app.font()
     #font.setPointSizeF(font.pointSizeF() * factor) # Scale font size
     app.setFont(font)
