@@ -24,7 +24,7 @@ from top import Top_MainWindow_Form
 from mid import Mid_MainWindow_Form
 from utils.language import Language
 from core.main_core import Main_Core
-from utils.shared import shared_root_path, license_path, temp_path, icon_path
+from utils.shared import shared_root_path, license_path, temp_path, icon_path, font_path
 from utils.license import make_HW_status, check_lic_status
 from constants.constants import LABEL_UNSELECTED
 from constants.constants import *
@@ -339,8 +339,13 @@ if __name__ == "__main__":
     # Adjust application font size based on DPI scaling factor
     screen = app.primaryScreen()
     factor  = screen.devicePixelRatio() # Get DPI scaling factor
-    font = app.font()
-    font.setPointSizeF(font.pointSizeF() * factor) # Scale font size
+    nunumSquareFont = "NanumSquareNeo-bRg.ttf"
+    fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, nunumSquareFont))
+    font = QtGui.QFont(QtGui.QFontDatabase.applicationFontFamilies(fontID)[0])
+    font.setHintingPreference(QtGui.QFont.HintingPreference.PreferFullHinting) # Set hinting preference to full hinting
+    font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias) # Set style strategy to prefer antialiasing
+    #font = app.font()
+    #font.setPointSizeF(font.pointSizeF() * factor) # Scale font size
     app.setFont(font)
     merge_MainWindow = QtWidgets.QMainWindow()
     ui = Merge_MainWindow_Form()
