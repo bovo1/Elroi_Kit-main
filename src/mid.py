@@ -77,8 +77,11 @@ from PyQt5.QtGui import QKeySequence
 from labeling.ui.labeling_mode_main import Label_Main
 from training.ui.training_mode_main import Train_Main
 from advanced.ui.adv_main import Advanced_Main
+from constants.constants import FONT_DEFAULT, FONT_PRETENDARD, FONT_NANUM_SQUARE_NEO, FONT_NANUM_GOTHIC
 
 from license_term import License_Form
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_INFORMATION
 """
     description
     modified by MyoungHwan(20240605) : modification of Version Variable Information
@@ -95,6 +98,7 @@ class VLine(QtWidgets.QFrame):
 class Mid_MainWindow_Form(QtWidgets.QMainWindow):
     """라벨링 모드 최상위 메인 클래스이다. 라벨링을 위한 이미지, 라벨, 디스플레이, 펜, 그래프 UI들이 하위 클래스에서 선언된다.
     """
+    settingFontFunction_signal = QtCore.pyqtSignal(str, str, str)
     def __init__(self, Core, lang):
         super().__init__()
         self.init(Core, lang)
@@ -182,6 +186,9 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.menuLanguage = QtWidgets.QMenu(self.menubar)
         self.menuLanguage.setObjectName("menuLanguage")
 
+        self.menuSetting = QtWidgets.QMenu(self.menubar)
+        self.menuSetting.setObjectName("menuSetting")
+
         self.statusbar = QtWidgets.QStatusBar(Mid_MainWindow)
         self.statusbar.setObjectName("statusbar")
         # self.statusbar.showMessage("Ready")
@@ -206,8 +213,10 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
     def init_Ui_bar_menu(self, Mid_MainWindow):
         """상위 bar menu UI 생성을 위한 초기 선언문이다. menubar에 들어갈 항목을 추가하는 함수이다.
-                Parameters
+                @Parameters
                 1.   Mid_MainWindow(object): PyQt widget object
+                @history:
+                    1. modified by GaEun Hwang(2026.03.06): Add font settings menu in the settings menu
         """
         self.action_save = QtWidgets.QAction(Mid_MainWindow)
         self.action_save.setObjectName("action_save")
@@ -249,6 +258,48 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.menuinfo.addMenu(self.menuLanguage)
         self.menuinfo.addAction(self.action_info_about)
         self.menuinfo.addAction(self.action_info_license)
+
+        self.menuSettingFont = QtWidgets.QMenu(self.menubar)
+        self.menuSettingFont.setObjectName("actionSettingFont")
+        self.lang.set("main", "mid", "actionSettingFont", self.menuSettingFont)
+        
+        self.actionSettingFont_Default = QtWidgets.QAction(Mid_MainWindow)
+        self.actionSettingFont_Pretendard = QtWidgets.QAction(Mid_MainWindow)
+        self.actionSettingFont_NanumSquareNeo = QtWidgets.QAction(Mid_MainWindow)
+        self.actionSettingFont_NanumGothic = QtWidgets.QAction(Mid_MainWindow)
+
+        self.actionSettingFont_Default.setCheckable(True)
+        self.actionSettingFont_Pretendard.setCheckable(True)
+        self.actionSettingFont_NanumSquareNeo.setCheckable(True)
+        self.actionSettingFont_NanumGothic.setCheckable(True)
+
+        self.actionSettingFont_Default.setObjectName("actionSettingFont_Default")
+        self.actionSettingFont_Pretendard.setObjectName("actionSettingFont_Pretendard")
+        self.actionSettingFont_NanumSquareNeo.setObjectName("actionSettingFont_NanumSquareNeo")
+        self.actionSettingFont_NanumGothic.setObjectName("actionSettingFont_NanumGothic")
+
+        self.actionSettingFont_Default.setData(FONT_DEFAULT)
+        self.actionSettingFont_Pretendard.setData(FONT_PRETENDARD)
+        self.actionSettingFont_NanumSquareNeo.setData(FONT_NANUM_SQUARE_NEO)
+        self.actionSettingFont_NanumGothic.setData(FONT_NANUM_GOTHIC)
+
+        self.lang.set("main", "mid", "actionSettingFont_Default", self.actionSettingFont_Default)
+        self.lang.set("main", "mid", "actionSettingFont_Pretendard", self.actionSettingFont_Pretendard)
+        self.lang.set("main", "mid", "actionSettingFont_NanumSquareNeo", self.actionSettingFont_NanumSquareNeo)
+        self.lang.set("main", "mid", "actionSettingFont_NanumGothic", self.actionSettingFont_NanumGothic)
+
+        self.menuSetting.addMenu(self.menuSettingFont)
+        self.menuSettingFont.addAction(self.actionSettingFont_Default)
+        self.menuSettingFont.addAction(self.actionSettingFont_Pretendard)
+        self.menuSettingFont.addAction(self.actionSettingFont_NanumSquareNeo)
+        self.menuSettingFont.addAction(self.actionSettingFont_NanumGothic)
+
+        self.fontActionGroup = QtWidgets.QActionGroup(Mid_MainWindow)
+        self.fontActionGroup.setExclusive(True)
+        self.fontActionGroup.addAction(self.actionSettingFont_Default)
+        self.fontActionGroup.addAction(self.actionSettingFont_Pretendard)
+        self.fontActionGroup.addAction(self.actionSettingFont_NanumSquareNeo)
+        self.fontActionGroup.addAction(self.actionSettingFont_NanumGothic)
 
     def init_Qaction(self, Mid_MainWindow):
         """
@@ -297,6 +348,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuinfo.menuAction())
+        self.menubar.addAction(self.menuSetting.menuAction())
 
         self.toolBar.addAction(self.actionLabeling_mode)
         self.toolBar.addAction(self.actionTraining_mode)
@@ -320,7 +372,11 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.action_info_about.triggered.connect(lambda : self.info_function(mode=0))
         self.action_info_license.triggered.connect(lambda : self.info_function(mode=1))
 
-        
+        # Setting Menu list trigger
+        self.actionSettingFont_Default.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_DEFAULT))
+        self.actionSettingFont_Pretendard.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_PRETENDARD))
+        self.actionSettingFont_NanumSquareNeo.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_SQUARE_NEO))
+        self.actionSettingFont_NanumGothic.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_GOTHIC))
 
     def setup_Ui_Main(self, Mid_MainWindow):
         """초기화된 ui의 디자인을 정의한다. Widget의 크기, layout 마진정의 및 정렬을 해당함수에서 정의한다.
@@ -338,6 +394,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.lang.set("main", "mid", "menuFile", self.menuFile)
         self.lang.set("main", "mid", "menuInfo", self.menuinfo)
         self.lang.set("main", "mid", "menuLanguage", self.menuLanguage)
+        self.lang.set("main", "mid", "menuSetting", self.menuSetting)
         self.lang.set("main", "mid", "actionLabeling_mode", self.actionLabeling_mode)
         self.lang.set("main", "mid", "actionTraining_mode", self.actionTraining_mode)
 
@@ -413,23 +470,29 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
     def info_function(self, mode):
         if mode == 0:#version info
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setIcon(QtWidgets.QMessageBox.Information)
-            msgbox.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            msgbox.setWindowTitle(self.lang.get("main", "mid", "action_info_about_title"))
             """
                 description
                 modified by MyoungHwan(20240605) : modify message
+                modified by Yugyeong Hong(2026.02.24) : Refactor message box with util method and language support
             """
             message = f'<p style="font-size:15pt; color: #0078FF;">ElroiKit</p>\n \
                         <p style="font-size:10pt; ">{self.lang.get("main", "mid", "action_info_about_version_msg") + f" :{major}.{minor}.{patch}"}</p>\n \
                         <p style="font-size:10pt; ">{self.lang.get("main", "mid", "action_info_about_contact_msg") + " :elroilab@elroilab.com"}</p>' 
-            msgbox.setText(message)
-            msgbox.exec_()
+            messageBox(mode=MESSAGE_BOX_INFORMATION, title=self.lang.get("main", "mid", "action_info_about_title"), text=message, buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
+        
         elif mode == 1: # license info
             self.license_term.exec_()
         elif mode == 2:
             pass 
+    
+    def settingFontFunction(self, fontName):
+        """
+            @description: send signal with selected font
+            @author: GaEun Hwang (2026.03.10)
+        """
+        changeFontMessageTitle = self.lang.get("main", "mid", "changeFontMessageTitle")
+        changeFontMessage = self.lang.get("main", "mid", "changeFontMessage")
+        self.settingFontFunction_signal.emit(fontName, changeFontMessageTitle, changeFontMessage)
 
     def mainwindow_to_core(self, input):
         """mid mainwindow에서 core로 시그널을 보내기 위한 함수 선언문이다. 현재 라벨링 저장 경로를 전달하기 위해 사용중이다.

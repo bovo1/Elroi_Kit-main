@@ -16,6 +16,7 @@ import os
 import sys
 import multiprocessing
 import psutil
+import json
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import Qt, QTimer, QTime
 from PyQt5.QtWidgets import QApplication
@@ -24,10 +25,10 @@ from top import Top_MainWindow_Form
 from mid import Mid_MainWindow_Form
 from utils.language import Language
 from core.main_core import Main_Core
-from utils.shared import shared_root_path, license_path, temp_path, icon_path, font_path
+from utils.shared import shared_root_path, license_path, temp_path, icon_path, font_path, settings_path
 from utils.license import make_HW_status, check_lic_status
-from constants.constants import LABEL_UNSELECTED
 from constants.constants import *
+from utils.custom_ui import messageBox
 
 class main_sub_Sync(QtCore.QObject):
     """
@@ -47,6 +48,7 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
     
     def __init__(self):
         super().__init__() 
+        self.lang = Language()
         self.init()
         self.init_Ui_main(self)
         self.setup_Ui_Main(self)
@@ -64,15 +66,14 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             
         """
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-
-        self.lang = Language()
+        self.lang.apply("en")
 
         self.main_sub_Sync = main_sub_Sync()
         self.main_top_to_merge_signal = self.main_sub_Sync.main_top_to_merge_signal
         self.main_top_to_merge_signal.connect(self.resize_signal)
         self.main_merge_to_top_signal = self.main_sub_Sync.main_merge_to_top_signal
 
-        self.Main_Core = Main_Core()
+        self.Main_Core = Main_Core(lang=self.lang)
         self.Sub_Core_Sync_Labeling = self.Main_Core.Sub_Core_Sync_Labeling
         self.Sub_Core_Sync_Training = self.Main_Core.Sub_Core_Sync_Training
 
@@ -140,8 +141,9 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
         self.merge_MainWindow_gridLayout.setVerticalSpacing(0)
         self.merge_MainWindow_gridLayout.addWidget(self.top_mainwindow, 0, 0, 1, 1)
         self.merge_MainWindow_gridLayout.addWidget(self.mid_mainwindow, 1, 0, 1, 1)
-
         self.lang.apply("en")
+
+        
 
     def center(self):
         """UI 위치를 센터에 위치하도록 배치하기 위한 함수이다.
@@ -250,18 +252,13 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             @author : MyoungHwan
             @history
                 1. Modified by MyoungHwan (2024.10.23): Elroikit 종료 관련 코드수정
+                2. Modified by Yugyeong Hong(2026.02.24) : Refactor message box with util method and language support
         """
-        msg_box = QtWidgets.QMessageBox()
-        msg_box.setIcon(QtWidgets.QMessageBox.Warning)
-        msg_box.setWindowTitle(self.lang.get("main", "top", "quit_title"))
-        msg_box.setText(self.lang.get("main", "top", "quit_title_msg"))
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes| QtWidgets.QMessageBox.No)
-        msb_box_ybtn = msg_box.button(QtWidgets.QMessageBox.Yes)
-        msb_box_ybtn.setText(self.lang.get("main", "top", "quit_title_msg_yes"))
-        msb_box_nbtn = msg_box.button(QtWidgets.QMessageBox.No)
-        msb_box_nbtn.setText(self.lang.get("main", "top", "quit_title_msg_no"))
-        msg_box.exec_()
-        if msg_box.clickedButton() == msb_box_ybtn:
+        self.messageBoxResponse = messageBox(mode=MESSAGE_BOX_CONFIRMATION,
+                                             title=self.lang.get("main", "top", "quit_title"),
+                                             text=self.lang.get("main", "top", "quit_title_msg"),
+                                             buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
+        if self.messageBoxResponse == "accept":
             e.accept()
         else:
             e.ignore()
@@ -273,12 +270,19 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             if self.isEnabled()==False:
                 self.setEnabled(True)
         else:
-            result = QtWidgets.QMessageBox.critical(self, "License is not authentication", "License is not authentication!!!", 
-                    QtWidgets.QMessageBox.Cancel| QtWidgets.QMessageBox.Reset )
-            if result == QtWidgets.QMessageBox.Cancel:
-                sys.exit(0)
-            elif result == QtWidgets.QMessageBox.Reset:
+            """
+                Description
+                    modified by Yugyeong Hong(2026.02.24) : Refactor message box with util method and language support
+            """
+            title = self.lang.get("main", "top", "licenseErrorTitle")
+            text = self.lang.get("main", "top", "licenseErrorMsg")
+            buttonRetry = self.lang.get("main", "messageBox", "msgRetry")
+            buttonCancel = self.lang.get("main", "messageBox", "msgCancel")
+            messageBoxResponse = messageBox(mode=MESSAGE_BOX_WARNING, title=title, text=text, buttons={buttonRetry: "accept", buttonCancel: "reject"})
+            if messageBoxResponse == "accept":
                 self.lic_chk()
+            else:
+                sys.exit(0)
 
 def checkSameProcess(processName):
     """
@@ -297,6 +301,19 @@ def checkSameProcess(processName):
             pass
     return False
 
+def runningErrorMessage():
+    """
+        Description: Show error message box when ElroiKit is already running
+        Author: Yugyeong Hong(2026.02.24)
+    """
+    lang = Language()
+    lang.apply("en") # Set default language to English for error message box
+    messageBox(mode=MESSAGE_BOX_WARNING,
+               title=lang.get("main", "top", "WarningTitle"), 
+               text=lang.get("main", "top", "alreadyRunningMsg"), 
+               buttons={lang.get("main", "messageBox", "msgOk"): "accept"})
+
+
 if __name__ == "__main__":
     # do not remove this !!
     multiprocessing.freeze_support()
@@ -304,7 +321,7 @@ if __name__ == "__main__":
     processName = "ElroiKit.exe"
     if multiprocessing.current_process().name == "MainProcess" and checkSameProcess(processName):
         tempApp = QtWidgets.QApplication([]) # Create a temporary QApplication instance for QMessageBox with low resource usage
-        QtWidgets.QMessageBox.information(None, "Error", "ElroiKit is already running", QtWidgets.QMessageBox.Ok)
+        runningErrorMessage()
         sys.exit(0)
     
     # Limit BLAS/OMP/MKL threads to 1 to prevent memory error
@@ -334,22 +351,92 @@ if __name__ == "__main__":
     # temp directory
     if not os.path.exists(temp_path):
         os.mkdir(temp_path)
+    
+    # settings
+    defaultSettingsContent = {
+        "font": FONT_DEFAULT
+    }
+
+    if not os.path.isfile(settings_path):
+        # If the settings.json file does not exist, create it with default settings
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(defaultSettingsContent, f, indent=4)
 
     app = QtWidgets.QApplication(sys.argv)
     # Adjust application font size based on DPI scaling factor
     screen = app.primaryScreen()
     factor  = screen.devicePixelRatio() # Get DPI scaling factor
-    nunumSquareFont = "NanumSquareNeo-bRg.ttf"
-    fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, nunumSquareFont))
-    font = QtGui.QFont(QtGui.QFontDatabase.applicationFontFamilies(fontID)[0])
-    font.setHintingPreference(QtGui.QFont.HintingPreference.PreferFullHinting) # Set hinting preference to full hinting
-    font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias) # Set style strategy to prefer antialiasing
-    #
-    #font = app.font()
-    #font.setPointSizeF(font.pointSizeF() * factor) # Scale font size
+
+    # defaultFont is system default font, which is used when user select "Default" font option.
+    # It can be different by OS and user settings.
+    defaultFont = app.font()
+
+    # add fonts to application
+    fontDict = dict()
+    for fontName, fontFile in FONT_DICTIONARY.items():
+        # add font to application not require font installation on OS
+        fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, fontFile))
+        # it returns the fontID if the font is successfully added, otherwise it returns -1
+        if fontID != -1:
+            # applicationFontFamilies() returns a list of font families for the given font ID
+            # first element of the list is the primary font family name
+            fontDict[fontName] = {
+                "font": QtGui.QFont(QtGui.QFontDatabase.applicationFontFamilies(fontID)[0])
+            }
+            fontDict[fontName]["font"].setPointSizeF(fontDict[fontName]["font"].pointSizeF() * factor)
+            fontDict[fontName]["font"].setHintingPreference(QtGui.QFont.HintingPreference.PreferFullHinting)
+            fontDict[fontName]["font"].setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias)
+        else:
+            print(f"Failed to load font: {fontName}")
+
+    # load settings
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settingsJson = json.load(f)
+    except Exception as e:
+        print(f"Error loading UI settings: {e}\n Load default UI settings.")
+        settingsJson = defaultSettingsContent
+        # If there is an error loading the settings.json file, overwrite it with default settings to prevent errors
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settingsJson, f, indent=4)
+
+    savedFont = settingsJson.get("font")
+    if savedFont in fontDict:
+        font = fontDict[savedFont]["font"]
+        fontName = savedFont
+    else:
+        font = defaultFont
+        fontName = FONT_DEFAULT
+
     app.setFont(font)
     merge_MainWindow = QtWidgets.QMainWindow()
     ui = Merge_MainWindow_Form()
     icon = QIcon(os.path.join(icon_path, 'E.ico'))
     app.setWindowIcon(icon)
+
+    # Set the corresponding font menu action as checked based on the loaded font setting
+    for fontAction in ui.mid_mainwindow.menuSettingFont.actions():
+        if fontAction.data() == fontName:
+            fontAction.setChecked(True)
+
+    def changeFont(fontName, messageTitle, message):
+        """
+            @description: Change application font based on user selection from the settings menu
+            @author: GaEun Hwang (2026.03.10)
+        """
+        # Save the selected font to settings.json for persistence
+        settingsJson["font"] = fontName
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settingsJson, f, indent=4)
+        
+        # Show message box to inform user that font change will be applied after restarting the application
+        messageBox(
+            mode=MESSAGE_BOX_INFORMATION,
+            title=messageTitle,
+            text=message,
+        )
+    
+    # Connect the font change function to the font menu actions
+    ui.mid_mainwindow.settingFontFunction_signal.connect(changeFont)
+
     sys.exit(app.exec_())

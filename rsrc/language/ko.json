@@ -1,5 +1,14 @@
 {
     "main": {
+        "messageBox": {
+            "msgYes" : "네",
+            "msgNo" : "아니오",
+            "msgRetry" : "재시도",
+            "msgCancel" : "취소",
+            "msgOk" : "확인",
+            "msgWarning" : "경고",
+            "msgInformation" : "알림"
+        },
         "mid": {
             "toolBar": "도구 바",
             "action_save": "저장",
@@ -10,6 +19,7 @@
             "menuFile": "파일",
             "menuInfo": "정보",
             "menuLanguage": "언어",
+            "menuSetting": "설정",
             "action_info_about": "도움말",
             "action_info_about_title": "도움말",
             "action_info_about_version_msg": "버전",
@@ -20,24 +30,45 @@
             "action_info_version_msg": "버전",
             "action_info_license": "라이선스",
             "action_language_english": "English",
-            "action_language_korean": "한글"
+            "action_language_korean": "한글",
+            "actionSettingFont": "글꼴",
+            "actionSettingFont_Default": "기본",
+            "actionSettingFont_Pretendard": "Pretendard",
+            "actionSettingFont_NanumSquareNeo": "NanumSquareNeo",
+            "actionSettingFont_NanumGothic": "NanumGothic",
+            "changeFontMessageTitle": "알림",
+            "changeFontMessage": "변경된 글꼴은 프로그램이 재시작된 후 적용됩니다."
         },
         "top": {
             "company_name_label": "ELROILAB KIT",
             "quit_title" : "엘로이랩",
             "quit_title_msg" : "프로그램을 종료하시겠습니까?",
-            "quit_title_msg_yes" : "네",
-            "quit_title_msg_no" : "아니오"
+            "licenseErrorTitle": "라이선스 인증 오류",
+            "licenseErrorMsg": "라이선스가 인증되지 않았습니다. 라이선스를 확인하고 다시 시도해주세요.",
+            "WarningTitle": "프로그램 실행 경고",
+            "alreadyRunningMsg": "이미 실행 중인 ElroiKit 프로그램이 있습니다.\n새로 실행된 프로그램을 종료합니다."
         }
     },
     "labeling": {
+        "core": {
+            "advancedLabelAggregationInfoMessageTitle": "데이터 정보",
+            "advancedLabelAggregationInfoMessage": "레퍼런스 데이터는 압축된 데이터입니다.",
+            "labelSaveTitle": "라벨 저장",
+            "labelSavedMessage": "라벨 정보가 저장되었습니다.",
+            "labelSavedInMemoryMessage": "라벨 정보가 메모리에 저장되었습니다.",
+            "labelSavedFailedMessageTitle": "라벨 저장 실패",
+            "labelSavedFailedMessage": "라벨 정보 저장에 실패했습니다: "
+        },
         "labeling_mode_main": {
             "imagelabel_tab_label": [0, "라벨"],
             "imagelabel_tab_graph": [1, "그래프 그룹"],
             "imagelabel_tab_image": [2, "이미지"],
             "Graph_tab_widget": [0, "그래프"]
         },
-        "display_main": {},
+        "display_main": {
+            "displayImageSelectWarningMsg": "선택한 폴더에 여러 개의 이미지 파일이 존재합니다. 하나의 이미지 파일만 선택해주세요.",
+            "displayImagePathNoneMsg": "이미지 경로가 없습니다."
+        },
         "display_sub_rgb_change": {
             "display_rgb_change_visualization_group": "시각화",
             "display_rgb_change_rgb_group":"밴드 선택",
@@ -55,7 +86,8 @@
         "graphGroupMain": {
             "graphGroupAdd": ["", "그래프 그룹 추가"],
             "graphGroupClear": ["", "그래프 그룹 초기화"],
-            "convertGraphGroupView": ["", "라벨 뷰 전환"]
+            "convertGraphGroupView": ["", "라벨 뷰 전환"],
+            "graphGroupWarningMsg": "최소 한 개 이상의 그룹을 선택해주세요."
         },
         "graph_main": {
             "graph_check": ["", "픽셀 선택"],
@@ -66,7 +98,8 @@
             "graph_linedrawing": ["", "미리보기 숨김"],
             "ldaGraphRefit": ["", "LDA 재적합"],
             "graph_plot_widget": ["픽셀 스펙트럼", "세기", "파장 대역(nm)"],
-            "ldaGraphPlotWidget": ["선형 판별 분석 스펙트럼", "LD2", "LD1"]
+            "ldaGraphPlotWidget": ["선형 판별 분석 스펙트럼", "LD2", "LD1"],
+            "ldaRequirementMsg": "LDA는 최소 3개의 클래스가 필요하며 각 클래스는 2개 이상의 픽셀을 가져야 합니다."
         },
         "image_main": {
             "image_add": ["", "데이터 불러오기"],
@@ -123,12 +156,41 @@
             "pen_redo": ["", "실행 취소(Ctrl+Y)"],
             "pen_painting": ["", "채우기(Alt+P)"],
             "pen_rectangle": ["", "사각형(R)"],
-            "pen_polygon": ["", "다각형"]
+            "pen_polygon": ["", "다각형"],
+            "penSemiAutoLabeling": ["", "왼쪽 버튼: 기능 켜고 끄기 \n오른쪽 버튼: 라벨링 설정"]
         },
         "pen_sub_erase": {
             "pen_eraser_main_title": "지우개 스타일",
             "pen_eraser_static_size": "크기",
             "pen_eraser_static_pix": "픽셀"
+        },
+        "penSubSemiAutoLabeling": {
+            "penSemiAutoLabelingWarning": "경고",
+            "penEndmemberTitleLabel": "대표 스펙트럼",
+            "penEndmemberImageLoad" : "정상 데이터/대표 스펙트럼",
+            "penNormalDirectoryLoadBtn": ["", "정상 데이터 디렉토리 불러오기"],
+            "penEndmemberFileLoadBtn": ["", "대표 스펙트럼 파일 불러오기"],
+            "penEndmemberParamDLabel": "차원 수(D)",
+            "penEndmemberParamKLabel": "클러스터 수(K)",
+            "penEndmemberSavePath": "저장 경로:",
+            "penEndmemberLoadCheck": "대표 스펙트럼 파일을 확인해주세요.",
+            "penEndmemberNormalDataLoadErrorMsg": "정상 데이터 디렉토리가 올바르지 않습니다. \n 디렉토리를 확인 후 다시 시도해주세요.",
+            "penEndmemberNormalDataRequiredError": "선택한 폴더에 필요한 파일이 존재하지 않습니다.\n 다음 파일이 존재하는지 확인해 주세요:",
+            "penEndmemberFileErrorMsg": "파일을 불러오는 중 에러가 발생했습니다:\n",
+            "penEndmemberBuildErrorMsg": "대표 스펙트럼 생성 중 에러가 발생했습니다:\n",
+            "penEndmemberSavedInMemory": "대표 스펙트럼이 메모리에 저장되었습니다.",
+            "penEndmemberLoadWarning": "불러온 파일이 endmember.npy가 아닙니다. \n 파일을 확인 후 다시 시도해주세요.",
+            "penAmapBuildingError": "대표 스펙트럼 데이터와 이물 데이터를 다시 확인해주세요",
+            "penSemiAutoLabelingStrictness": "정상-이물 구분 기준",
+            "penSemiAutoLabelingTolerance": "이물 허용 범위",
+            "penSemiAutoLabelingStrictnessGuide" : "(높을수록 라벨링 기준 엄격)",
+            "penSemiAutoLabelingToleranceGuide" : "(높을수록 라벨링 기준 약화)",
+            "penEndmemberBuildBtn": ["생성", ""],
+            "penSemiAutoLabelingTitleLabel": "반자동 라벨링",
+            "penEndmemberAvailableLabel": "이미 생성된 대표 스펙트럼이 있습니다",
+            "penEndmemberDisabledLabel": "대표 스펙트럼을 저장해주세요",
+            "penEndmemberBuilding": "대표 스펙트럼 생성 중..."
+
         },
         "pen_sub_style": {
             "pen_style_main_title": "그리기 스타일",
@@ -182,9 +244,9 @@
             "CommonSettingsModelLabel": "모델 종류",
             "CommonSettingsSavePathLabel": "모델 저장 경로:",
             "CommonSettingsLoadPathLabel": "모델 불러오기:",
-            "CommonSettingsLoadRefPathLabel": "레퍼런스 데이터 불러오기:",
+            "CommonSettingsLoadRefPathLabel": "레퍼런스 불러오기:",
             "CommonSettingsModelDescriptionLabel": "모델 설명:",
-            "CommonSettingsGPUUseLabel": "CUDA 연산 사용:",
+            "CommonSettingsGPUUseLabel": "CUDA 사용:",
             "CommonSettingsGPUDeviceLabel": "장치 이름:",
             "CommonSettingsVideoLabel": "학습 진행 비디오 출력:",
             "CommonSettingsVerboseLabel": "상세한 출력:",
@@ -193,7 +255,7 @@
             "ParameterLoadPushButton": ["불러오기", "저장된 설정 불러오기"],
             "CommonSettingsSavePathPushButton": ["", "학습이 완료된 모델이 저장될 경로입니다."],
             "CommonSettingsLoadPathPushButton": ["", "학습된 모델을 불러옵니다."],
-            "CommonSettingsLoadRefPathPushButton": ["", "래퍼런스를 불러옵니다."],
+            "CommonSettingsLoadRefPathPushButton": ["", "레퍼런스를 불러옵니다."],
             "hyperparameter_reset_info_title": "하이퍼파라메터 초기화",
             "hyperparameter_reset_info_msg": "모든 하이퍼파라메터를 초기화하시겠습니까?",
             "hyperparameter_file_error_title": "파일 에러",
@@ -251,6 +313,8 @@
             "RemainTimeLabel_time_second": "초",
             "RemainTimeLabel_stop": "중단됨",
             "RemainTimeLabel_runtime_error": "에러 발생",
+            "RuntimeErrorMsg": "런타임 에러가 발생했습니다.",
+            "PathInvalidErrorMsg": "경로가 존재하지 않습니다.",
             "Stop_info_title": "작업 중지",
             "Stop_info_msg": "현재 진행 중인 작업을 중단 하시겠습니까?"
         },
@@ -262,6 +326,9 @@
             "F1PlotTitle": "F1-Score 그래프",
             "LoadButton": ["결과 불러오기", "저장된 결과를 불러옵니다."],
             "ReportButton": ["보고서", "모든 결과를 PDF로 요약합니다."],
+            "ReportMessageBoxTitle": "보고서",
+            "ReportMessageBoxText": "보고서가 아래 경로에 저장되었습니다. \n",
+            "ReportNoResultText": "보고서에 저장 할 결과가 존재하지않습니다.",
             "PredictionMapLabel": "예측맵: ",
             "ThresholdLabel": "임계 값: ",
             "ThresholdButton": ["적용", "이미지에 입력된 임계값을 적용합니다."]
@@ -274,7 +341,7 @@
             "advanced_sal_Form": [1, "이진 분류 기능"],
             "advanced_pixel_based_labeling_Form": [2, "유사도 탐색 기능"],
             "advanced_label_correction_Form": [3, "라벨 수정 기능"],
-            "advanced_label_optimization_Form": [4, "라벨 압축 기능"]
+            "advanced_label_aggregation_Form": [4, "라벨 압축 기능"]
         },
         "advanced_predictlabel_main": {
             "advanced_predictlabel_setting_groupbox": "설정",
@@ -297,7 +364,11 @@
             "advanced_predictlabel_msg_warning_already_allocated_title": "경고",
             "advanced_predictlabel_msg_warning_already_allocated_message": "해당 기능이 이미 처리중입니다.",
             "advanced_predictlabel_msg_stop_title": "알림",
-            "advanced_predictlabel_msg_stop_message": "현재 진행중인 프로세스를 중단하시겠습니까?"
+            "advanced_predictlabel_msg_stop_message": "현재 진행중인 프로세스를 중단하시겠습니까?",
+            "advancedPredictLabelingErrorTitle": "처리 오류",
+            "advancedPredictLabelingErrorMsg": "처리 중 오류가 발생했습니다: ",
+            "advancedPredictLabelThresholdErrorTitle": "임계값 오류",
+            "advancedPredictLabelThresholdErrorMsg": "유효한 임계값을 설정해주세요."
         },
         "advanced_simpleautolabel_main": {
             "advanced_simpleautolabel_setting_groupbox": "설정",
@@ -352,11 +423,11 @@
             "advanced_label_correction_setting_start_btn": ["시작", "라벨 수정 기능을 시작합니다"],
             "advanced_label_correction_setting_stop_btn": ["정지", "라벨 수정 기능을 정지합니다"],
             "advanced_label_correction_status_groupbox": "상태",
-            "ThresholdLabel": "임계값 : ",
-            "ThresholdButton": ["적용", "변경된 임계값을 적용합니다"],
-            "ReducedPixelLabel": "제거된 라벨(비율) : ",
+            "thresholdLabel": "임계값 : ",
+            "thresholdButton": ["적용", "변경된 임계값을 적용합니다"],
+            "reducedPixelLabel": "제거된 라벨(비율) : ",
             "statusTab": [0, "상태"],
-            "imageResultTab": [1, "결과 이미지"],
+            "imageResultTab": [1, "결과"],
             "advanced_label_correction_similaritymode_label": "1. 유사도 함수",
             "advanced_label_correction_similaritythreshold_label": "2. 임계값",
             "advanced_label_correction_calibration_label": "3. 보정 사용",
@@ -368,25 +439,26 @@
             "advanced_label_correction_msg_stop_title": "알림",
             "advanced_label_correction_msg_stop_message": "현재 진행중인 프로세스를 중단하시겠습니까?"
         },
-        "advanced_label_optimization_main": {
-            "advanced_label_optimization_setting_groupbox": "설정",
-            "advanced_label_optimization_datalist_groupbox": "데이터 항목",
-            "advanced_label_optimization_datalist_tableview": ["horizontal", ["인덱스", "데이터", "사용여부"]],
-            "advanced_label_optimization_datalist_global_search_btn": ["불러오기", "사용할 데이터를 불러옵니다"],
-            "advanced_label_optimization_datalist_global_clear_btn": ["초기화", "로드된 데이터 리스트를 초기화합니다"],
-            "advanced_label_optimization_setting_start_btn": ["시작", "라벨 압축 기능을 시작합니다"],
-            "advanced_label_optimization_setting_stop_btn": ["정지", "라벨 압축 기능을 정지합니다"],
-            "advanced_label_optimization_status_groupbox": "상태",
-            "advanced_label_optimization_hyperspectral_label": "1. 초분광 타입",
-            "advanced_label_optimization_rawingredient_label": "2. 저장할 원물 이름",
-            "advanced_label_optimization_savepath_label": "3. 저장 경로",
-            "advanced_label_optimization_savepath_button": ["찾기", "저장할 경로를 찾습니다"],
-            "advanced_label_optimization_calibration_label": "4. 임계값",
-            "advanced_label_optimization_calibrationratio_label": "5. 임계값 비율",
-            "advanced_label_optimization_msg_warning_already_allocated_title": "경고",
-            "advanced_label_optimization_msg_warning_already_allocated_message": "해당 기능이 이미 처리중입니다.",
-            "advanced_label_optimization_msg_stop_title": "알림",
-            "advanced_label_optimization_msg_stop_message": "현재 진행중인 프로세스를 중단하시겠습니까?"
+        "advanced_label_aggregation_main": {
+            "advanced_label_aggregation_setting_groupbox": "설정",
+            "advanced_label_aggregation_datalist_groupbox": "데이터 항목",
+            "advanced_label_aggregation_datalist_tableview": ["horizontal", ["인덱스", "데이터", "사용여부"]],
+            "advanced_label_aggregation_datalist_global_search_btn": ["불러오기", "사용할 데이터를 불러옵니다"],
+            "advanced_label_aggregation_datalist_global_clear_btn": ["초기화", "로드된 데이터 리스트를 초기화합니다"],
+            "advanced_label_aggregation_setting_start_btn": ["시작", "라벨 압축 기능을 시작합니다"],
+            "advanced_label_aggregation_setting_stop_btn": ["정지", "라벨 압축 기능을 정지합니다"],
+            "advanced_label_aggregation_status_groupbox": "상태",
+            "advanced_label_aggregation_hyperspectral_label": "1. 초분광 타입",
+            "advanced_label_aggregation_filename_label": "2. 파일 이름",
+            "advanced_label_aggregation_savepath_label": "3. 저장 경로",
+            "advanced_label_aggregation_savepath_button": ["불러오기", "저장할 경로를 찾습니다"],
+            "advanced_label_aggregation_useCommonReference_label": "4. 공통 레퍼런스 사용",
+            "advanced_label_aggregation_commonReferencePath_label": "5. 공통 레퍼런스 경로",
+            "advanced_label_aggregation_commonReferencePath_button": ["불러오기", "필요 시 공통 레퍼런스 경로를 찾습니다"],
+            "advanced_label_aggregation_msg_warning_already_allocated_title": "경고",
+            "advanced_label_aggregation_msg_warning_already_allocated_message": "해당 기능이 이미 처리중입니다.",
+            "advanced_label_aggregation_msg_stop_title": "알림",
+            "advanced_label_aggregation_msg_stop_message": "현재 진행중인 프로세스를 중단하시겠습니까?"
         }
     }
 }

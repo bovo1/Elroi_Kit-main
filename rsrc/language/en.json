@@ -1,5 +1,14 @@
 {
     "main": {
+        "messageBox": {
+            "msgYes" : "Yes",
+            "msgNo" : "No",
+            "msgRetry" : "Retry",
+            "msgCancel" : "Cancel",
+            "msgOk" : "OK",
+            "msgWarning" : "Warning",
+            "msgInformation" : "Information"
+        },
         "mid": {
             "toolBar": "Tool Bar",
             "action_save": "Save",
@@ -10,28 +19,51 @@
             "menuFile": "File",
             "menuInfo": "Info",
             "menuLanguage": "Language",
+            "menuSetting": "Setting",
             "action_info_about": "About",
             "action_info_about_title": "About",
             "action_info_about_version_msg": "Version",
             "action_info_about_contact_msg": "Contact",
             "action_info_license": "License",
             "action_language_english": "English",
-            "action_language_korean": "한글s"
+            "action_language_korean": "한글",
+            "actionSettingFont": "Font",
+            "actionSettingFont_Default": "Default",
+            "actionSettingFont_Pretendard": "Pretendard",
+            "actionSettingFont_NanumSquareNeo": "NanumSquareNeo",
+            "actionSettingFont_NanumGothic": "NanumGothic",
+            "changeFontMessageTitle": "Information",
+            "changeFontMessage": "Changed font will be applied after restarting the program."
         },
         "top": {
             "company_name_label": "ELROILAB KIT",
             "quit_title" : "ELROILAB",
             "quit_title_msg" : "Do you want to quit 'ELOILAB KIT'?",
-            "quit_title_msg_yes" : "Yes",
-            "quit_title_msg_no" : "No"
+            "licenseErrorTitle": "License Authentication Error",
+            "licenseErrorMsg": "License is not authenticated. Please check your license and try again.",
+            "WarningTitle": "Program Execution Warning",
+            "alreadyRunningMsg": "ElroiKit is already running.\nThe newly launched program will be closed."
         }
     },
     "labeling": {
+         "core": {
+            "advancedLabelAggregationInfoMessageTitle": "Information",
+            "advancedLabelAggregationInfoMessage": "Reference data is aggregation data.",
+            "labelSaveTitle": "Label Saved Message",
+            "labelSavedMessage": "Label saved !",
+            "labelSavedInMemoryMessage": "Label Saved in memory",
+            "labelSavedFailedMessageTitle": "Label Saved Failed",
+            "labelSavedFailedMessage": "Label saved failed: "
+        },
         "labeling_mode_main": {
             "imagelabel_tab_label": [0, "Label"],
             "imagelabel_tab_graph": [1, "Graph Group"],
             "imagelabel_tab_image": [2, "Image"],
             "Graph_tab_widget": [0, "Graph"]
+        },
+        "display_main": {
+            "displayImageSelectWarningMsg": "Multiple image files detected in the folder. Please ensure only one image file.",
+            "displayImagePathNoneMsg": "Image path is None."
         },
         "display_sub_rgb_change": {
             "display_rgb_change_visualization_group": "Visualization Type",
@@ -50,7 +82,8 @@
         "graphGroupMain": {
             "graphGroupAdd": ["", "Add Graph Group"],
             "graphGroupClear": ["", "Clear Graph Group"],
-            "convertGraphGroupView": ["", "Convert Label View"]
+            "convertGraphGroupView": ["", "Convert Label View"],
+            "graphGroupWarningMsg": "At least one graph group is required."
         },
         "graph_main": {
             "graph_check": ["", "Pick"],
@@ -61,7 +94,8 @@
             "graph_linedrawing": ["", "Hide Graph Preview"],
             "ldaGraphRefit": ["", "Refit LDA"],
             "graph_plot_widget": ["Pixel Spectra", "Reflectance", "Wavelength(nm)"],
-            "ldaGraphPlotWidget": ["Linear Discriminant Analysis", "LD2", "LD1"]
+            "ldaGraphPlotWidget": ["Linear Discriminant Analysis", "LD2", "LD1"],
+            "ldaRequirementMsg": "LDA requires at least 3 classes and each class must have more than 2 pixels."
         },
         "image_main": {
             "image_add": ["", "Add Image"],
@@ -119,12 +153,41 @@
             "pen_redo": ["", "Redo(Ctrl+Y)"],
             "pen_painting": ["", "Paint(Alt+P)"],
             "pen_rectangle": ["", "Rectangle(R)"],
-            "pen_opacity": ["", "Label Opacity Setting"]
+            "pen_opacity": ["", "Label Opacity Setting"],
+            "penSemiAutoLabeling": ["", "Left: Semi Auto Labeling on/off \nRight: Settings"]
         },
         "pen_sub_erase": {
             "pen_eraser_main_title": "Eraser Style",
             "pen_eraser_static_size": "Size",
             "pen_eraser_static_pix": "Pix"
+        },
+        "penSubSemiAutoLabeling": {
+            "penSemiAutoLabelingWarning": "Warning",
+            "penEndmemberTitleLabel": "Normal Endmember",
+            "penEndmemberImageLoad" : "Normal data/Endmember",
+            "penNormalDirectoryLoadBtn": ["", "Load Normal Data Directory"],
+            "penEndmemberFileLoadBtn": ["", "Load Normal Endmember File"],
+            "penEndmemberParamDLabel": "Dimension(D)",
+            "penEndmemberParamKLabel": "Clusters(K)",
+            "penEndmemberSavePath": "Saved to",
+            "penEndmemberLoadCheck" : "Please check the endmember file.",
+            "penEndmemberNormalDataLoadErrorMsg": "Please check the selected folder exists and is accessible.",
+            "penEndmemberNormalDataRequiredError": "Required files do not exist in the selected folder. \n Please check that the following files exist:",
+            "penEndmemberFileErrorMsg": "Error loading endmember file:\n",
+            "penEndmemberBuildErrorMsg": "Failed building endmember",
+            "penEndmemberSavedInMemory": "Endmember saved in memory.",
+            "penEndmemberLoadWarning": "The loaded file is not endmember.npy. \nPlease check the file and try again.",
+            "penAmapBuildingError": "An error occurred during similarity computation. \nPlease verify the endmember and input data",
+            "penSemiAutoLabelingStrictness": "Normal Gate Strictness",
+            "penSemiAutoLabelingTolerance" : "Intra Class Tolerance",
+            "penSemiAutoLabelingStrictnessGuide" : "(Increase to be more conservative)",
+            "penSemiAutoLabelingToleranceGuide"  : "(Increase to be more permissive)",
+            "penEndmemberBuildBtn": ["Build", ""],
+            "penSemiAutoLabelingTitleLabel": "Semi Auto Labeling",
+            "penEndmemberAvailableLabel": "Available Endmembers Exist",
+            "penEndmemberDisabledLabel": "Save the endmember before proceeding",
+            "penEndmemberBuilding": "Building Endmembers..."
+
         },
         "pen_sub_style": {
             "pen_style_main_title": "Drawing Style",
@@ -247,6 +310,8 @@
             "RemainTimeLabel_time_second": "s",
             "RemainTimeLabel_stop": "Process Stoped",
             "RemainTimeLabel_runtime_error": "Runtime Error",
+            "RuntimeErrorMsg": "Runtime Error Occurred",
+            "PathInvalidErrorMsg": "Path invalid error",
             "Stop_info_title": "Stop Training",
             "Stop_info_msg": "Are you sure to stop the process?"
         },
@@ -258,6 +323,9 @@
             "F1PlotTitle": "F1-Score Plot",
             "LoadButton": ["Load", "Load a results"],
             "ReportButton": ["Report", "Summarize all result in PDF file"],
+            "ReportMessageBoxTitle": "Report",
+            "ReportMessageBoxText": "Report has been saved in: \n",
+            "ReportNoResultText": "There is no results to report",
             "PredictionMapLabel": "Pred Map: ",
             "ThresholdLabel": "Threshold: ",
             "ThresholdButton": ["Apply", "Apply threshold on image"]
@@ -270,7 +338,7 @@
             "advanced_sal_Form": [1, "Simple Auto Labeling"],
             "advanced_pixel_based_labeling_Form": [2, "Pixel-Based Labeling"],
             "advanced_label_correction_Form": [3, "Label Correction"],
-            "advanced_label_optimization_Form": [4, "Label Optimization"]
+            "advanced_label_aggregation_Form": [4, "Label Aggregation"]
         },
         "advanced_predictlabel_main": {
             "advanced_predictlabel_setting_groupbox": "Setting",
@@ -293,7 +361,11 @@
             "advanced_predictlabel_msg_warning_already_allocated_title": "Warning",
             "advanced_predictlabel_msg_warning_already_allocated_message": "Function is already allocated.",
             "advanced_predictlabel_msg_stop_title": "Stop Training",
-            "advanced_predictlabel_msg_stop_message": "Are you sure to stop the process?"
+            "advanced_predictlabel_msg_stop_message": "Are you sure to stop the process?",
+            "advancedPredictLabelingErrorTitle": "Processing Error",
+            "advancedPredictLabelingErrorMsg": "An error occurred during processing: ",
+            "advancedPredictLabelThresholdErrorTitle": "Threshold Error",
+            "advancedPredictLabelThresholdErrorMsg": "Please set a valid threshold value."
         },
         "advanced_simpleautolabel_main": {
             "advanced_simpleautolabel_setting_groupbox": "Setting",
@@ -347,11 +419,11 @@
             "advanced_label_correction_setting_start_btn": ["Start", "Start the label correction process"],
             "advanced_label_correction_setting_stop_btn": ["Stop", "Stop the label correction process"],
             "advanced_label_correction_status_groupbox": "Status",
-            "ThresholdLabel": "Similarity Threshold : ",
-            "ThresholdButton": ["Apply", "Apply chaged threshold"],
-            "ReducedPixelLabel": "Reduced Pixel : ",
+            "thresholdLabel": "Similarity Threshold : ",
+            "thresholdButton": ["Apply", "Apply chaged threshold"],
+            "reducedPixelLabel": "Reduced Pixel : ",
             "statusTab": [0, "Status"],
-            "imageResultTab": [1, "Image results"],
+            "imageResultTab": [1, "Results"],
             "advanced_label_correction_similaritymode_label": "1. Similarity Mode",
             "advanced_label_correction_similaritythreshold_label": "2. Similarity Threshold",
             "advanced_label_correction_calibration_label": "3. Calibration",
@@ -363,25 +435,26 @@
             "advanced_label_correction_msg_stop_title": "Warning",
             "advanced_label_correction_msg_stop_message": "Are you sure to stop the process?"
         },
-        "advanced_label_optimization_main": {
-            "advanced_label_optimization_setting_groupbox": "Setting",
-            "advanced_label_optimization_datalist_groupbox": "Data List",
-            "advanced_label_optimization_datalist_tableview": ["horizontal", ["Index", "Data", "Use"]],
-            "advanced_label_optimization_datalist_global_search_btn":  ["Search", "Search thre data to use"],
-            "advanced_label_optimization_datalist_global_clear_btn": ["Clear", "Clear the loaded data list"],
-            "advanced_label_optimization_setting_start_btn": ["Start", "Start the label optimization process"],
-            "advanced_label_optimization_setting_stop_btn": ["Stop", "Stop the label optimization process"],
-            "advanced_label_optimization_status_groupbox": "Status",
-            "advanced_label_optimization_hyperspectral_label": "1. Hyperspectral",
-            "advanced_label_optimization_rawingredient_label": "2. Raw Ingredient",
-            "advanced_label_optimization_savepath_label": "3. Save Path",
-            "advanced_label_optimization_savepath_button": ["Path", "Select Save path"],
-            "advanced_label_optimization_calibration_label": "4. Calibration",
-            "advanced_label_optimization_calibrationratio_label": "5. Calibration Ratio",
-            "advanced_label_optimization_msg_warning_already_allocated_title": "Warning",
-            "advanced_label_optimization_msg_warning_already_allocated_message": "Function is already allocated.",
-            "advanced_label_optimization_msg_stop_title": "Warning",
-            "advanced_label_optimization_msg_stop_message": "Are you sure to stop the process?"
+        "advanced_label_aggregation_main": {
+            "advanced_label_aggregation_setting_groupbox": "Setting",
+            "advanced_label_aggregation_datalist_groupbox": "Data List",
+            "advanced_label_aggregation_datalist_tableview": ["horizontal", ["Index", "Data", "Use"]],
+            "advanced_label_aggregation_datalist_global_search_btn":  ["Search", "Search thre data to use"],
+            "advanced_label_aggregation_datalist_global_clear_btn": ["Clear", "Clear the loaded data list"],
+            "advanced_label_aggregation_setting_start_btn": ["Start", "Start the label aggregation process"],
+            "advanced_label_aggregation_setting_stop_btn": ["Stop", "Stop the label aggregation process"],
+            "advanced_label_aggregation_status_groupbox": "Status",
+            "advanced_label_aggregation_hyperspectral_label": "1. Hyperspectral",
+            "advanced_label_aggregation_filename_label": "2. File Name",
+            "advanced_label_aggregation_savepath_label": "3. Save Path",
+            "advanced_label_aggregation_savepath_button": ["Search", "Select Save path"],
+            "advanced_label_aggregation_useCommonReference_label": "4. Use Common Reference",
+            "advanced_label_aggregation_commonReferencePath_label": "5. Common Reference Path",
+            "advanced_label_aggregation_commonReferencePath_button": ["Search", "Select Common Reference path"],
+            "advanced_label_aggregation_msg_warning_already_allocated_title": "Warning",
+            "advanced_label_aggregation_msg_warning_already_allocated_message": "Function is already allocated.",
+            "advanced_label_aggregation_msg_stop_title": "Warning",
+            "advanced_label_aggregation_msg_stop_message": "Are you sure to stop the process?"
         }
     }
 }
