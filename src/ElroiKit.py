@@ -376,7 +376,7 @@ if __name__ == "__main__":
     for fontName, fontFile in FONT_DICTIONARY.items():
         # add font to application not require font installation on OS
         fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, fontFile))
-        # it returns the fontID if the font is successfully added, otherwise it returns -1.
+        # it returns the fontID if the font is successfully added, otherwise it returns -1
         if fontID != -1:
             # applicationFontFamilies() returns a list of font families for the given font ID
             # first element of the list is the primary font family name
