@@ -185,6 +185,9 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.menuLanguage = QtWidgets.QMenu(self.menubar)
         self.menuLanguage.setObjectName("menuLanguage")
 
+        self.menuSetting = QtWidgets.QMenu(self.menubar)
+        self.menuSetting.setObjectName("menuSetting")
+
         self.statusbar = QtWidgets.QStatusBar(Mid_MainWindow)
         self.statusbar.setObjectName("statusbar")
         # self.statusbar.showMessage("Ready")
