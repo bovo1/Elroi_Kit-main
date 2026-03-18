@@ -1,7 +1,8 @@
 name: Build Installer
 on:
-  schedule:
-    - cron: '30 0 22-28 * 1'
+  push:
+    branches:
+      - main
 
 env:
   ver: 1.8.0
