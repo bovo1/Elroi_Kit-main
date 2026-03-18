@@ -17,6 +17,7 @@ from labeling.stylesheet.stylesheet_graph_main import stylesheet
 from labeling.module.graph_adv_option import setSavitzkyGolay, setGaussian
 from utils.custom_item import customScatterItem
 from labeling.module.advanced_analysis import visualizerLDA
+from utils.custom_ui import messageBox
 
 if __name__ == "__main__" :
     from graph_sub import graph_sub_Form
@@ -491,6 +492,8 @@ class Graph_Form(QtWidgets.QWidget):
         """
             @description : refit lda model
             @author : GaEun Hwang (2025.09.04)
+            @history :
+                Yugyeong Hong(2026.02.25) - Refactor message box with util method and language support
         """
         select_image_number = self.image_control_dict['select_image_number']
         labelList = self.Core_DB_Labeling['image_list'][select_image_number]['label_list']
@@ -501,7 +504,10 @@ class Graph_Form(QtWidgets.QWidget):
             self.ldaGraphPlotWidget.clear()
             self.plotLDAGraph(self.ldaData, label, labelList)
         else:
-            messageBox = QtWidgets.QMessageBox.information(None, "Information", "LDA requires at least 3 classes and each class must have more than 2 pixels.")   
+            messageBox(mode=MESSAGE_BOX_INFORMATION,
+                       title=self.lang.get("main", "messageBox", "msgInformation"),
+                       text=self.lang.get("labeling", "graph_main", "ldaRequirementMsg"),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
         # uncheck button, to allow re-click
         self.ldaGraphRefitBtn.setChecked(False)
     
@@ -564,6 +570,7 @@ class Graph_Form(QtWidgets.QWidget):
             @author : GaEun Hwang (2025.09.04)
             @history :
                 2025.12.05 - modify to apply graph filter to existing graph points according to view mode by GaEun Hwang
+                Yugyeong Hong(2026.02.25) - Refactor message box with util method and language support
         """
         # only proceed if the current filter mode is different value
         if self.currentFilterMode != value:
@@ -608,7 +615,10 @@ class Graph_Form(QtWidgets.QWidget):
                     self.currentFilterMode = value
 
                 else:
-                    messageBox = QtWidgets.QMessageBox.information(None, "Information", "LDA requires at least 3 classes and each class must have more than 2 pixels.")
+                    messageBox(mode=MESSAGE_BOX_INFORMATION,
+                                title=self.lang.get("main", "messageBox", "msgInformation"),
+                                text=self.lang.get("labeling", "graph_main", "ldaRequirementMsg"),
+                                buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
                     # turn filtermode back to previous
                     self.graphComboboxSelectAdvOption.setCurrentText(self.currentFilterMode)
 

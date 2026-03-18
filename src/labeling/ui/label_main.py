@@ -5,15 +5,16 @@
 """
 import random
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QColorDialog, QInputDialog, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import QColorDialog, QInputDialog, QFileDialog
 from PyQt5.QtCore import pyqtSlot, Qt
 from constants.constants import *
+
 if __name__ == "__main__" :
     from label_sub import label_sub_Form
 else:
     from .label_sub import label_sub_Form
 
-from utils.custom_ui import custom_qtablewidget, custom_qheaderview
+from utils.custom_ui import custom_qtablewidget, custom_qheaderview, messageBox
 
 ## generate random color
 gen_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
@@ -330,6 +331,7 @@ class Labellist_Form(QtWidgets.QWidget):
                 2. name_list(str): saved label class name list
             @ History
                 1. Added by GaEun Hwang(2025.06.05): Add color_list
+                2. Modified by Yugyeong Hong (2026.02.25): Refactor message box with util method and language support
         """
         label_number_list = number_list
         label_name_list = name_list
@@ -363,15 +365,19 @@ class Labellist_Form(QtWidgets.QWidget):
 
             if override_dict:
                 feedback_msg = (f"{list(override_dict.keys())} " + (self.lang.get("labeling", "label_main", "load_prev_label_warning_msg")))
-                feedback = self.feedback_(title=self.lang.get("labeling", "label_main", "load_prev_label_warning_title"), msg=feedback_msg)
+
                 for k,v in override_dict.items():
-                    if feedback == QMessageBox.Yes:
+                    feedback =  messageBox(mode=MESSAGE_BOX_CONFIRMATION,
+                                  title=self.lang.get("labeling", "label_main", "load_prev_label_warning_title"),
+                                  text=feedback_msg,
+                                  buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject", self.lang.get("main", "messageBox", "msgCancel"): "reject"})
+                    if feedback == "accept":
                         v['name_widget'].setText(v['name'])
                         v['color_widget'].setStyleSheet(f"background-color: rgb({v['color'][0]}, {v['color'][1]}, {v['color'][2]});  border: 1px solid black;")
                         v['color_widget'].setProperty("color", v['color'])
                         self.label_name_change(v['name'], k)
                         self.label_color_select(cnt=k, obj=v['color_widget'], selected_color=v['color'])
-                    elif feedback == QMessageBox.No:
+                    elif not feedback:
                         break
                     else:
                         return
@@ -540,7 +546,7 @@ class Labellist_Form(QtWidgets.QWidget):
         """
         if self.label_control_dict['label_control_sw']:
             if ch:
-                self.core_obj_dict['status_labeling_status'].setText(f"Label: {cnt} [{self.label_obj_dict[cnt]['name']}]")
+                self.core_obj_dict['status_labeling_status'][1].setText(f'{cnt} [{self.label_obj_dict[cnt]["name"]}]')
                 self.label_control_dict['select_main_label_number'] = cnt
                 self.label_control_dict['label_control_sw'] = False
                 for label in self.label_obj_dict.keys():
@@ -569,7 +575,7 @@ class Labellist_Form(QtWidgets.QWidget):
             else:
                 #disable
                 if self.label_control_dict['select_main_label_number'] == cnt :
-                    self.core_obj_dict['status_labeling_status'].setText(f"Label: ")
+                    self.core_obj_dict['status_labeling_status'][1].setText("")
                     self.label_control_dict['old_select_label_number'] = cnt
                     self.label_control_dict['select_main_label_number'] = -1
                     self.label_control_dict['label_control_sw'] = False
@@ -729,7 +735,7 @@ class Labellist_Form(QtWidgets.QWidget):
                 tmp_dict = {}
                 tmp_dict['mode'] = 'reset'
                 self.label_to_pen_style(tmp_dict)
-                self.core_obj_dict['status_labeling_status'].setText(f"Label: {new_label} [{self.label_obj_dict[new_label]['name']}]")
+                self.core_obj_dict['status_labeling_status'][1].setText(f'{new_label} [{self.label_obj_dict[new_label]["name"]}]')
                 # When changing to a number that does not exist, label_obj_dict's order is changed.
                 # So, resorting is needed for select label using shortcut correctly.
                 self.label_list_resorting.click()
@@ -738,15 +744,26 @@ class Labellist_Form(QtWidgets.QWidget):
                 """
                     Description: Prevent a chanage to same class
                     Author : Hyeok Yoon (2025.11.06)
+                    History
+                        1. Modified by Yugyeong Hong (2026.02.25): Refactor message box with util method and language support
                 """
-                self.warning_(self.lang.get("labeling", "label_main", "load_prev_label_merge_same_warning_title"), self.lang.get("labeling", "label_main", "load_prev_label_merge_same_warning_msg"))
+                messageBox(mode=MESSAGE_BOX_WARNING,
+                           title=self.lang.get("labeling", "label_main", "load_prev_label_merge_same_warning_title"),
+                           text=self.lang.get("labeling", "label_main", "load_prev_label_merge_same_warning_msg"),
+                           buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             else:
                 """
                     Description: Label merging part, This part trying to merging new_label to old_label
                     Author : Hyeok Yoon (2025.11.06)
+                    History
+                        1. Modified by Yugyeong Hong (2026.02.25): Refactor message box with util method and language support
                 """
-                feedback = self.feedback_(self.lang.get("labeling", "label_main", "load_prev_label_merge_warning_title"), self.lang.get("labeling", "label_main", "load_prev_label_merge_warning_msg"), "yes_no")
-                if feedback == QMessageBox.Yes:
+                feedback= messageBox(mode=MESSAGE_BOX_CONFIRMATION,
+                            title=self.lang.get("labeling", "label_main", "load_prev_label_merge_warning_title"),
+                            text=self.lang.get("labeling", "label_main", "load_prev_label_merge_warning_msg"),
+                            buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
+                
+                if feedback == "accept":
                     tmp_dict = {}
                     tmp_dict['mode'] = 'modify'
                     tmp_dict['type'] = 'label'
@@ -781,7 +798,7 @@ class Labellist_Form(QtWidgets.QWidget):
                     tmp_dict = {}
                     tmp_dict['mode'] = 'reset'
                     self.label_to_pen_style(tmp_dict)
-                    self.core_obj_dict['status_labeling_status'].setText(f"Label: {new_label} [{self.label_obj_dict[new_label]['name']}]")
+                    self.core_obj_dict['status_labeling_status'][1].setText(f'{new_label} [{self.label_obj_dict[new_label]["name"]}]')
 
                     emitDict = {}
                     emitDict['mode'] = MERGE_LABEL
@@ -878,32 +895,8 @@ class Labellist_Form(QtWidgets.QWidget):
         emitDict['labelName'] = txt
         self.labelToGraphGroupSignal.emit(emitDict)
 
-        self.core_obj_dict['status_labeling_status'].setText(f"Label: {cnt} [{self.label_obj_dict[cnt]['name']}]")
+        self.core_obj_dict['status_labeling_status'][1].setText(f'{cnt} [{self.label_obj_dict[cnt]["name"]}]')
 
-    def warning_(self, title="", msg="", info=None):
-        warning_msgBox = QMessageBox()
-        warning_msgBox.setIcon(QMessageBox.Information)
-        warning_msgBox.setText(msg)
-        warning_msgBox.setWindowTitle(title)
-        warning_msgBox.setStandardButtons(QMessageBox.Ok)
-        returnValue = warning_msgBox.exec_()
-
-    """
-        Description: Add type argument to distinguish yes_no and yes_no_cancel option
-        Modified by Hyeok Yoon (2025.11.06)
-    """
-    def feedback_(self, title="", msg="", type="yes_no_cancel", info=None):
-        feedback_msgBox = QMessageBox()
-        feedback_msgBox.setIcon(QMessageBox.Question)
-        feedback_msgBox.setText(msg)
-        feedback_msgBox.setWindowTitle(title)
-        if type == "yes_no":
-            feedback_msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        elif type == "yes_no_cancel":
-            feedback_msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
-        feedback = feedback_msgBox.exec_()
-
-        return feedback
 
     def select_label_remove(self, obj, cnt):
         """
@@ -915,17 +908,24 @@ class Labellist_Form(QtWidgets.QWidget):
             @History
                 1. Improvemented by MyoungHwan (2024.12.13): label 삭제 동작 코드 수정
                 2. Modified by MyoungHwan(25.06.13): Fix scroll position moves irregularly when deleting a specific row in a CustomUI table.
+                3. Modified by Yugyeong Hong (2026.02.25): Refactor message box with util method and language support
 
         """
         delete_check = True
 
         if cnt == 0:
-            self.warning_(title=self.lang.get("labeling", "label_main", "label_index_error_title"), msg=self.lang.get("labeling", "label_main", "label_index_remove_zero_error_msg"))
+            messageBox(mode=MESSAGE_BOX_WARNING,
+                       title=self.lang.get("labeling", "label_main", "label_index_error_title"),
+                       text=self.lang.get("labeling", "label_main", "label_index_remove_zero_error_msg"),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             delete_check = False
 
         elif len(self.label_obj_dict.keys()) == 1:
             print(f"Can not remove last index!")
-            self.warning_(title=self.lang.get("labeling", "label_main", "label_index_error_title"), msg=self.lang.get("labeling", "label_main", "label_index_remove_last_error_msg"))
+            messageBox(mode=MESSAGE_BOX_WARNING,
+                       title=self.lang.get("labeling", "label_main", "label_index_error_title"),
+                       text=self.lang.get("labeling", "label_main", "label_index_remove_last_error_msg"),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             delete_check = False
 
         if delete_check:

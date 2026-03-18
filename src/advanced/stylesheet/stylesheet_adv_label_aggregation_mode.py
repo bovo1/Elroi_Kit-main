@@ -86,14 +86,4 @@ QTableView {
 QHeaderView::section {
     background-color: rgb(83, 83, 83);
 }
-
-QProgressBar {
-		color: white;
-		border: 1px solid grey;
-		border-radius: 5px;
-		text-align: center;
-}
-QProgressBar::chunk {
-		background-color: #778899;
-}
 """

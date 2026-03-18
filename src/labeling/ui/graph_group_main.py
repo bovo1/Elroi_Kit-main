@@ -7,11 +7,11 @@
 import random
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QColorDialog, QMessageBox
+from PyQt5.QtWidgets import QColorDialog
 from PyQt5.QtCore import pyqtSlot
 from constants.constants import *
 
-from utils.custom_ui import custom_qtablewidget, custom_qheaderview
+from utils.custom_ui import custom_qtablewidget, custom_qheaderview, messageBox
 
 gen_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
 iconSize = 30
@@ -479,9 +479,14 @@ class graphGroupForm(QtWidgets.QWidget):
         """
             Description: remove a graph group
             Author: GaEun Hwang (2025.12.05)
+            History:
+                Yugyeong Hong(2026.02.25): Refactor message box with util method and language support
         """
         if self.graphGroupTable.rowCount() <= 1:
-            QMessageBox.warning(None, "Warning", "At least one graph group is required.")
+            messageBox(mode=MESSAGE_BOX_WARNING,
+                       title=self.lang.get("main", "messageBox", "msgWarning"),
+                       text=self.lang.get("labeling", "graphGroupMain", "graphGroupWarningMsg"),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             return
         # calculate the row index of the item to be removed
         indexRow = self.graphGroupTable.indexAt(item.parent().pos()).row()

@@ -16,7 +16,7 @@ from constants.constants import *
 from utils.optimize_nn import Optimize
 
 from ..models.PE import PA2Ev2, PA2E_model, PA_Encoder
-from ..utils import ProgressManager, load_model, get_scores, get_images, get_threshold_from_log, cat_tensor, save_model
+from ..utils import ProgressManager, load_model, get_scores, get_images, get_threshold_from_log, cat_tensor, save_model, makeMetadata, modelMetadata
 
 """
 description: training module for anomaly detection task
@@ -36,6 +36,8 @@ class T_PA2E_DSAD():
         self.images = config["images"]
         self.current_model_load_path = config["current_model_load_path"]
         self.current_model_save_path = config["current_model_save_path"]
+        self.current_model_param_dict = config["current_model_param_dict"]
+        self.hyperparameter_shared_dict = config["hyperparameter_shared_dict"]
         self.data_path_dict = config["data_path_dict"]
         self.shared_data = config["shared_data"]
         self._printer = config["_printer"]
@@ -118,7 +120,15 @@ class T_PA2E_DSAD():
             self.pae_scheduler = None
         elif pae_scheduler_index == 1:
             self.pae_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.pae_optimizer, T_max=self.pae_epochs)
-
+        
+        """
+            @description : Collect and save model metadata for PE
+            @author : Hyunsu Kim(2026.03.03)
+        """
+        self.metadatas = {}
+        if self.is_train:
+            self.metadatas = makeMetadata(config, self.num_bands, False, self.batch_size, self.patch_size,\
+                                        self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.pae_model.modelType)
 
     def set_weight(self, n_band, n_w, w_s, s):
         """
@@ -253,7 +263,7 @@ class T_PA2E_DSAD():
 
                 loss_total.append(loss.item())
                 self.progress_manager.step()
-            
+
             mean_loss = np.mean(loss_total)
 
             self._printer.print(f"(Main {self.current_model_type}) - [Training] ", color="#33FFFF", font_weight="bold", append=True)
@@ -283,14 +293,23 @@ class T_PA2E_DSAD():
                     self._printer.print(f"Training early stop, Epoch: {epoch}/{self.pae_epochs}, Loss: {mean_loss:.5f}")
                     self.progress_manager.step(len(self.train_loader) * self.pae_epochs + (len(self.train_loader) + len(self.val_loader)) * self.pae_epochs)
                     break
-
+                
+            """
+                description : Collect and save model metadata after each epoch
+                author : Hyunsu Kim(2026.03.03)
+            """
+            self.metadatas["bestThr"] = self.bestThr
+            self.modelMetadata = modelMetadata.setMetadata(self.metadatas).to_dict()
+            self.modelMetadata["model"]["bestThreshold"] = [MI_FLOAT, str(self.metadatas["bestThr"])]
+            self.modelMetadata["model"]["classScore"] = [MI_FLOAT_ARRAY, self.metadatas["classScore"]]
+            self.modelMetadata["model"]["datasetScore"] = [MI_FLOAT_ARRAY, self.metadatas["datasetScore"]]
             # Save
             if is_best_model:
-                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"))
+                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"), self.modelMetadata)
                 is_model_saved = True
 
             if not self.save_best_model_only:
-                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}_{epoch}.el"))
+                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}_{epoch}.el"), self.modelMetadata)
                 is_model_saved = True
 
             if is_model_saved:
@@ -312,7 +331,7 @@ class T_PA2E_DSAD():
         results = []
         cm = []
 
-        best_thr = 1.0
+        self.bestThr = 1.0
         aupr = None
         # Progress
         if not val:
@@ -381,15 +400,14 @@ class T_PA2E_DSAD():
                 precision, recall, thresholds = precision_recall_curve(labels_without_ignored-2, scores_without_ignored)
                 aupr = average_precision_score(labels_without_ignored-2, scores_without_ignored)
                 f1scores = 2.*(recall*precision)/(recall+precision+self.eps)
-                best_thr = thresholds[np.argmax(f1scores)]
+                self.bestThr = thresholds[np.argmax(f1scores)]
 
             if not self.is_train:
                 if (tmp_thr := get_threshold_from_log(os.path.dirname(self.current_model_load_path))) is not None:
-                    best_thr = tmp_thr
-
+                    self.bestThr = tmp_thr
             # best threshold ad results
-            preds_ad_without_ignored = np.where(scores_without_ignored < best_thr, 2, 3) # normal < threshold <= abnormal
-            preds_ad = np.where(scores < best_thr, 2, 3)
+            preds_ad_without_ignored = np.where(scores_without_ignored < self.bestThr, 2, 3) # normal < threshold <= abnormal
+            preds_ad = np.where(scores < self.bestThr, 2, 3)
             preds = preds_ad
             labels = labels_binary
             mean_inf_time = time_list[0] if len(time_list) == 1 else np.mean(time_list[:-1]) # Handle case where only one time exists; use mean otherwise.
@@ -401,10 +419,11 @@ class T_PA2E_DSAD():
             for c in np.unique(labels_without_ignored):
                 score = scores_without_ignored[np.where(labels_without_ignored == c)]
                 self._printer.print(f"Class {str(c)}: Score N(mean={np.mean(score):.5f}, std={np.std(score):.5f})")
+                self.metadatas["classScore"][int(c)] = [float(np.mean(score)), float(np.std(score))]
             self._printer.print(f"Average Batch Inference Time: {mean_inf_time*1000:.3f} ms")
             if aupr is not None:
                 self._printer.print(f"AUPR: {aupr:.5f}")
-            self._printer.print(f"Best Threshold: {best_thr:.5f}")
+            self._printer.print(f"Best Threshold: {self.bestThr:.5f}")
             if not val:
                 for result in results:
                     self._printer.print(result)
@@ -413,7 +432,7 @@ class T_PA2E_DSAD():
                 self.shared_data.put({"label_images": label_images})
                 self.shared_data.put({"results": results})
                 self.shared_data.put({"cm": cm})
-                self.shared_data.put({"best_threshold": best_thr}) # threshold for all
+                self.shared_data.put({"bestThreshold": self.bestThr}) # threshold for all
                 self.shared_data.put({"abnormal_scores": scores})
                 self.shared_data.put({"labels": labels_binary})
                 self.shared_data.put({"position_indices": indices})
@@ -424,9 +443,9 @@ class T_PA2E_DSAD():
                 self.shared_data.put({"val_loss": mean_loss})
             # ============= Result =============
         
-        return {"aupr": aupr, "loss": mean_loss}
+        return {"aupr": aupr, "loss": mean_loss, "classScore": self.metadatas["classScore"]}
 
-    def save(self, save_path):
+    def save(self, save_path, metaData=None):
         if self.layer_fusion:
             copied_model = PA_Encoder(n_band=self.num_bands, n_w = self.num_window, w_s=self.window_size, s=self.window_stride, n_layer=self.num_layers, n_aglayer=self.num_agg_layers, rep_dim=self.rep_dims, w_rep_dim=self.window_rep_dims, dropout=self.dropout_rate, act_verbose=self.act_verbose, factor=self.factor).to(self.device)
             
@@ -441,7 +460,7 @@ class T_PA2E_DSAD():
 
             Modified by Chansik Kim 2025.09.08
         """
-        save_model(output_model, save_path, self.num_bands, self.patch_size, self.batch_size, self.device)
+        save_model(output_model, save_path, self.num_bands, self.patch_size, self.batch_size, self.device, metaData)
 
     def load(self, load_path:str) -> None:
         """
@@ -453,7 +472,7 @@ class T_PA2E_DSAD():
 
         Modified by Chansik Kim 2025.09.08
         """
-        self.pae_model = load_model(load_path, device=self.device)
+        self.pae_model, self.modelMetadata = load_model(load_path, device=self.device)
 
     def visualization(self, indices, labels, preds):
         origin_images, _, label_images = get_images(self.images, indices, labels, preds, os.path.join(self.current_model_save_path), f"{self.current_model_type.replace(' ', '_')}", list(zip(*self.data_path_dict["test"]))[0])

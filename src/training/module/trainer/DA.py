@@ -4,9 +4,7 @@
     Copyright 2024. Elroilab All rights reserved.
 """
 
-import datetime
 import os
-import json
 import torch
 import numpy as np
 import torch.nn as nn
@@ -16,7 +14,7 @@ from sklearn.metrics import precision_recall_curve, average_precision_score, acc
 from constants.constants import *
 from ..models.Module import AutoEncoder
 from ..models.DA import DSAD, CDSAD
-from ..utils import ProgressManager, load_model, get_scores, get_images, get_threshold_from_log, save_model, format_confusion_matrix
+from ..utils import ProgressManager, load_model, get_scores, get_images, save_model, format_confusion_matrix, makeMetadata, modelMetadata
 
 
 """
@@ -42,16 +40,6 @@ class T_DSAD():
         self.data_path_dict = config["data_path_dict"]
         self.shared_data = config["shared_data"]
         self._printer = config["_printer"]
-        if self.is_train:
-            self.cudaInfo = config["cudaInfo"]
-            self.metaData = config["metaData"]
-            self.labelData = config["labelData"]
-            self.elroikitVersion = config["elroikitVersion"]
-            wavelengths = [float(w) for w in self.metaData['wavelength']]
-            self.cameraInfo = 'fx17' if any(float(w) > 1000 for w in wavelengths) else 'fx10'
-            self.waverange = [min(wavelengths), max(wavelengths)]
-            self.channelsFirst = True
-            self.fx17InputHeight = 640
 
         self.current_model_type = config["hyperparameter_shared_dict"]["current_model_type"]
         current_model_settings_dict = config["hyperparameter_shared_dict"][self.current_model_type]
@@ -81,9 +69,6 @@ class T_DSAD():
         self.ae_weight_decay = current_model_settings_dict["params_dict"]["ae_trainer"]["weight_decay"]["value"]
         self.eps = torch.tensor(torch.finfo(torch.float32).eps, device=self.device)
         self.best_epoch = None
-        self.modelMetadata = {}
-        self.classScore = {}
-        self.datasetScore = []
 
         # Loader
         self.train_loader = config["loader_dict"]["train"]
@@ -94,7 +79,6 @@ class T_DSAD():
             self.dsad_model = CDSAD(self.num_bands, self.num_layers, self.rep_dims, self.patch_size, CNN=self.spatial, normalization=self.normalization, num_classes=self.num_classes).to(self.device)
         else:
             self.dsad_model = DSAD(self.num_bands, self.num_layers, self.rep_dims, self.patch_size, CNN=self.spatial, normalization=self.normalization).to(self.device)
-
         ae_optimizer_index = current_model_settings_dict["params_dict"]["ae_trainer"]["optimizer"]["value"]
         if ae_optimizer_index == 0:
             self.ae_optimizer = torch.optim.AdamW(self.ae_model.parameters(), lr=self.ae_learning_rate, weight_decay=self.ae_weight_decay)
@@ -126,6 +110,15 @@ class T_DSAD():
             self.dsad_scheduler = None
         elif scheduler_index == 1:
             self.dsad_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.dsad_optimizer, T_max=self.epochs)
+        
+        """
+            @description : Collect and save model metadata for classification task
+            @author : Hyunsu Kim(2026.03.03)
+        """
+        self.metadatas = {}
+        if self.is_train:
+            self.metadatas = makeMetadata(config, self.num_bands, self.classifier, self.batch_size, self.patch_size,\
+                                        self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.dsad_model.modelType)
 
     def train(self):
         # Progress
@@ -183,7 +176,7 @@ class T_DSAD():
         # DSAD Train
         model_score_max = 0
         self.best_epoch = 1
-        best_thr = 1.0
+        self.bestThr = 1.0
         early_stop_counter = 0
 
         # Initialize DSAD
@@ -246,25 +239,8 @@ class T_DSAD():
                 description: Collect metadata information about input/output shape and type
                 modified by ChanSik Kim 2025.12.12
             '''
-            it = iter(self.train_loader)
-            X0, _, _, _ = next(it)
-            self.input_shape = list(X0.shape)
-            if self.cameraInfo == "fx17":
-                self.input_shape[0] = self.fx17InputHeight
-            self.input_type = str(X0.dtype)
-            if self.classifier:
-                self.output_shape = [list(hypothesis.shape), list(dist.shape)]
-                if self.cameraInfo == "fx17":
-                    self.output_shape[0][0] = self.fx17InputHeight
-                    self.output_shape[1][0] = self.fx17InputHeight
-            else:
-                self.output_shape = list(dist.shape)
-                if self.cameraInfo == "fx17":
-                    self.output_shape[0] = self.fx17InputHeight
-            self.output_type = str(dist.dtype)
             
             mean_loss = float((dsad_epoch_loss_sum / dsad_epoch_cnt).item())    
-            self.datasetScore = [0.0, 0.0]
 
             self._printer.print(f"(Main {self.current_model_type}) - [Training] ", color="#33FFFF", font_weight="bold", append=True)
             self._printer.print(f"Epoch: {epoch}/{self.epochs}, Loss: {mean_loss:.5f}")
@@ -276,9 +252,9 @@ class T_DSAD():
                 self.dsad_scheduler.step()
                 
             if epoch%self.val_interval == 0:
-                test_results = self.test(True, self.val_loader, epoch, best_thr)
-                best_thr = test_results["best_thr"]
-                classScore = test_results["classScore"]
+                test_results = self.test(True, self.val_loader, epoch, self.bestThr)
+                self.bestThr = test_results["bestThr"]
+                self.metadatas["classScore"] = test_results["classScore"]
                 '''
                     description: Weighted model selection score (AD primary, CLS secondary).
                     modified by Chansik Kim 2025.12.12
@@ -304,51 +280,15 @@ class T_DSAD():
                     break
 
             # ============= MetaData =============
-            dateTime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-            torchVersion = torch.__version__.split('+')[0]
-            binning = 1 if self.cameraInfo == 'fx10' else 0
-            classInfoType = "binary" if not self.classifier else "classification"
-
-            self.modelMetadata = {
-                "inputShape" : [MI_INT_ARRAY, str(self.input_shape)], # input shape - list [512, 224]
-                "inputType" : [MI_FLOAT, str(self.input_type)], # input type - torch.float32
-                "outputShape" : [MI_INT_ARRAY_TUPLE if self.classifier else MI_INT_ARRAY, str(self.output_shape)], # output shape - list [512]
-                "outputType" : [MI_FLOAT, str(self.output_type)], # output type - torch.float32
-                "patchSize" : [MI_INT, str(self.patch_size)], # patch size - 1
-                "lineShape" : [MI_INT, str(self.batch_size)], # line shape - 512
-                "channelsFirst" : [MI_BOOL, str(self.channelsFirst)], # channels first - True
-                "model" : {
-                    "modelName" : [MI_STRING, self.current_model_type], # model name - DA
-                    "modelDescription" : [MI_STRING, self.hyperparameter_shared_dict['modelDescription']],
-                    "modelType" : [MI_STRING, self.dsad_model.modelType], # model type - AD or CLS
-                    "bestThreshold" : [MI_FLOAT, str(best_thr)],
-                    "classScore" : [MI_FLOAT_ARRAY, classScore], # mean and std score for each class
-                    "datasetScore" : [MI_FLOAT_ARRAY, self.datasetScore] # mean and std score for dataset
-                },
-                "data" : {
-                    "cameraInfo" : [MI_STRING, self.cameraInfo], # camera info - fx10 or fx17
-                    "calibrationType" : [MI_STRING, "min/max"],
-                    "calibrationRate" : [MI_FLOAT, str(self.current_model_param_dict["loader"]["calibration_rate"]["value"])], # calibration rate - 1.0
-                    "inputChannel" : [MI_INT, str(self.num_bands)], # input channel - 224
-                    "waverange" : [MI_FLOAT_ARRAY, str(self.waverange)], # waverange - [400.67, 997.99]
-                    "spectralBinning" : [MI_INT, str(binning)],
-                    "spatialBinning" : [MI_INT, str(binning)],
-                    "classInfo" : {
-                        "type" : [MI_STRING, classInfoType],
-                        "Info" : [MI_STRING_ARRAY, self.labelData] # class info - '0' : {'label_name': "플라스틱_검정", 'label_color': '[61, 238, 220]'}
-                    }
-                },
-                "metaData" : {
-                    "dateTime" : [MI_STRING, dateTime],
-                    "generatedBy" : [MI_STRING, "local"],
-                    "trainGpu" : [MI_STRING, self.cudaInfo['deviceName']], # gpu name - NVIDIA GeForce RTX 4070 Laptop GPU
-                    "useGpu" : [MI_BOOL, str(self.cudaInfo['useCuda'])], # use gpu - True
-                    "gpuDeviceNum" : [MI_INT, str(self.cudaInfo['cudaDevice'])], # gpu device number - 0
-                    "gpuCapability" : [MI_STRING, self.cudaInfo['cudaCapability']], # gpu capability - 8.9
-                    "CUDAVersion" : [MI_STRING, self.cudaInfo['CUDAVersion']], # cuda version - 12.6
-                    "torchVersion" : [MI_STRING, torchVersion], # torch version - 2.6.0
-                    "elroikitVersion" : [MI_STRING, self.elroikitVersion]}, # elroikit version - 1.7.2
-            }
+            """
+                description : Collect and save model metadata after each epoch
+                author : Hyunsu Kim(2026.03.03)
+            """
+            self.metadatas["bestThr"] = self.bestThr
+            self.modelMetadata = modelMetadata.setMetadata(self.metadatas).to_dict()
+            self.modelMetadata["model"]["bestThreshold"] = [MI_FLOAT, str(self.metadatas["bestThr"])]
+            self.modelMetadata["model"]["classScore"] = [MI_FLOAT_ARRAY, self.metadatas["classScore"]]
+            self.modelMetadata["model"]["datasetScore"] = [MI_FLOAT_ARRAY, self.metadatas["datasetScore"]]
 
             # Save
             # Only transmit metadata when it's the best model
@@ -366,7 +306,7 @@ class T_DSAD():
         self._printer.print(f"Best Epoch: {self.best_epoch}/{self.epochs}")
 
     @torch.inference_mode()
-    def test(self, val=True, data_loader=None, epoch=None, best_thr=1.0) -> dict:
+    def test(self, val=True, data_loader=None, epoch=None, bestThr=1.0) -> dict:
         indices = []
         preds_cls = []
         preds_softmax = []
@@ -385,7 +325,8 @@ class T_DSAD():
 
         mean_loss = 0.0
         aupr = 0.0
-        best_thr = best_thr
+        beta = 0.5
+        bestThr = bestThr
         trained_cls_list = None
 
         # GPU accumulation buffers
@@ -422,7 +363,7 @@ class T_DSAD():
         else:
             if self.classifier:
                 # During validation, always extract trained classes from labelData
-                trained_cls_list = extract_trained_ids(self.labelData)
+                trained_cls_list = extract_trained_ids(self.metadatas["config"]['labelData'])
 
         if self.classifier and trained_cls_list is not None and len(trained_cls_list) > 0:
             trained_cls_tensor = torch.tensor(trained_cls_list, device=self.device, dtype=torch.long)
@@ -553,12 +494,12 @@ class T_DSAD():
             f1scores = 2. * (precision * recall) / (precision + recall + self.eps.cpu().numpy())
             # precision/recall are length N+1, thresholds are length N. Use f1scores[:-1] to match thresholds.
             if thresholds.size > 0:
-                best_thr = thresholds[int(np.argmax(f1scores[:-1]))]
+                bestThr = thresholds[int(np.argmax(f1scores[:-1]))]
         # -------------------------------
         # AD predictions
         # -------------------------------
-        preds_ad_without_ignored = np.where(scores_without_ignored < best_thr, 2, 3)
-        preds_ad_with_ignored   = np.where(scores < best_thr, 2, 3)
+        preds_ad_without_ignored = np.where(scores_without_ignored < bestThr, 2, 3)
+        preds_ad_with_ignored   = np.where(scores < bestThr, 2, 3)
         # ----- Visualization label/pred separation -----
         if self.classifier:
             # Multi-class GT (0: ignore, 1/2: normal, 3+ abnormal classes)
@@ -598,10 +539,10 @@ class T_DSAD():
         for c in np.unique(labels_without_ignored):
             score = scores_without_ignored[np.where(labels_without_ignored == c)]
             self._printer.print(f"Class {str(c)}: Score N(mean={np.mean(score):.5f}, std={np.std(score):.5f})")
-            self.classScore[str(c)] = [float(np.mean(score)), float(np.std(score))]
+            self.metadatas["classScore"][str(c)] = [float(np.mean(score)), float(np.std(score))]
         if aupr:
             self._printer.print(f"[AD] AUPR: {aupr:.5f}")
-        self._printer.print(f"[AD] Best Threshold: {best_thr:.5f}")
+        self._printer.print(f"[AD] Best Threshold: {bestThr:.5f}")
 
         # ======================================================
         #  Multi-class Classification Metrics (classifier=True)
@@ -709,7 +650,7 @@ class T_DSAD():
             self.shared_data.put({"origin_images": origin_images})
             self.shared_data.put({"pred_images": pred_images})
             self.shared_data.put({"label_images": label_images})
-            self.shared_data.put({"best_threshold": best_thr})
+            self.shared_data.put({"bestThreshold": bestThr})
             self.shared_data.put({"abnormal_scores": scores})
             self.shared_data.put({"position_indices": indices})
             if self.classifier:
@@ -724,7 +665,7 @@ class T_DSAD():
             self.shared_data.put({"val_loss": mean_loss})
         # ==========================================================
 
-        return {"aupr": aupr, "loss": mean_loss, "best_thr": best_thr, "classScore": self.classScore, "cls_macro_f1": cls_macro_f1 if self.classifier else None}
+        return {"aupr": aupr, "loss": mean_loss, "bestThr": bestThr, "classScore": self.metadatas["classScore"], "cls_macro_f1": cls_macro_f1 if self.classifier else None}
 
 
     def save(self, save_path, metaData=None):

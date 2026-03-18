@@ -8,6 +8,7 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from qtwidgets import AnimatedToggle
+from PyQt5.QtWidgets import QMessageBox
 
 class custom_qtablewidget(QtWidgets.QTableWidget):
     def __init__(self, obj_name="tablewidget_obj_name" , col=3, row=4, fontsize=10):
@@ -177,7 +178,7 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
                     tmp_qlabel = QtWidgets.QLabel()
                     tmp_qlabel.setObjectName(f"{idx}_tmp_qlabel")
                     tmp_qlabel.setText(value_)
-                    tmp_qlabel.setFixedWidth(tmp_qlabel.width() + 50)
+                    tmp_qlabel.setFixedWidth(tmp_qlabel.sizeHint().width() + 50)
                     tmp_obj_dict_["label"] = tmp_qlabel
                     tmp_qlayout.addWidget(tmp_qlabel)
                 
@@ -248,3 +249,100 @@ class custom_qheaderview(QtWidgets.QHeaderView):
         if section not in self.clickable_sections:
             return  # 클릭된 column이 리스트에 존재하지 않을경우 ignore
         super().mousePressEvent(event)  # 클릭된 column이 리스트에 존재하지 않을경우 ignore
+
+class ReDockOnCloseDockWidget(QtWidgets.QDockWidget):
+    """
+        @description: 
+            When user wants to separate a dock into a floating window, give it a comfortable size and standard window buttons.
+            When user clicks X on a floating dock, re-dock instead of hiding it.
+        @author : Hyunsu Kim (2026.02.09)
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Give floating docks a comfortable default size and standard window buttons.
+        self.preferred_floating_size = QtCore.QSize(900, 700)
+        try:
+            self.topLevelChanged.connect(self.on_top_level_changed)
+        except Exception:
+            pass
+
+    def setPreferredFloatingSize(self, w: int, h: int) -> None:
+        self.preferred_floating_size = QtCore.QSize(int(w), int(h))
+
+    def on_top_level_changed(self, floating: bool) -> None:
+        if not floating:
+            return
+        try:
+            # Ensure the floating dock has normal window controls (min/max buttons).
+            self.setWindowFlags(
+                self.windowFlags()
+                | Qt.WindowMinimizeButtonHint
+                | Qt.WindowMaximizeButtonHint
+            )
+            self.show()
+            # If it's tiny, expand to a reasonable starting size.
+            if self.width() < self.preferred_floating_size.width() or self.height() < self.preferred_floating_size.height():
+                self.resize(self.preferred_floating_size)
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        event.ignore()
+        try:
+            # If floating, dock back to its last dock position.
+            if self.isFloating():
+                self.setFloating(False)
+            # If it was hidden by any means, restore.
+            mw = self.parent()
+            if isinstance(mw, QtWidgets.QMainWindow):
+                mw.restoreDockWidget(self)
+        except Exception:
+            pass
+        self.show()
+        self.raise_()
+
+
+def messageBox(mode=None, title=None, text=None, buttons=None):
+    """
+        Description:A wrapper function for QMessageBox to simplify the process of creating message boxes
+        Parameters:
+            mode: The type of message box (e.g., "information", "warning")
+            title: The title of the message box
+            text: The main text content of the message box
+            buttons: A dictionary where keys are button texts and values are their roles ("accept" or "reject")
+                    example: buttons={"Yes": "accept", "No": "reject"}
+        Returns:
+            response(str): Role of the clicked button
+        Author: Yugyeong Hong(2026.02.24)
+    """
+    box = QMessageBox()
+    box.setWindowTitle(title)
+    box.setText(text)
+
+    iconMapping = {
+        "information": QMessageBox.Information,
+        "warning": QMessageBox.Warning,
+        "confirmation": QMessageBox.Question,
+        "error" : QMessageBox.Critical
+    }
+
+    box.setIcon(iconMapping.get(mode, QMessageBox.NoIcon))
+
+    buttonRoles = {
+        "accept": QMessageBox.AcceptRole, # ex) for "OK" or "Yes"
+        "reject": QMessageBox.RejectRole, # ex) for "No" or "Cancel"
+        "ignore": QMessageBox.ActionRole
+    }
+
+    buttonRoleMap = {}
+    # Add buttons based on the provided dictionary as many as needed
+    if buttons is None:
+        box.addButton("Ok", QMessageBox.AcceptRole)
+    else:
+        for buttonText, role in buttons.items():
+            btn = box.addButton(buttonText, buttonRoles.get(role, QMessageBox.NoRole))
+            buttonRoleMap[btn] = role
+    box.exec_()
+    clicked = box.clickedButton()
+    return buttonRoleMap.get(clicked)

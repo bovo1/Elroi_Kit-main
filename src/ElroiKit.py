@@ -351,7 +351,7 @@ if __name__ == "__main__":
     # temp directory
     if not os.path.exists(temp_path):
         os.mkdir(temp_path)
-    
+
     # settings
     defaultSettingsContent = {
         "font": FONT_DEFAULT

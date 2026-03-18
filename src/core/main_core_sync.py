@@ -20,21 +20,33 @@ class Main_Core_Sync(QObject):
             1. Modified by MyoungHwan (2024.12.13): focus widget 변수 제거
             2. Modified by MyoungHwan (2025.03.14): current focus widget 변수 추가
     """
-    def __init__(self):
+    def __init__(self, lang=None):
         super().__init__()
+        self.lang = lang
 
+        self.status_image_status = QLabel()
+        self.lang.set("main", "mainCoreSync", "statusImage", self.status_image_status)
+        self.imagePathValue = QLabel()
+
+        self.status_labeling_status = QLabel()
+        self.lang.set("main", "mainCoreSync", "statusLabel", self.status_labeling_status)
+        self.labelNumValue = QLabel()
+
+        self.status_pointer_status = QLabel()
+        self.lang.set("main", "mainCoreSync", "statusCoordinate", self.status_pointer_status)
+        self.pixelCoordinateValue = QLabel()
         #function object
         self.core_obj_dict = {
             # Modified by MyoungHwan (2025.03.14): current focus widget 변수 추가
             "cur_focus_widget":None,
-            "status_image_status": QLabel("Image :   "),
-            "status_labeling_status": QLabel("Label :  "),
-            "status_pointer_status": QLabel("Current Point :  "),
+            "status_image_status": [self.status_image_status, self.imagePathValue],
+            "status_labeling_status": [self.status_labeling_status, self.labelNumValue],
+            "status_pointer_status": [self.status_pointer_status, self.pixelCoordinateValue],
             "status_training_status": QLabel("")
         }
-        self.core_obj_dict["status_image_status"].setMargin(5)
-        self.core_obj_dict["status_labeling_status"].setMargin(5)
-        self.core_obj_dict["status_pointer_status"].setMargin(5)
+        self.core_obj_dict["status_image_status"][0].setMargin(5)
+        self.core_obj_dict["status_labeling_status"][0].setMargin(5)
+        self.core_obj_dict["status_pointer_status"][0].setMargin(5)
         self.core_obj_dict["status_training_status"].setMargin(5)
 
         self.Sub_Core_Sync_Labeling = Sub_Core_Sync_Labeling(self.core_obj_dict)

@@ -2,7 +2,6 @@ import os
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QThread, QTimer, pyqtSignal
-from PyQt5.QtWidgets import QMessageBox
 
 import multiprocessing
 from multiprocessing import Queue
@@ -11,6 +10,8 @@ from training.module import training_main
 from .video_window import Video_Form
 
 from training.stylesheet.stylesheet_run_main import stylesheet
+from constants.constants import MESSAGE_BOX_WARNING, MESSAGE_BOX_CONFIRMATION
+from utils.custom_ui import messageBox
 
 class ProgressBar(QtWidgets.QProgressBar):
     def text(self):
@@ -289,7 +290,11 @@ class Run_Form(QtWidgets.QWidget):
                 self.VideoForm.play(self.is_train)
 
     def stop(self):
-        if self.training_thread.isRunning() and self.yes_no_message(self.lang.get("training", "run_main", "Stop_info_title"), self.lang.get("training", "run_main", "Stop_info_msg")):
+        response = messageBox(mode=MESSAGE_BOX_CONFIRMATION, 
+                             title=self.lang.get("training", "run_main", "Stop_info_title"),
+                             text=self.lang.get("training", "run_main", "Stop_info_msg"),
+                             buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
+        if self.training_thread.isRunning() and response == "accept":
             self.status = 3
             # stop timer
             self.timer.stop()
@@ -328,13 +333,10 @@ class Run_Form(QtWidgets.QWidget):
         self.RemainTimeLabel.setText(self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"))
         self.Sync.core_obj_dict["status_training_status"].setText(self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"))
 
-        msgbox = QMessageBox()
-        msgbox.setIcon(QMessageBox.Warning)
-        msgbox.setStandardButtons(QMessageBox.Ok)
-        msgbox.setWindowTitle("Runtime Error")
-        msgbox.setText(msg)
-        msgbox.exec_()
-
+        messageBox(mode=MESSAGE_BOX_WARNING,
+                   title=self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"),
+                   text=self.lang.get("training", "run_main", "RuntimeErrorMsg"),
+                   buttons={self.lang.get("main", "messageBox", "msgOk"):"accept"})
     def end(self):
         self.status = 2
         # stop timer
@@ -380,12 +382,10 @@ class Run_Form(QtWidgets.QWidget):
             message_list.append("Load path is invalid")
 
         if message_list != []:
-            msgbox = QMessageBox()
-            msgbox.setIcon(QMessageBox.Information)
-            msgbox.setStandardButtons(QMessageBox.Ok)
-            msgbox.setWindowTitle("Path invalid error")
-            msgbox.setText("\n".join(message_list))
-            msgbox.exec_()
+            messageBox(mode=MESSAGE_BOX_WARNING,
+                       title= self.lang.get("main", "run_main", "PathInvalidErrorMsg"),
+                       text="\n".join(message_list),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"):"accept"})
             return False
         return True
 
@@ -431,19 +431,6 @@ class Run_Form(QtWidgets.QWidget):
             self.remain_time -= 1
             if self.remain_time <= 0:
                 self.remain_time = 0
-    
-    def yes_no_message(self, title, message):
-        msgbox = QMessageBox()
-        msgbox.setIcon(QMessageBox.Warning)
-        msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msgbox.setDefaultButton(QMessageBox.No)
-        msgbox.setWindowTitle(title)
-        msgbox.setText(message)
-        answer = msgbox.exec_()
-        if answer == QMessageBox.Yes:
-            return True
-        else:
-            return False
 
     def close(self):
         if self.training_thread.isRunning():

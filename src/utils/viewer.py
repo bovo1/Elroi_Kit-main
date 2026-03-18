@@ -5,6 +5,7 @@
 """
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from constants.constants import VIEWER_ORIGINAL_WIDTH
 
 class Display_viewer(QtWidgets.QGraphicsView):
     viewer_signal = QtCore.pyqtSignal(dict)
@@ -28,6 +29,7 @@ class Display_viewer(QtWidgets.QGraphicsView):
         self._scene.addItem(self.preview_rect)
         self.start_pos = None
         self.rotation_count = 0
+        self.originViewRectWidth = VIEWER_ORIGINAL_WIDTH # default value for fitting view when initializing viewer
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -51,8 +53,12 @@ class Display_viewer(QtWidgets.QGraphicsView):
             self._scale(1 / unity.width(), 1 / unity.height())
             viewrect = self.viewport().rect()
             scenerect = self.transform().mapRect(rect)
-            factor = min(viewrect.width() / scenerect.width(),
-                            viewrect.height() / scenerect.height())
+            if viewrect.width() == 0:
+                factor = min(self.originViewRectWidth / scenerect.width(),
+                        viewrect.height() / scenerect.height())
+            else:
+                factor = min(viewrect.width() / scenerect.width(),
+                        viewrect.height() / scenerect.height())
             self._scale(factor, factor)
             self._zoom = 0
 

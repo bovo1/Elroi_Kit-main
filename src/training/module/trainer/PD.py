@@ -8,7 +8,7 @@ from constants.constants import *
 
 from ..models.PD import PLSDA
 
-from ..utils import ProgressManager, save_model, load_model, get_scores, get_images
+from ..utils import ProgressManager, makeMetadata, modelMetadata, save_model, load_model, get_scores, get_images
 
 class T_PLSDA():
     def __init__(self, config):
@@ -23,7 +23,9 @@ class T_PLSDA():
         self.data_path_dict = config["data_path_dict"]
         self.shared_data = config["shared_data"]
         self._printer = config["_printer"]
-
+        self.config = config
+        self.current_model_param_dict = config["current_model_param_dict"]
+        self.hyperparameter_shared_dict = config["hyperparameter_shared_dict"]
         self.current_model_type = config["hyperparameter_shared_dict"]["current_model_type"]
         current_model_settings_dict = config["hyperparameter_shared_dict"][self.current_model_type]
 
@@ -31,8 +33,8 @@ class T_PLSDA():
         self.max_iter = int(current_model_settings_dict["params_dict"]["main_trainer"]["max_iter"]["value"])
         self.num_lv = current_model_settings_dict["params_dict"]["main_trainer"]["num_lv"]["value"]
         self.thr = current_model_settings_dict["params_dict"]["main_trainer"]["thr"]["value"]
-
-        self.normalLabel = 2
+        self.batch_size = int(current_model_settings_dict["params_dict"]["loader"]["batch_size"]["value"])
+        self.patch_size = int(current_model_settings_dict["params_dict"]["loader"]["patch_size"]["value"])
 
         # Train Loader
         if self.is_train:
@@ -63,12 +65,26 @@ class T_PLSDA():
         # Build a Model
         self.model = PLSDA(self.num_bands, self.num_classes, max_iter=self.max_iter, num_lv=self.num_lv, progress_manager=self.progress_manager, device=self.device)
         self._printer.print(f"({self.current_model_type}) parameters -> max_iter: {self.max_iter}, num_lv: {self.num_lv}")
+        
+        """
+            @description : Collect and save model metadata for PD
+            @author : Hyunsu Kim(2026.03.03)
+        """
+        self.metadatas = {}
+        if self.is_train:
+            self.metadatas = makeMetadata(config, self.num_bands, not self.binary, self.batch_size, self.patch_size,\
+                                        self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.model.modelType)
 
     def train(self):
+        """
+            description : Collect and save model metadata after each epoch
+            author : Hyunsu Kim(2026.03.03)
+        """
         self._printer.print(f"({self.current_model_type}) - [Training]...", color="#33FFFF", font_weight="bold")
         self.model.fit(self.train_data, self.dummy_values)
-        # Save model after training completion
-        self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"))
+
+        self.modelMetadata = modelMetadata.setMetadata(self.metadatas).to_dict()
+        self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"), self.modelMetadata)
     
     def test(self, val:bool=False, data_loader=None):
         self._printer.print(f"({self.current_model_type}) - [Testing]...", color="#CE33FF", font_weight="bold")
@@ -98,7 +114,6 @@ class T_PLSDA():
 
         preds = np.array(preds)
         labels = np.array(labels)
-        labels[labels == 0] += self.normalLabel
         # ============= Result =============
         results, cm = get_scores(preds, labels)
         for result in results:
@@ -115,7 +130,7 @@ class T_PLSDA():
         self.progress_manager.step() # last progress step
         return None
 
-    def save(self, save_path):
+    def save(self, save_path, modelMetadata=None):
         patch_size = 1
         batch_size = 512
         """
@@ -126,7 +141,7 @@ class T_PLSDA():
             History:
                 1. Save label mapping file along with the model Modified by Hyunsu Kim 2025.09.10
         """
-        save_model(self.model, save_path, self.num_bands, patch_size, batch_size, self.device)
+        save_model(self.model, save_path, self.num_bands, patch_size, batch_size, self.device, modelMetadata)
         np.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}_labelMapping.npy"), self.labelMapping)
         self._printer.print(f"Model has been saved in {self.current_model_save_path}")
 
@@ -143,7 +158,7 @@ class T_PLSDA():
         History:
             1. Load label mapping file along with the model Modified by Hyunsu Kim 2025.09.10
         """
-        self.model = load_model(load_path, device=self.device)
+        self.model, self.modelMetadata = load_model(load_path, device=self.device)
         self.labelMapping = np.load(os.path.join("\\".join(load_path.split("\\")[:-1]), f"{self.current_model_type}_labelMapping.npy"))
 
     def visualization(self, indices, labels, preds):

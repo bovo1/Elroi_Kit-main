@@ -7,11 +7,12 @@ import numpy as np
 import pickle
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
+from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtCore import QTimer#, pyqtSlot
 from qtwidgets import AnimatedToggle
 from sklearn.metrics import precision_score, recall_score, f1_score
-
+from constants.constants import MESSAGE_BOX_INFORMATION
+from utils.custom_ui import messageBox
 # from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 # from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 # import matplotlib.pyplot as plt
@@ -441,11 +442,6 @@ class Result_Form(QtWidgets.QWidget):
         return f"Prec: {precision:.3f}, Rec: {recall:.3f}, F1: {F1score:.3f}"
 
     def report_result(self):
-        msgbox = QMessageBox()
-        msgbox.setIcon(QMessageBox.Information)
-        msgbox.setStandardButtons(QMessageBox.Ok)
-        msgbox.setWindowTitle("Report")
-
         if (len(self.origin_images) != 0):
             # report resource directory
             temp_path = os.path.join(self.save_path, "temp")
@@ -522,15 +518,20 @@ class Result_Form(QtWidgets.QWidget):
             pdf.output(os.path.join(self.save_path, "report.pdf"), "F")
 
             shutil.rmtree(temp_path)
-            message = f"Report has been saved in {self.save_path}"
-            msgbox.setText(message)
-            msgbox_widget = QtWidgets.QWidget()
-            msgbox_widget.setFixedWidth(int(8 * len(message)))
-            msgbox.layout().addWidget(msgbox_widget, 3, 0, 1, 3)
-            msgbox.exec_()
+            message = f'{self.lang.get("training", "result_main", "ReportMessageBoxText")}{self.save_path}'
+            print(message)
+            messageBox(mode=MESSAGE_BOX_INFORMATION,
+                       title=self.lang.get("training", "result_main", "ReportMessageBoxTitle"),
+                       text=message,
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"}
+                       )
         else:
-            msgbox.setText("There is no results to report")
-            msgbox.exec_()
+            message = self.lang.get("training", "result_main", "ReportNoResultText")
+            messageBox(mode=MESSAGE_BOX_INFORMATION,
+                       title=self.lang.get("training", "result_main", "ReportMessageBoxTitle"),
+                       text=message,
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"}
+                       )
 
     def save_result(self, save_path):
         with open(os.path.join(save_path, "result.re"), "wb") as f:

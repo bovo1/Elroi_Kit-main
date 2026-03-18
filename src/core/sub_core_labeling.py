@@ -6,7 +6,6 @@
 
 import json
 from PyQt5.QtCore import QObject, pyqtSlot
-from PyQt5.QtWidgets import QMessageBox
 
 import os
 import cv2
@@ -16,7 +15,8 @@ import spectral
 import time
 
 from .db_labeling import DB_Control_Labeling
-from constants.constants import PEN_MODE_IMAGE
+from constants.constants import MESSAGE_BOX_WARNING, PEN_MODE_IMAGE, AGGREGATION_DATA, MESSAGE_BOX_INFORMATION
+from utils.custom_ui import messageBox
 
 from utils.shared import temp_path
 
@@ -24,18 +24,20 @@ class Sub_Core_Labeling(QObject):
     """각 기등들 간 상태를 주고받기 위해 호출하는 클래스. Core DB를 통해 데이터 정보에 대해 저장할 수 있다.
     """
     # def __init__(self, Sub_Core_Sync_Labeling = None):
-    def __init__(self, Sync = None):
+    def __init__(self, Sync = None, lang=None):
         super().__init__()
-        self.init(Sync)
+        self.init(Sync, lang)
         self.init_DB()
         self.init_DBCTL()
         self.init_Sync()
 
-    def init(self, Sync):
+    def init(self, Sync, lang):
         self.Sync = Sync # self.Main_Core_Sync
+        self.lang=lang
         self.Sub_Core_Sync_Labeling = self.Sync.Sub_Core_Sync_Labeling
         self.image_control_dict = self.Sub_Core_Sync_Labeling.image_control_dict
         self.label_obj_dict = self.Sub_Core_Sync_Labeling.label_obj_dict
+        self.semiAutoLabelingDict = self.Sub_Core_Sync_Labeling.semiAutoLabelingDict
         self.Core_DB_Labeling = self.Sub_Core_Sync_Labeling.Core_DB_Labeling
 
     def init_DB(self):
@@ -82,6 +84,8 @@ class Sub_Core_Labeling(QObject):
         self.image_to_graph_signal.connect(self.send_image_to_graph)
         self.image_to_graph_sub_signal = self.Sub_Core_Sync_Labeling.image_to_graph_sub_signal
         self.image_to_graph_sub_signal.connect(self.send_image_to_graph_sub)
+        self.imageToSemiAutoLabelingSignal = self.Sub_Core_Sync_Labeling.imageToSemiAutoLabelingSignal
+        self.imageToSemiAutoLabelingSignal.connect(self.sendImageToSemiAutoLabeling)
 
         #image detail
         self.image_sub_to_core_signal = self.Sub_Core_Sync_Labeling.image_sub_to_core_signal
@@ -153,6 +157,8 @@ class Sub_Core_Labeling(QObject):
         self.coreToGraphGroupSignal = self.Sub_Core_Sync_Labeling.coreToGraphGroupSignal
         self.core_to_graph_signal = self.Sub_Core_Sync_Labeling.core_to_graph_signal
         self.core_to_graph_sub_signal = self.Sub_Core_Sync_Labeling.core_to_graph_sub_signal
+        self.coreToSemiAutoLabelingSignal = self.Sub_Core_Sync_Labeling.coreToSemiAutoLabelingSignal
+        
 
         #graph
         self.graphGroupToCoreSignal = self.Sub_Core_Sync_Labeling.graphGroupToCoreSignal
@@ -175,6 +181,8 @@ class Sub_Core_Labeling(QObject):
         self.pen_to_core_signal.connect(self.recv_pen_to_core)
         self.pen_to_display_signal = self.Sub_Core_Sync_Labeling.pen_to_display_signal
         self.pen_to_display_signal.connect(self.send_pen_to_display)
+        self.penToSemiAutoLabelingSignal = self.Sub_Core_Sync_Labeling.penToSemiAutoLabelingSignal
+        self.penToSemiAutoLabelingSignal.connect(self.sendPenToSemiAutoLabeling)
 
         #pen style
         self.pen_style_to_core_signal = self.Sub_Core_Sync_Labeling.pen_style_to_core_signal
@@ -187,6 +195,7 @@ class Sub_Core_Labeling(QObject):
         self.pen_eraser_to_core_signal.connect(self.recv_pen_eraser_to_core)
         self.pen_eraser_to_display_signal = self.Sub_Core_Sync_Labeling.pen_eraser_to_display_signal
         self.pen_eraser_to_display_signal.connect(self.send_pen_eraser_to_display)
+
 
         """
             Description: label opacity 기능 위치 변경에 따른 signal 추가
@@ -250,6 +259,12 @@ class Sub_Core_Labeling(QObject):
     @pyqtSlot(dict)
     def recv_pen_eraser_to_core(self, input):
         """pen eraser로부터 signal을 받기 위한 함수이다.
+        """
+        self.query_db_labeling(input)
+
+    @pyqtSlot(dict)
+    def recv_pen_semi_auto_labeling_to_core(self, input):
+        """Receive signal from pen_sub_semi_auto_labeling
         """
         self.query_db_labeling(input)
 
@@ -403,6 +418,11 @@ class Sub_Core_Labeling(QObject):
             output['mode_detail'] = 0
 
         self.send_core_to_graph_sub(output)
+
+    @pyqtSlot(dict)
+    def sendImageToSemiAutoLabeling(self, output):
+        output['data'] = self.Core_DB_Labeling['image_list'][self.image_control_dict['select_image_number']]['image_info']['image_raw']
+        self.sendCoreToSemiAutoLabeling(output)
 
     @pyqtSlot(dict)
     def send_image_sub_to_label(self, output):
@@ -570,6 +590,14 @@ class Sub_Core_Labeling(QObject):
         self.send_core_to_display(input)
 
     @pyqtSlot(dict)
+    def sendPenToSemiAutoLabeling(self, output):
+        self.sendCoreToSemiAutoLabeling(output)
+
+    @pyqtSlot(dict)
+    def sendPenSemiAutoLabelingToPen(self,output):
+        self.sendCoreToPen(output)
+
+    @pyqtSlot(dict)
     def send_pen_style_to_display(self, output):
         input = {}
         input['from'] = 'pen_sub'
@@ -584,6 +612,12 @@ class Sub_Core_Labeling(QObject):
     def send_pen_eraser_to_display(self, output):
         output['from'] = 'pen_sub'
         output['type'] = 'eraser'
+        self.send_core_to_display(output)
+    
+    @pyqtSlot(dict)
+    def send_pen_semi_auto_labeling_to_display(self, output):
+        output['from'] = 'pen_sub'
+        output['type'] = 'semi_auto_labeling'
         self.send_core_to_display(output)
 
     @pyqtSlot(dict)
@@ -677,7 +711,15 @@ class Sub_Core_Labeling(QObject):
         """core에서 label sub로 signal에 대한 요청 결과를 보내기 위한 함수이다.
         """
         self.core_to_label_sub_signal.emit(input)
-        
+    
+    def sendCoreToSemiAutoLabeling(self, input):
+        """emit signal from core to semi auto labeling.
+        """
+        self.coreToSemiAutoLabelingSignal.emit(input)
+
+    def sendCoreToPen(self,input):
+        self.core_to_pen_signal.emit(input)
+
     def send_core_to_display(self, input):
         """core에서 display로 signal에 대한 요청 결과를 보내기 위한 함수이다.
         """
@@ -725,6 +767,10 @@ class Sub_Core_Labeling(QObject):
                 4. shape(list) : mode가 2일 경우 image shape의 크기를 명시해야 함 (width, height, band)
             @History
                 1. Improvemented by MyoungHwan(2024.12.13): image 리스트 업데이트 코드 추가
+                2. GaEun Hwang(26.02.03):
+                    - Add branch for data generated by label aggregation
+                3. Yugyeong Hong(26.02.24):
+                    - Refactor message box with util method and language support
         """
         full_path = path
 
@@ -741,10 +787,12 @@ class Sub_Core_Labeling(QObject):
                 hsi_data_name = "data.raw"
                 only_file_name = os.path.splitext(hsi_data_name)[0]
                 spectral_data = spectral.io.envi.open(full_path + "/" + only_file_name + ".hdr", full_path + "/" + only_file_name + ".raw")
-                hsi_data_origin = spectral_data.asarray()
-                hsi_data = spectral_data.asarray()
+                hsi_data_origin = spectral_data.asarray().copy()
+                hsi_data = spectral_data.asarray().copy()
                 image_width, image_height, _ = hsi_data.shape
                 hsi_metadata = spectral_data.metadata
+                refFiles = ["DARKREF.hdr", "DARKREF.raw", "WHITEREF.hdr", "WHITEREF.raw"]
+
                 if 'lines' in hsi_metadata:
                     image_width = int(hsi_metadata['lines'])
                 if 'samples' in hsi_metadata:
@@ -753,16 +801,26 @@ class Sub_Core_Labeling(QObject):
                     image_hsi_bands = int(hsi_metadata['bands'])
 
                 # calibration
-                if 'DARKREF.hdr' in os.listdir(full_path) and 'DARKREF.raw' in os.listdir(full_path):
-                    dark_spcetral_data = spectral.io.envi.open(full_path + "/" + 'DARKREF.hdr', full_path + "/" + 'DARKREF.raw')
-                    dark_data = dark_spcetral_data.asarray().mean(0)
-  
-                    if 'WHITEREF.hdr' in os.listdir(full_path) and 'WHITEREF.raw' in os.listdir(full_path):
-                        white_spcetral_data = spectral.io.envi.open(full_path + "/" + 'WHITEREF.hdr', full_path + "/" + 'WHITEREF.raw')
-                        white_data = white_spcetral_data.asarray().mean(0)
-                
-                        if len(dark_data) > 0 and len(white_data) > 0:
-                            hsi_data = np.clip(((hsi_data_origin-dark_data)/(white_data-dark_data)), 0, 1) * 4095.0
+                if all(os.path.exists(os.path.join(full_path, f)) for f in refFiles):
+                    dark_spectral_data = spectral.io.envi.open(full_path + "/" + 'DARKREF.hdr', full_path + "/" + 'DARKREF.raw')
+                    dark_data = dark_spectral_data.asarray()
+                    white_spectral_data = spectral.io.envi.open(full_path + "/" + 'WHITEREF.hdr', full_path + "/" + 'WHITEREF.raw')
+                    white_data = white_spectral_data.asarray()
+                    # Add branch for data generated by label aggregation
+                    if spectral_data.metadata.get("information") != AGGREGATION_DATA:
+                        if dark_spectral_data.metadata.get("information") != AGGREGATION_DATA and white_spectral_data.metadata.get("information") != AGGREGATION_DATA:
+                            dark_data = dark_spectral_data.asarray().mean(0)
+                            white_data = white_spectral_data.asarray().mean(0)
+                        else:
+                            # notify user that reference data is aggregation data
+                            message = f"{full_path}\n + {self.lang.get('labeling', 'core', 'advancedLabelAggregationInfoMessage')}"
+                            messageBox(mode = MESSAGE_BOX_INFORMATION, 
+                                       title = self.lang.get("labeling", "core", "advancedLabelAggregationInfoMessageTitle"), 
+                                       text = message,
+                                       buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
+      
+                    if len(dark_data) > 0 and len(white_data) > 0:
+                        hsi_data = np.clip(((hsi_data_origin-dark_data)/(white_data-dark_data)), 0, 1) * 4095.0
             
             except:
                 print(f"raw load error, Full path : {full_path}")
@@ -863,6 +921,7 @@ class Sub_Core_Labeling(QObject):
             @History
                 1. Modified by MyoungHwan(2024.02.15): Add MessageBox and Exception when labeled data saved.
                 2. Modified by MyoungHwan(2024.03.14): Add Exception(ValueError) and delete signal code
+                3. Modified by Yugyeong(2026.02.24): Refactor message box with util method and language support
         """
         mode = input['mode']
         select_image_number = self.image_control_dict['select_image_number']
@@ -896,13 +955,21 @@ class Sub_Core_Labeling(QObject):
             
             with open(folder_path+'/data.json', 'w', encoding='utf-8') as fp:
                 json.dump(tmp_dict, fp,indent="\t", ensure_ascii=False)
-            self.info_msg(mode=0, title="Label Saved Message.", msg=f"Label Saved !")
+            
+            messageBox(mode = MESSAGE_BOX_INFORMATION, 
+                        title = self.lang.get("labeling", "core", "labelSaveTitle"),
+                        text = self.lang.get("labeling", "core", "labelSavedMessage"),
+                        buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
         # Modified by MyoungHwan(2024.03.14): Add Exception(ValueError) and delete signal code
         except ValueError as ve:
             print(ve)
         except Exception as e:
             print(e)
-            self.info_msg(mode=1, title="Label Saved Message.", msg=f"Label saved failed: {e}.")
+            messageBox(mode = MESSAGE_BOX_WARNING,
+                        title = self.lang.get("labeling", "core", "labelSavedFailedMessageTitle"),
+                        text = f'{self.lang.get("labeling", "core", "labelSavedFailedMessage")} {e}',
+                        buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
+            
 
     def save_class_data(self):
         """
@@ -922,26 +989,9 @@ class Sub_Core_Labeling(QObject):
             tmp_dict['label_number_list'].append(label_number)
             tmp_dict['label_name_list'].append(self.label_obj_dict[label_number]['name'])
             tmp_dict['label_color_list'].append(self.label_obj_dict[label_number]['color'])
-
-        self.info_msg(mode=0, title="Label Saved Message.", msg=f"Label Saved in memory.")
+        
+        messageBox(mode = MESSAGE_BOX_INFORMATION, 
+                    title = self.lang.get("labeling", "core", "labelSaveTitle"),
+                    text = self.lang.get("labeling", "core", "labelSavedInMemoryMessage"),
+                    buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
         self.send_core_to_label(tmp_dict)
-
-    def info_msg(self, mode, title="", msg="msg"):
-        """
-            Description: Showing information Message
-            parameters
-                1. mode
-                    - 0: information msg
-                    - 1: Warning msg
-
-            Implemented by MyoungHwan (20240215)
-        """ 
-        msgBox = QMessageBox()
-        msgBox.setStandardButtons(QMessageBox.Ok)
-        msgBox.setWindowTitle(title)
-        if mode == 0:
-            msgBox.setIcon(QMessageBox.Information)
-        elif mode == 1:
-            msgBox.setIcon(QMessageBox.Warning)
-        msgBox.setText(msg)
-        msgBox.exec_()

@@ -33,6 +33,7 @@ class DDCNN(nn.Module):
         self.num_bands = num_bands
         self.num_classes = num_classes
         self.dropout=dropout
+        self.modelType = "CLS"
     
         self.int_c = 16 
         self.g = 32

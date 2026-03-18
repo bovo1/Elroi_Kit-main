@@ -298,8 +298,10 @@ class DB_Control_Labeling(object):
                     pass
                 elif output_type_detail == 'polygon':
                     pass
+                elif output_type_detail == 'semiAutoLabeling':
+                    pass
 
-        # delete mode, All or Select one delete
+        # delete mode, All or Select one deletee
         elif output_cmd == 'delete':
             output_type = output['type']
             if output_type == 'image':

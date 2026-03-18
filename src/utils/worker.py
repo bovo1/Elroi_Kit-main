@@ -7,7 +7,7 @@
 import sys
 import numpy as np
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QThread, pyqtSlot, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSlot, pyqtSignal, QObject
 import inspect
 
 def testfunc(data, label, label_num=0, c_num=2):
@@ -66,6 +66,20 @@ class Threading_Worker(QThread):
             print("Threading Complete")
         else:
             print(f"Threading Target id: {id(self.Func)} is not complete")
+    
+    def stop(self):
+        """
+            @description: Stop Threading Worker
+            @author : GaEun Hwang (26.02.10)
+        """
+        # check thread status
+        if self.status == False:
+            self.terminate()
+            # use wait to ensure thread has completely stopped
+            self.wait()
+            self.reset_()
+            print("Threading Stopped")
+            self.output.emit(self.output_dict)
 
 class AutoLabel_Worker(QThread):
     """
@@ -115,7 +129,6 @@ class AutoLabel_Worker(QThread):
             self.quit()
         else:
             print(f"Threading Target id: {id(self.Func)} is not complete")
-
 
 class test_MyWindow(QtWidgets.QMainWindow):
     def __init__(self):

@@ -6,14 +6,15 @@
 
 import os
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QAbstractItemView, QFileDialog, QListView, QTreeView, QWidget, QMessageBox
+from PyQt5.QtWidgets import QAbstractItemView, QFileDialog, QListView, QTreeView, QWidget
+from constants.constants import MESSAGE_BOX_WARNING
 from labeling.stylesheet.stylesheet_image_main import stylesheet
 if __name__ == "__main__" :
     from image_sub_detail import Image_detail_Form
 else:
     from .image_sub_detail import Image_detail_Form
 
-from utils.custom_ui import custom_qtablewidget
+from utils.custom_ui import custom_qtablewidget, messageBox
 from labeling.stylesheet.stylesheet_image_main import stylesheet
 
 class Image_Form(QWidget):
@@ -50,6 +51,7 @@ class Image_Form(QWidget):
         self.imageToGraphGroupSignal = self.Sync.imageToGraphGroupSignal
         self.image_to_graph_signal  = self.Sync.image_to_graph_signal
         self.image_to_graph_sub_signal = self.Sync.image_to_graph_sub_signal
+        self.imageToSemiAutoLabelingSignal = self.Sync.imageToSemiAutoLabelingSignal
 
         self.core_obj_dict = self.Sync.core_obj_dict
         self.image_obj_dict = self.Sync.image_obj_dict
@@ -165,6 +167,7 @@ class Image_Form(QWidget):
             @History
                 1. Improvemented by MyoungHwan(2024.11.07): Image Main UI 코드 개선 (미사용 object 제거 및 수정)
                 2. Improvemented by MyoungHwan(2024.12.13): image 리스트 업데이트 코드 추가
+                3. Yugyeong Hong(2026.02.25): Refactor message box with util method and language support
         """
         fname = []
         file_dialog = QFileDialog()
@@ -196,11 +199,16 @@ class Image_Form(QWidget):
                 else:
                     tmp_exist_data_list.append(full_path)
                     continue
-                    
             if len(tmp_wrong_data_list):
-                self.warning_(title=self.lang.get("labeling", "image_main", "image_load_error_msg_wrong") ,msg=f"{self.lang.get('labeling', 'image_main', 'image_load_error_msg_wrong')}\n"+"".join([f"{l}\n" for l in tmp_wrong_data_list]))
+                messageBox(mode=MESSAGE_BOX_WARNING,
+                           title=self.lang.get("main", "messageBox", "msgWarning"),
+                           text=f'{self.lang.get("main", "image_main", "image_load_error_msg_wrong")}\n'+"".join([f"{l}\n" for l in tmp_wrong_data_list]),
+                           buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             if len(tmp_exist_data_list):
-                self.warning_(title=self.lang.get("labeling", "image_main", "image_load_error_msg_already") ,msg=f"{self.lang.get('labeling', 'image_main', 'image_load_error_msg_already')}\n"+"".join([f"{l}\n" for l in tmp_exist_data_list]))
+                messageBox(mode=MESSAGE_BOX_WARNING,
+                           title=self.lang.get("main", "messageBox", "msgWarning"),
+                           text=f'{self.lang.get("labeling", "image_main", "image_load_error_msg_already")}\n'+"".join([f"{l}\n" for l in tmp_exist_data_list]),
+                           buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
         
         # Improvemented by MyoungHwan(2024.12.13): image 리스트 업데이트 코드 추가
         self.image_detail_form.update_data_list()
@@ -302,8 +310,8 @@ class Image_Form(QWidget):
                     1. Update date : 202305091453
                     아무것도 선택되지 않았을때
                 """
-                tmp_txt = f"Image: {self.image_obj_dict[cnt]['name']}"
-                self.core_obj_dict['status_image_status'].setText(tmp_txt)
+                tmp_txt = self.image_obj_dict[cnt]["name"]
+                self.core_obj_dict['status_image_status'][1].setText(tmp_txt)
                 self.image_control_dict['select_image_number'] = cnt
 
                 #labeing mode main 에 시그널 전달
@@ -352,7 +360,11 @@ class Image_Form(QWidget):
                 self.image_to_display_sub_rgb_change(tmp_dict)
 
                 
-                
+                # emit signal to semi auto labeling
+                tmp_dict = {}   
+                tmp_dict['from'] = 'image'
+                self.imageToSemiAutoLabeling(tmp_dict)
+
             else:
                 if self.image_control_dict['select_image_number'] != cnt:
                     """
@@ -366,8 +378,10 @@ class Image_Form(QWidget):
                     if self.image_obj_dict[old_image_number]['obj_dict']['select'].isChecked():
                         self.image_obj_dict[old_image_number]['obj_dict']['select'].toggle()
                     self.connect_sw = True
-                    tmp_txt = f"Image: {self.image_obj_dict[cnt]['name']}"
-                    self.core_obj_dict['status_image_status'].setText(tmp_txt)
+                    tmp_txt = self.image_obj_dict[cnt]["name"]
+                    self.core_obj_dict['status_image_status'][1].setText(tmp_txt)
+                    self.core_obj_dict['status_labeling_status'][1].setText("")
+                    self.core_obj_dict['status_pointer_status'][1].setText("")
                     self.image_control_dict['select_image_number'] = cnt
 
                     # label list에 시그널 전달
@@ -419,6 +433,11 @@ class Image_Form(QWidget):
                     tmp_dict['image_number'] = cnt
                     self.image_to_display_sub_rgb_change(tmp_dict)
 
+                    # emit signal to semi auto labeling
+                    tmp_dict = {}
+                    tmp_dict['from'] = 'image'
+                    self.imageToSemiAutoLabeling(tmp_dict)
+
 
                 elif self.image_control_dict['select_image_number'] == cnt:
                     """
@@ -426,8 +445,9 @@ class Image_Form(QWidget):
                         선택한 이미지(cnt)와 현재 선택된 이미지가 같은 이미지일때 and 선택 값(ch)이 False 일때
                         해제
                     """
-                    tmp_txt = f"Image: "
-                    self.core_obj_dict['status_image_status'].setText(tmp_txt)
+                    self.core_obj_dict['status_image_status'][1].setText("")
+                    self.core_obj_dict['status_labeling_status'][1].setText("")
+                    self.core_obj_dict['status_pointer_status'][1].setText("")
                     self.image_control_dict['select_image_number'] = -1
 
                     #labeing mode main 에 시그널 전달, 라벨 비활성
@@ -582,14 +602,6 @@ class Image_Form(QWidget):
         elif mode == 1:
             del self.data_list[cnt_idx]
             del self.image_obj_dict[cnt]
-
-    def warning_(self, title="", msg="", info=None):
-        warning_msgBox = QMessageBox()
-        warning_msgBox.setIcon(QMessageBox.Information)
-        warning_msgBox.setText(msg)
-        warning_msgBox.setWindowTitle(title)
-        warning_msgBox.setStandardButtons(QMessageBox.Ok)
-        returnValue = warning_msgBox.exec_()
     
     def image_to_core(self, input):
         """Image에서 core로 시그널을 보내기 위한 함수 선언문이다. Core DB에 대한 값을 업데이트하거나 조정하기 위한 함수로 쓰인다.
@@ -651,6 +663,8 @@ class Image_Form(QWidget):
         else :
             self.image_detail_form.close()
 
+    def imageToSemiAutoLabeling(self, input):
+        self.imageToSemiAutoLabelingSignal.emit(input)
 
 if __name__ == "__main__":
     import sys

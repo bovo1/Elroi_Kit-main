@@ -14,6 +14,8 @@ from utils.worker import Threading_Worker
 from utils.advanced import simplelabeling
 from qtwidgets import AnimatedToggle
 import cv2
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
 
 if __name__ == "__main__" :
     from adv_gen_module import gen_module
@@ -553,6 +555,7 @@ class advanced_sal_Form(QtWidgets.QWidget):
             @author : MyoungHwan
             @history :
                 1. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+                2. Yugyeong Hong(2026.02.24): Refactor message box with util method and language support
         """
         if mode == 0: #start
             if self.worker_id == -1 :
@@ -578,17 +581,22 @@ class advanced_sal_Form(QtWidgets.QWidget):
                 self.worker_id = self.worker_1.cur_id
                 self.worker_1.start()
             else:
-                QtWidgets.QMessageBox.information(
-                    self, self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_warning_already_allocated_title"),
-                    f"{self.lang.get('advanced', 'advanced_simpleautolabel_main', 'advanced_simpleautolabel_msg_warning_already_allocated_message')} Worker ID:{self.worker_id}"
+                messageBox(
+                    mode=MESSAGE_BOX_WARNING,
+                    title=self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_warning_already_allocated_title"),
+                    text=f'{self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_warning_already_allocated_message")} Worker ID:{self.worker_id}',
+                    buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"}
                 )
 
 
         elif mode == 1: #stop
-            if self.yes_no_message(
-                self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_stop_title"),
-                self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_stop_message")
-            ):
+            response = messageBox(
+                mode=MESSAGE_BOX_CONFIRMATION,
+                title=self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_stop_title"),
+                text=self.lang.get("advanced", "advanced_simpleautolabel_main", "advanced_simpleautolabel_msg_stop_message"),
+                buttons={self.lang.get("main", "messgaeBox", "msgYes"): "accept", self.lang.get("main", "messgaeBox", "msgNo"): "reject"}
+            )
+            if response == "accept":
                 self.interrupt_ = True
 
 
@@ -737,23 +745,6 @@ class advanced_sal_Form(QtWidgets.QWidget):
             @author : MyoungHwan
         """
         self.advanced_sal_status_textedit.appendPlainText(string_)
-
-    def yes_no_message(self, title, message):
-        """
-            @description: 기능 정지 버튼 클릭 시 발생하는 확인 메시지
-            @author : MyoungHwan
-        """
-        msgbox = QtWidgets.QMessageBox()
-        msgbox.setIcon(QtWidgets.QMessageBox.Warning)
-        msgbox.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        msgbox.setDefaultButton(QtWidgets.QMessageBox.No)
-        msgbox.setWindowTitle(title)
-        msgbox.setText(message)
-        answer = msgbox.exec_()
-        if answer == QtWidgets.QMessageBox.Yes:
-            return True
-        else:
-            return False
 
     def showEvent(self, e):
         pass

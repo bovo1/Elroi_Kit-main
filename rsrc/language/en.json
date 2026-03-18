@@ -19,7 +19,6 @@
             "menuFile": "File",
             "menuInfo": "Info",
             "menuLanguage": "Language",
-            "menuSetting": "Setting",
             "action_info_about": "About",
             "action_info_about_title": "About",
             "action_info_about_version_msg": "Version",
@@ -39,6 +38,13 @@
             "company_name_label": "ELROILAB KIT",
             "quit_title" : "ELROILAB",
             "quit_title_msg" : "Do you want to quit 'ELOILAB KIT'?",
+            "quit_title_msg_yes" : "Yes",
+            "quit_title_msg_no" : "No"
+        },
+        "mainCoreSync": {
+            "statusImage": "Image : ",
+            "statusLabel": "Label : ",
+            "statusCoordinate": "Pixel Coordinates : ",
             "licenseErrorTitle": "License Authentication Error",
             "licenseErrorMsg": "License is not authenticated. Please check your license and try again.",
             "WarningTitle": "Program Execution Warning",
@@ -61,9 +67,32 @@
             "imagelabel_tab_image": [2, "Image"],
             "Graph_tab_widget": [0, "Graph"]
         },
+        "labelSub": {
+            "labelSubTitle" : "Advanced Label Setting",
+            "labelSubGroupBoxTitle": "Advanced Labeling Mode",
+            "labelSubRelabeling" : "Relabeling Mode",
+            "labelSubApply" : ["Apply", ""],
+            "labelSubCommonAbnormal" : "Common Abnormal Auto Labeling",
+            "labelSubAnalysis": "Analysis Mode",
+            "labelSubESS" : "ESS Mode",
+            "labelSubOption" : ["Option", ""],
+            "labelSubGraphTitle": "Spectrum Distribution of Normal and Abnormal data"
+        },
+        "labelSubESSOption": {
+            "labelESSTitle": "ESS Setting",
+            "labelESSGlobalSettingTitle" : "Global Setting",
+            "labelESSSpectrumLabel": "Specific Sparse Spectrum",
+            "labelESSApply": ["Apply", ""],
+            "labelESSSpecificSettingTitle": "Specific Setting",
+            "labelESSLabel": "Label",
+            "labelESSIncludeSpectrum": "Include Spectrum",
+            "labelESSDefault": ["Default", ""],
+            "labelESSExit": ["Save && Exit", ""]
+        },
         "display_main": {
+            "displayPixelCoordinate": "Pixel Coordinates : ",
             "displayImageSelectWarningMsg": "Multiple image files detected in the folder. Please ensure only one image file.",
-            "displayImagePathNoneMsg": "Image path is None."
+            "displayImagePathNoneMsg": "Image path is None."  
         },
         "display_sub_rgb_change": {
             "display_rgb_change_visualization_group": "Visualization Type",
@@ -96,6 +125,16 @@
             "graph_plot_widget": ["Pixel Spectra", "Reflectance", "Wavelength(nm)"],
             "ldaGraphPlotWidget": ["Linear Discriminant Analysis", "LD2", "LD1"],
             "ldaRequirementMsg": "LDA requires at least 3 classes and each class must have more than 2 pixels."
+        },
+        "graph_sub": {
+            "graphSubWindowTitle": "Graph Setting",
+            "graphSubEtc": "Etc",
+            "graphSubSave": ["Graph Save", ""],
+            "graphSubCalibration": "Calibration",
+            "graphSubMode": "Mode",
+            "graphSubRatio": "Ratio",
+            "graphSubApply": ["Apply",""],
+            "graphSubAdvanced":"Advanced"
         },
         "image_main": {
             "image_add": ["", "Add Image"],
@@ -199,6 +238,15 @@
             "pen_style_sub_drawing_label": "Right Button",
             "pen_style_not_used_label": "Not Used",
             "pen_style_used_label": "Label"
+        },
+        "penSubOpacity": {
+            "penOpacityTitle": "Label Opacity Setting",
+            "penOpacityGlobalSetting": "Global Setting(All Label)",
+            "penOpacityRatio": "Opacity Ratio",
+            "penOpacityDefault": ["Default", ""],
+            "penOpacityApply": ["Apply", ""],
+            "penOpacitySpecificTitle": "Specific Setting(Select Label)",
+            "penOpacityLabel": "Label"
         }
     },
     "training": {

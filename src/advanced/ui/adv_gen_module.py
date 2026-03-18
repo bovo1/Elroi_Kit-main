@@ -6,32 +6,36 @@
 
 
 import numpy as np
-import datetime
 import os
 import spectral
 import torch
 from utils.encrypt import AesEncryption
+from constants.constants import AGGREGATION_DATA
 from PyQt5.QtCore import *
 
 class gen_module(object):
 	"""
-		Description: 학습모델을 이용한 데이터 예측 및 Noise 영역을 추출하기 위한 클래스
+		Description: Class for predicting data using trained models and extracting noise areas and merging data.
 		Implement by MyoungHwan(2024.05.13)
     """
-	def __init__(self):
-		self.hdr_info = self.gen_hdr_info()
-
 	def gen_hdr_info(self, hyp="VNIR", info="None"):
 		"""
-			Description: 데이터 생성시 추가하는 헤더선언 부분
+			Description: Add header declaration part when generating data
 			Implement by MyoungHwan(2024.05.13)
+			@history:
+				1. GaEun Hwang(26.01.26):
+					- Modify default band info format
     	"""
 		_dict = {}
 		if hyp == "NIR":
 			_dict = {
-				"info":info,
-				"width":400,
-				"height": 640,
+				"information":info,
+				"data type": 12,
+				"interleave": "bil",
+				"byte order": 0,
+				"samples": 640,
+				"bands": 224,
+				"lines": 400,
 				"default band":{192,113,51},
 				"WaveCount":224,
 				"wavelength":[
@@ -54,9 +58,13 @@ class gen_module(object):
 			}
 		elif hyp == "VNIR":
 			_dict = {
-				"info":info,
-				"width":400,
-				"height": 512,
+				"information":info,
+				"data type": 12,
+				"interleave": "bil",
+				"byte order": 0,
+				"samples": 512,
+				"bands": 224,
+				"lines": 400,
 				"default band":{192,113,51},
 				"WaveCount":224,
 				"wavelength":[
@@ -81,61 +89,78 @@ class gen_module(object):
 
 		return _dict
 
-	def gen_merge_raw(self, save_path, data, product_name="merged", description="data", calibration=True):
+	def gen_merge_raw(self, save_path, data, label, ref, description="", hyperspectralType="VNIR"):
 		"""
-			Description: 데이터 생성부분
+			Description: Generate merged raw data
 			Implement by MyoungHwan(2024.05.13)
+			@history:
+				1. GaEun Hwang(26.01.26):
+					- Add ref parameter to save custom WHITEREF/DARKREF data
+					- Add stopFunc parameter to handle thread interruption for label aggregation mode
     	"""
 		print("Generate merged data...")
 		print(f"file save path:{save_path}")
+		savePath = []
+		headerDict = self.gen_hdr_info(hyperspectralType, AGGREGATION_DATA)
+		lines, samples, band = headerDict["lines"], headerDict["samples"], headerDict["WaveCount"]
+		outputNum = data.shape[0] // (lines*samples)
+		if data.shape[0] % (lines*samples) != 0:
+			outputNum += 1
+		tmp_data = np.zeros((lines*samples*outputNum, band), dtype=np.uint16)
+		tmp_label = np.zeros((lines*samples*outputNum), dtype=np.int64)
+		tmpWhiteRef = np.zeros((lines*samples*outputNum, band), dtype=np.float32)
+		tmpDarkRef = np.zeros((lines*samples*outputNum, band), dtype=np.float32)
+		
+		tmp_data[:data.shape[0]] = data.astype(np.uint16)
+		tmp_label[:data.shape[0]] = label
+		tmpWhiteRef[:data.shape[0]] = ref[0][:data.shape[0]].astype(np.float32)
+		tmpDarkRef[:data.shape[0]] = ref[1][:data.shape[0]].astype(np.float32)
 
-		w, h = self.hdr_info["width"], self.hdr_info["height"]
-		data_len = data.shape[0] // (w*h)
-		if data.shape[0] % (w*h) != 0:
-			data_len += 1
-		tmp_data = np.zeros((w*h*data_len,224))
-		tmp_label = np.zeros((w*h*data_len))
-		tmp_data[:data.shape[0]] = data
-		tmp_label[:data.shape[0]] = 2
-
-		for idx in range(data_len):
-			file_name = f"/{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{product_name}_{description}_{idx}"
+		for idx in range(outputNum):
+			file_name = f"/{description}_{idx}"
 			output_path = save_path + file_name
 			if not os.path.isdir(output_path):
 				os.mkdir(output_path)
+			savePath.append(output_path)
 			print("-"*50)
 			print(f"Index:{idx}, file:{file_name}.")
 
-			si, ei = (idx)*w*h, (idx+1)*w*h
-			tmp_save_data = tmp_data[si:ei]
+			si, ei = (idx)*lines*samples, (idx+1)*lines*samples
+			tmp_save_data = tmp_data[si:ei].astype(np.uint16)
 			tmp_save_label = tmp_label[si:ei]
+			tmpSaveWhiteRef = tmpWhiteRef[si:ei].astype(np.float32)
+			tmpSaveDarkRef = tmpDarkRef[si:ei].astype(np.float32)
 
-			save_data = tmp_save_data.reshape(w,h,-1)
-			save_label = tmp_save_label.reshape(w,h)
+			save_data = tmp_save_data.reshape(lines,samples,-1).astype(np.uint16)
+			save_label = tmp_save_label.reshape(lines,samples)
+			saveWhiteRef = tmpSaveWhiteRef.reshape(lines,samples,-1).astype(np.float32)
+			saveDarkRef = tmpSaveDarkRef.reshape(lines,samples,-1).astype(np.float32)
+
 			np.save(f"{output_path}/label.npy",save_label)
-			print(f"Index:{idx}, file:{file_name}, label saved.")
+			print(f"Index:{idx}, file:{file_name}, label.npy saved.")
 			
 			output_data_hdr_path = output_path +"/data.hdr"
-			spectral.io.envi.save_image(output_data_hdr_path, save_data, ext=".raw", interleave="bil", 
-										dtype=np.uint16, force=True, metadata=self.hdr_info)
-			print(f"Index:{idx}, file:{file_name}, Generated Dummy Merged raw data.")
-			if calibration:
-				whiteref =np.ones((100,h)) * 4095.0
-				darkref=np.zeros((100,h))
-				output_dark_hdr_path = output_path+"/DARKREF.hdr"
-				spectral.io.envi.save_image(output_dark_hdr_path, darkref, ext=".raw", interleave="bil", 
-											dtype=np.uint16, force=True, metadata=self.hdr_info)
-				print(f"Index:{idx}, file:{file_name}, Generated Dummy DARK REF raw data.")
-				
-				output_white_hdr_path = output_path+"/WHITEREF.hdr"
-				spectral.io.envi.save_image(output_white_hdr_path, whiteref, ext=".raw", interleave="bil", 
-											dtype=np.uint16, force=True, metadata=self.hdr_info)
-				print(f"Index:{idx}, file:{file_name}, Generated Dummy WHITE REF raw data.")
+			spectral.io.envi.save_image(output_data_hdr_path, save_data, ext=".raw", interleave="bil",
+										byteorder=0, dtype=np.uint16, force=True, metadata=headerDict)
+			print(f"Index:{idx}, file:{file_name}, Generated Merged raw data.")
+			
+			headerDict["data type"] = 4  # float32
+			output_dark_hdr_path = output_path+"/DARKREF.hdr"
+			spectral.io.envi.save_image(output_dark_hdr_path, saveDarkRef, ext=".raw", interleave="bil", 
+										dtype=np.float32, force=True, metadata=headerDict)
+			print(f"Index:{idx}, file:{file_name}, Generated Merged DARK REF raw data.")
+			
+			output_white_hdr_path = output_path+"/WHITEREF.hdr"
+			spectral.io.envi.save_image(output_white_hdr_path, saveWhiteRef, ext=".raw", interleave="bil", 
+										dtype=np.float32, force=True, metadata=headerDict)
+			print(f"Index:{idx}, file:{file_name}, Generated Merged WHITE REF raw data.")
 			print(f"Index:{idx}, file:{file_name}, Generate complete.")
+
+		return savePath
 			
 	def get_sample(self, path):
 		"""
-			Description: 데이터 호출시 메타데이터 반환해주는 부분
+			Description: Return meta data when data is called
 			Implement by MyoungHwan(2024.05.13)
     	"""
 		meta_data = spectral.io.envi.open(path + "/data.hdr", path + "/data.raw").metadata
@@ -143,7 +168,7 @@ class gen_module(object):
 	
 	def load_data(self, data_path, calibration=True, calibration_rate=1.0) -> np.ndarray:
 		"""
-			Description: 데이터 호출부분
+			Description: Return data when data is called
 			Implement by MyoungHwan(2024.05.13)
     	"""
 		data = np.array(spectral.io.envi.open(data_path + "/data.hdr", data_path + "/data.raw").load())
@@ -156,7 +181,7 @@ class gen_module(object):
 		
 	def load_model(self, load_path, gpu="cuda"):
 		"""
-			Description: 학습모델 호출부분
+			Description: Return trained model when model is called
 			Implement by MyoungHwan(2024.05.13)
     	"""
 		model = torch.jit.load(AesEncryption().make_water(load_path, _type="model"))

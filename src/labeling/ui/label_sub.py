@@ -12,7 +12,6 @@ import copy
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import QMessageBox
 from utils.advanced import fastsimifeat, simplelabeling, Kmeans, autoCommonLabel
 from utils.worker import AutoLabel_Worker, Threading_Worker
 
@@ -31,7 +30,7 @@ else:
     from .label_sub_ess_option import label_sub_ess_option_Form
 
 
-class label_sub_Form(QtWidgets.QWidget):
+class label_sub_Form(QtWidgets.QDialog):
     def __init__(self, Sync=None, lang=None, parent=None) -> None:
         super().__init__()
 
@@ -152,7 +151,7 @@ class label_sub_Form(QtWidgets.QWidget):
         """
         Form.setObjectName("label_sub_form")
         Form.setFixedSize(320, 360)
-        Form.setWindowTitle("Advanced Label Setting")
+        self.lang.set("labeling", "labelSub", "labelSubTitle", Form)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -162,7 +161,7 @@ class label_sub_Form(QtWidgets.QWidget):
 
         self.label_sub_adv_group = QtWidgets.QGroupBox()
         self.label_sub_adv_group.setObjectName("label_sub_adv_group")
-        self.label_sub_adv_group.setTitle("Advanced Labeling Mode")
+        self.lang.set("labeling", "labelSub", "labelSubGroupBoxTitle", self.label_sub_adv_group)
         
         self.label_sub_adv_vertical = QtWidgets.QVBoxLayout(self.label_sub_adv_group)
         self.label_sub_adv_vertical.setObjectName("label_sub_adv_vertical")
@@ -174,24 +173,24 @@ class label_sub_Form(QtWidgets.QWidget):
         self.label_sub_adv_relabel_horizon.setObjectName("label_sub_adv_relabel_horizon")
         self.label_sub_adv_relabel_mode_label = QtWidgets.QLabel()
         self.label_sub_adv_relabel_mode_label.setObjectName("label_sub_adv_relabel_mode_label")
-        self.label_sub_adv_relabel_mode_label.setText("Relabeling Mode")
+        self.lang.set("labeling", "labelSub", "labelSubRelabeling", self.label_sub_adv_relabel_mode_label)
         self.label_sub_adv_relabel_mode_btn = QtWidgets.QPushButton()
         self.label_sub_adv_relabel_mode_btn.setObjectName("label_sub_adv_relabel_mode_btn")
-        self.label_sub_adv_relabel_mode_btn.setText("Apply")
+        self.lang.set("labeling", "labelSub", "labelSubApply", self.label_sub_adv_relabel_mode_btn)
 
         self.label_sub_adv_autoCommonLabel_horizon = QtWidgets.QHBoxLayout()
         self.label_sub_adv_autoCommonLabel_horizon.setObjectName("label_sub_adv_autoCommonLabel_horizon")
         self.label_sub_adv_autoCommonLabel_mode_label = QtWidgets.QLabel()
         self.label_sub_adv_autoCommonLabel_mode_label.setObjectName("label_sub_adv_autoCommonLabel_mode_label")
-        self.label_sub_adv_autoCommonLabel_mode_label.setText("Common Abnormal Auto Labeling")
+        self.lang.set("labeling", "labelSub", "labelSubCommonAbnormal",  self.label_sub_adv_autoCommonLabel_mode_label)
         self.label_sub_adv_autoCommonLabel_mode_btn = QtWidgets.QPushButton()
         self.label_sub_adv_autoCommonLabel_mode_btn.setObjectName("label_sub_adv_autoCommonLabel_mode_btn")
-        self.label_sub_adv_autoCommonLabel_mode_btn.setText("Apply")
+        self.lang.set("labeling", "labelSub", "labelSubApply", self.label_sub_adv_autoCommonLabel_mode_btn)
 
 
         self.label_sub_anly_group = QtWidgets.QGroupBox()
         self.label_sub_anly_group.setObjectName("label_sub_anly_group")
-        self.label_sub_anly_group.setTitle("Analysis Mode")
+        self.lang.set("labeling", "labelSub", "labelSubAnalysis", self.label_sub_anly_group)
 
         self.label_sub_anly_vertical = QtWidgets.QVBoxLayout(self.label_sub_anly_group)
         self.label_sub_anly_vertical.setObjectName("label_sub_anly_vertical")
@@ -201,14 +200,14 @@ class label_sub_Form(QtWidgets.QWidget):
 
         self.label_sub_anly_ess_label = QtWidgets.QLabel()
         self.label_sub_anly_ess_label.setObjectName("label_sub_anly_ess_label")
-        self.label_sub_anly_ess_label.setText("ESS Mode")
+        self.lang.set("labeling", "labelSub", "labelSubESS", self.label_sub_anly_ess_label)
+
         self.label_sub_anly_ess_option_btn = QtWidgets.QPushButton()
         self.label_sub_anly_ess_option_btn.setObjectName("label_sub_anly_ess_option_btn")
-        self.label_sub_anly_ess_option_btn.setText("Option")
+        self.lang.set("labeling", "labelSub", "labelSubOption", self.label_sub_anly_ess_option_btn)
         self.label_sub_anly_ess_btn = QtWidgets.QPushButton()
         self.label_sub_anly_ess_btn.setObjectName("label_sub_anly_ess_btn")
-        self.label_sub_anly_ess_btn.setText("Apply")
-
+        self.lang.set("labeling", "labelSub", "labelSubApply", self.label_sub_anly_ess_btn)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
 
@@ -429,8 +428,9 @@ class label_sub_Form(QtWidgets.QWidget):
                 description
                 modified by Myounghwan(20240531) : cetner spectrum 저장하는 딕셔너리 변수명 변경
             """
+            title = self.lang.get("labeling", "labelSub", "labelSubGraphTitle")
             self.plt_save(tmp_center_dict,
-                          title="정상 원물 및 이물 스펙트럼 분포", 
+                          title=title, 
                           save_path=graph_full_path + f"/{self.select_image_name}_graph.png"
                           )
             with open(self.tmp_fname+'/result.json', 'w', encoding='utf-8') as fp:
@@ -468,18 +468,6 @@ class label_sub_Form(QtWidgets.QWidget):
             self.parent.label_list_setting.toggle()
         if self.label_sub_ess_option_Form.isVisible():
             self.label_sub_ess_option_Form.close()
-
-    def warning_(self, title="", msg="", info=None):
-        """
-            Description: MessageBox
-            Implemented by MyoungHwan (2024.02.05)
-        """
-        warning_msgBox = QMessageBox()
-        warning_msgBox.setIcon(QMessageBox.Information)
-        warning_msgBox.setText(msg)
-        warning_msgBox.setWindowTitle(title)
-        warning_msgBox.setStandardButtons(QMessageBox.Ok)
-        returnValue = warning_msgBox.exec_()
 
 if __name__ == "__main__":
     import sys

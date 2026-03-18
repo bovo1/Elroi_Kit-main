@@ -46,7 +46,7 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
         """
         Form.setObjectName("adv_opacity_setting_form")
         Form.resize(318, 199)
-        Form.setWindowTitle("Label Opacity Setting")
+        self.lang.set("labeling","penSubOpacity", "penOpacityTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -56,7 +56,7 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.pen_sub_adv_opacity_sub_global_groupbox = QtWidgets.QGroupBox()
         self.pen_sub_adv_opacity_sub_global_groupbox.setObjectName("pen_sub_adv_opacity_sub_global_groupbox")
-        self.pen_sub_adv_opacity_sub_global_groupbox.setTitle("Global Setting(All Label)")
+        self.lang.set("labeling","penSubOpacity", "penOpacityGlobalSetting", self.pen_sub_adv_opacity_sub_global_groupbox)
 
         self.pen_sub_adv_opacity_sub_global_vertical = QtWidgets.QVBoxLayout()
         self.pen_sub_adv_opacity_sub_global_vertical.setObjectName("pen_sub_adv_opacity_sub_global_vertical")
@@ -72,8 +72,8 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.pen_sub_adv_opacity_sub_global_label = QtWidgets.QLabel()
         self.pen_sub_adv_opacity_sub_global_label.setObjectName("pen_sub_adv_opacity_sub_global_label")
-        self.pen_sub_adv_opacity_sub_global_label.setText("Opacity Ratio")
-
+        self.lang.set("labeling","penSubOpacity","penOpacityRatio", self.pen_sub_adv_opacity_sub_global_label)
+                      
         self.pen_sub_adv_opacity_sub_global_spin = QtWidgets.QSpinBox()
         self.pen_sub_adv_opacity_sub_global_spin.setObjectName("pen_sub_adv_opacity_sub_global_spin")
         self.pen_sub_adv_opacity_sub_global_spin.setRange(0, 100)
@@ -90,16 +90,15 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.pen_sub_adv_opacity_sub_global_default_btn = QtWidgets.QPushButton()
         self.pen_sub_adv_opacity_sub_global_default_btn.setObjectName("pen_sub_adv_opacity_sub_global_default_btn")
-        self.pen_sub_adv_opacity_sub_global_default_btn.setText("Default")
+        self.lang.set("labeling","penSubOpacity","penOpacityDefault", self.pen_sub_adv_opacity_sub_global_default_btn)
 
         self.pen_sub_adv_opacity_sub_global_apply_btn = QtWidgets.QPushButton()
         self.pen_sub_adv_opacity_sub_global_apply_btn.setObjectName("pen_sub_adv_opacity_sub_global_apply_btn")
-        self.pen_sub_adv_opacity_sub_global_apply_btn.setText("Apply")
-
+        self.lang.set("labeling","penSubOpacity", "penOpacityApply", self.pen_sub_adv_opacity_sub_global_apply_btn)
 
         self.pen_sub_adv_opacity_sub_specific_groupbox = QtWidgets.QGroupBox()
         self.pen_sub_adv_opacity_sub_specific_groupbox.setObjectName("pen_sub_adv_opacity_sub_specific_groupbox")
-        self.pen_sub_adv_opacity_sub_specific_groupbox.setTitle("Specific Setting(Select Label)")
+        self.lang.set("labeling","penSubOpacity", "penOpacitySpecificTitle", self.pen_sub_adv_opacity_sub_specific_groupbox)
 
         self.pen_sub_adv_opacity_sub_specific_vertical = QtWidgets.QVBoxLayout()
         self.pen_sub_adv_opacity_sub_specific_vertical.setObjectName("pen_sub_adv_opacity_sub_specific_vertical")
@@ -115,7 +114,7 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.pen_sub_adv_opacity_sub_specific_label = QtWidgets.QLabel()
         self.pen_sub_adv_opacity_sub_specific_label.setObjectName("pen_sub_adv_opacity_sub_specific_label")
-        self.pen_sub_adv_opacity_sub_specific_label.setText("Opacity Ratio")
+        self.lang.set("labeling","penSubOpacity","penOpacityRatio",self.pen_sub_adv_opacity_sub_specific_label)
 
         self.pen_sub_adv_opacity_sub_specific_combo = QtWidgets.QComboBox()
         self.pen_sub_adv_opacity_sub_specific_combo.setObjectName("pen_sub_adv_opacity_sub_specific_combo")
@@ -137,11 +136,11 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.pen_sub_adv_opacity_sub_specific_default_btn = QtWidgets.QPushButton()
         self.pen_sub_adv_opacity_sub_specific_default_btn.setObjectName("pen_sub_adv_opacity_sub_specific_default_btn")
-        self.pen_sub_adv_opacity_sub_specific_default_btn.setText("Default")
+        self.lang.set("labeling","penSubOpacity", "penOpacityDefault", self.pen_sub_adv_opacity_sub_specific_default_btn)
         
         self.pen_sub_adv_opacity_sub_specific_apply_btn = QtWidgets.QPushButton()
         self.pen_sub_adv_opacity_sub_specific_apply_btn.setObjectName("pen_sub_adv_opacity_sub_specific_apply_btn")
-        self.pen_sub_adv_opacity_sub_specific_apply_btn.setText("Apply")
+        self.lang.set("labeling","penSubOpacity", "penOpacityApply", self.pen_sub_adv_opacity_sub_specific_apply_btn)
 
         self.pen_sub_adv_opacity_sub_setting_view_label = QtWidgets.QLabel()
         self.pen_sub_adv_opacity_sub_setting_view_label.setObjectName("pen_sub_adv_opacity_sub_setting_view_label")
@@ -327,7 +326,7 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
 
         self.label_order_list = sorted(list(self.label_obj_dict.keys()))
         for label_num in self.label_order_list:
-            self.pen_sub_adv_opacity_sub_specific_combo.addItem(f"Label: {str(label_num)}")
+            self.pen_sub_adv_opacity_sub_specific_combo.addItem(f'{self.lang.get("labeling", "penSubOpacity", "penOpacityLabel")}: {str(label_num)}')
         self.pen_sub_adv_opacity_sub_specific_combo.setCurrentIndex(0)
         self.pen_sub_adv_opacity_sub_specific_spin.setValue(self.label_opcaity_dict[self.label_order_list[0]]['origin']*100)
         self.pen_sub_adv_opacity_sub_specific_slider.setValue(self.label_opcaity_dict[self.label_order_list[0]]['origin']*100)

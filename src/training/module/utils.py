@@ -5,6 +5,8 @@ import json
 import types
 import numpy as np
 import distinctipy
+from dataclasses import dataclass, asdict
+from constants.constants import *
 # distinctipy library - https://distinctipy.readthedocs.io/en/latest/about.html
 
 from time import time
@@ -279,3 +281,235 @@ def format_confusion_matrix(cm: np.ndarray, labels=None, col_width=7):
         rows.append(f"{lbl:>6}| {row_vals}")
 
     return "\n" + pred_header + "\n" + col_header + "\n" + sep + "\n" + "\n".join(rows)
+
+def makeMetadata(config, num_bands, classifier, batch_size, patch_size, num_classes, current_model_type, hyperparameter_shared_dict, current_model_param_dict, modelType):
+    """
+        @description : Collect and save model metadata for model training.
+        @author : Hyunsu Kim(2026.03.10)
+        @parameter :
+            config : dict (configuration information for model training)
+            num_bands : int (number of input bands)
+            classifier : bool (whether the model is a classifier)
+            batch_size : int (batch size for model training)
+            patch_size : int (patch size for model training)
+            num_classes : int (number of classes for classification model)
+            current_model_type : str (current model type - DN, SC, PD, DA, PE)
+            hyperparameter_shared_dict : dict (shared hyperparameters for model training)
+            current_model_param_dict : dict (current model parameters for model training)
+            modelType : str (model type - AD or CLS or AD_CLS)
+    """
+    metadatas = {}
+    metadatas["config"] = config
+    wavelengths = [float(w) for w in metadatas["config"]["metaData"]['wavelength']]
+    metadatas["cameraInfo"] = 'fx17' if any(w > 1000 for w in wavelengths) else 'fx10'
+    metadatas["num_bands"] = num_bands
+    metadatas["classifier"] = classifier
+    metadatas["batch_size"] = batch_size
+    metadatas["patch_size"] = patch_size
+    metadatas["num_classes"] = num_classes
+    metadatas["current_model_type"] = current_model_type
+    metadatas["hyperparameter_shared_dict"] = hyperparameter_shared_dict
+    metadatas["current_model_param_dict"] = current_model_param_dict
+    metadatas["modelType"] = modelType
+    metadatas["datasetScore"] = [0.0, 0.0]
+    metadatas["classScore"] = {}
+    return metadatas
+
+@dataclass
+class modelMetadata:
+    """
+        @description : Set metadata for train model using dataclass.
+        @author : Hyunsu Kim (2026.03.03)
+        @parameter :
+            inputShape : list (height, channel)
+            inputType : str (data type of input - float32)
+            outputShape : list (height, ) or (height, num_classes)
+            outputType : str (data type of output - float32)
+            patchSize : int (DA/PE: 1, DN/SC/PD: patch size)
+            lineShape : int (batch size - 512)
+            channelsFirst : bool (True)
+            model : dict
+            data : dict
+            metaData : dict
+
+    """
+
+    @dataclass
+    class modelInfo:
+        """
+            @description : Set model information for metadata.
+            @author : Hyunsu Kim (2026.03.03)
+            @parameter :
+                modelName : list (DN, SC, PD, DA, PE)
+                modelDescription : list (model description for user reference)
+                modelType : list (AD or CLS or AD_CLS)
+        """
+        modelName: str
+        modelDescription: str
+        modelType: str
+
+    @dataclass
+    class classInfo:
+        """
+            @description : Set class information for metadata.
+            @author : Hyunsu Kim (2026.03.03)
+            @parameter :
+                    type : str (binary or classification)
+                    Info : list (class labels for classification model)
+        """
+        type: str
+        Info: dict
+
+    @dataclass
+    class dataInfo:
+        """
+            @description : Set data information for metadata.
+            @author : Hyunsu Kim (2026.03.03)
+            @parameter :
+                    cameraInfo : str (camera information - fx10 or fx17)
+                    calibrationType : str (calibration type - min/max)
+                    calibrationRate : float (calibration rate for data normalization)
+                    inputChannel : int (number of input channels - 224)
+                    waverange : list (min and max wavelength of the data)
+                    spectralBinning : int (spectral binning factor - 1)
+                    spatialBinning : int (spatial binning factor - 1)
+                    classInfo : dict
+        """
+        cameraInfo: str
+        calibrationType: str
+        calibrationRate: float
+        inputChannel: int
+        waverange: list
+        spectralBinning: int
+        spatialBinning: int
+        classInfo: "modelMetadata.classInfo"
+
+    @dataclass
+    class runtimeMeta:
+        """
+            @description : Set gpu, CUDA, version, and other information for metadata.
+            @author : Hyunsu Kim (2026.03.03)
+            @parameter :
+                dateTime : str (training date and time)
+                generatedBy : str (training environment - local or server)
+                trainGpu : str (GPU used for training)
+                useGpu : bool (whether GPU was used for training)
+                gpuDeviceNum : int (GPU device number used for training)
+                gpuCapability : str (GPU capability)
+                CUDAVersion : str (CUDA version used for training)
+                torchVersion : str (PyTorch version used for training)
+                elroikitVersion : str (ElroiKit version used for training)
+        """
+        dateTime: str
+        generatedBy: str
+        trainGpu: str
+        useGpu: bool
+        gpuDeviceNum: int
+        gpuCapability: str
+        CUDAVersion: str
+        torchVersion: str
+        elroikitVersion: str
+
+    inputShape: list
+    inputType: list
+    outputShape: list
+    outputType: list
+    patchSize: int
+    lineShape: int
+    channelsFirst: bool
+    model: modelInfo
+    data: dataInfo
+    metaData: runtimeMeta
+
+    @classmethod
+    def setMetadata(self, metaData):
+        """
+            @description : Set metadata for model training.
+            @author : Hyunsu Kim (2026.03.03)
+            @parameter :
+                metaData : dict (metadata information for model training)
+                    - config : dict (configuration information for model training)
+                return : modelMetadata instance with all metadata information
+            @history :
+                - Modified by Hyunsu Kim (2026.03.10): Add metadata collection and setting for model training
+        """
+        wavelengths = [float(w) for w in metaData["config"]["metaData"]['wavelength']]
+        waverange = [min(wavelengths), max(wavelengths)]
+        channelsFirst = True
+        dateTime = datetime.now().strftime('%Y-%m-%d-%H-%M')
+        torchVersion = torch.__version__.split('+')[0]
+        binning = 1 if metaData["cameraInfo"] == 'fx10' else 0
+        classInfoType = "binary" if not metaData["classifier"] else "classification"
+
+        if metaData["patch_size"] >= 2:
+            inputShape = [metaData["config"]["dataInputHeight"], metaData["num_bands"], metaData["patch_size"], metaData["patch_size"]]
+        else:
+            inputShape = [metaData["config"]["dataInputHeight"], metaData["num_bands"]]
+        
+        inputType = "torch." + str(metaData["config"]["dataType"])
+        outputShape = [metaData["config"]["dataInputHeight"]]
+        if metaData["classifier"]:
+            outputShape = [metaData["config"]["dataInputHeight"], metaData["num_classes"]]
+        outputType = "torch." + str(metaData["config"]["dataType"])
+        lineShape = metaData["config"]["dataInputHeight"]
+
+        modelInfo = self.modelInfo(
+            modelName=[MI_STRING, metaData["current_model_type"]],
+            modelDescription=[MI_STRING, metaData["hyperparameter_shared_dict"]['modelDescription']],
+            modelType=[MI_STRING, metaData["modelType"]]
+        )
+        
+        classInfo = self.classInfo(
+            type=[MI_STRING, classInfoType],
+            Info=[MI_STRING_ARRAY, metaData["config"]["labelData"]],
+        )
+
+        dataInfo = self.dataInfo(
+            cameraInfo=[MI_STRING, metaData["cameraInfo"]],
+            calibrationType=[MI_STRING, "min/max"],
+            calibrationRate=[MI_FLOAT, str(metaData["current_model_param_dict"]["loader"]["calibration_rate"]["value"])],
+            inputChannel=[MI_INT, str(metaData["num_bands"])],
+            waverange=[MI_FLOAT_ARRAY, str(waverange)],
+            spectralBinning=[MI_INT, str(binning)],
+            spatialBinning=[MI_INT, str(binning)],
+            classInfo=classInfo,
+        )
+
+        runtimeMeta = self.runtimeMeta(
+            dateTime=[MI_STRING, dateTime],
+            generatedBy=[MI_STRING, "local"],
+            trainGpu=[MI_STRING, metaData["config"]["cudaInfo"]['deviceName']],
+            useGpu=[MI_BOOL, str(metaData["config"]["cudaInfo"]['useCuda'])],
+            gpuDeviceNum=[MI_INT, str(metaData["config"]["cudaInfo"]['cudaDevice'])],
+            gpuCapability=[MI_STRING, metaData["config"]["cudaInfo"]['cudaCapability']],
+            CUDAVersion=[MI_STRING, metaData["config"]["cudaInfo"]['CUDAVersion']],
+            torchVersion=[MI_STRING, torchVersion],
+            elroikitVersion=[MI_STRING, metaData["config"]["elroikitVersion"]],
+        )
+
+        return self(
+            inputShape=[MI_INT_ARRAY, str(inputShape)],
+            inputType=[MI_FLOAT, inputType],
+            outputShape=[
+                MI_INT_ARRAY_TUPLE if metaData["classifier"] else MI_INT_ARRAY,
+                str(outputShape),
+            ],
+            outputType=[MI_FLOAT, outputType],
+            patchSize=[MI_INT, str(metaData["patch_size"])],
+            lineShape=[MI_INT, str(lineShape)],
+            channelsFirst=[MI_BOOL, str(channelsFirst)],
+            model=modelInfo,
+            data=dataInfo,
+            metaData=runtimeMeta,
+        )
+
+    # -------------------------
+    # Export Method
+    # -------------------------
+
+    def to_dict(self):
+        """
+            @description : Convert modelMetadata instance to dictionary for JSON serialization.
+            @author : Hyunsu Kim (2026.03.03)
+        """
+        return asdict(self)

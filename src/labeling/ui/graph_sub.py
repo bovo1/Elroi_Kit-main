@@ -7,7 +7,7 @@ from qtwidgets import AnimatedToggle
 
 
 
-class graph_sub_Form(QtWidgets.QWidget):
+class graph_sub_Form(QtWidgets.QDialog):
     def __init__(self, Sync=None, lang=None, parent=None) -> None:
         super().__init__()
 
@@ -76,7 +76,7 @@ class graph_sub_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("graph_sub_form")
         Form.setFixedSize(290, 340)
-        Form.setWindowTitle("Graph Setting")
+        self.lang.set("labeling", "graph_sub", "graphSubWindowTitle", Form)
         Form.setEnabled(False)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -87,14 +87,14 @@ class graph_sub_Form(QtWidgets.QWidget):
 
         self.graph_sub_calib_group = QtWidgets.QGroupBox()
         self.graph_sub_calib_group.setObjectName("groupBox")
-        self.graph_sub_calib_group.setTitle("Calibration")
+        self.lang.set("labeling", "graph_sub", "graphSubCalibration", self.graph_sub_calib_group)
 
         self.graph_sub_calib_vertical = QtWidgets.QVBoxLayout(self.graph_sub_calib_group)
         self.graph_sub_calib_vertical.setObjectName("graph_sub_calib_vertical")
 
         self.graph_sub_calib_mode_label = QtWidgets.QLabel()
         self.graph_sub_calib_mode_label.setObjectName("graph_sub_calib_mode_label")
-        self.graph_sub_calib_mode_label.setText("Mode")
+        self.lang.set("labeling", "graph_sub", "graphSubMode", self.graph_sub_calib_mode_label)
         
         self.graph_sub_calib_mode_toggle = AnimatedToggle(
             pulse_checked_color="transparent",
@@ -111,11 +111,11 @@ class graph_sub_Form(QtWidgets.QWidget):
 
         self.graph_sub_calib_ratio_label = QtWidgets.QLabel()
         self.graph_sub_calib_ratio_label.setObjectName("graph_sub_calib_ratio_label")
-        self.graph_sub_calib_ratio_label.setText("Ratio")
+        self.lang.set("labeling", "graph_sub", "graphSubRatio", self.graph_sub_calib_ratio_label)
 
         self.graph_sub_calib_apply_btn = QtWidgets.QPushButton()
         self.graph_sub_calib_apply_btn.setObjectName("graph_sub_calib_apply_btn")
-        self.graph_sub_calib_apply_btn.setText("Apply")
+        self.lang.set("labeling", "graph_sub", "graphSubApply", self.graph_sub_calib_apply_btn)
         
         self.graph_sub_calib_ratio_spinbox = QtWidgets.QSpinBox()
         self.graph_sub_calib_ratio_spinbox.setObjectName("graph_sub_calib_ratio_spinbox")
@@ -126,7 +126,8 @@ class graph_sub_Form(QtWidgets.QWidget):
 
         self.graph_sub_adv_group = QtWidgets.QGroupBox()
         self.graph_sub_adv_group.setObjectName("graph_sub_adv_group")
-        self.graph_sub_adv_group.setTitle("Advanced")
+        self.lang.set("labeling", "graph_sub", "graphSubAdvanced", self.graph_sub_adv_group)
+        
         
         self.graph_sub_adv_vertical = QtWidgets.QVBoxLayout(self.graph_sub_adv_group)
         self.graph_sub_adv_vertical.setObjectName("graph_sub_adv_vertical")
@@ -136,7 +137,7 @@ class graph_sub_Form(QtWidgets.QWidget):
 
         self.graph_sub_adv_mode_label = QtWidgets.QLabel()
         self.graph_sub_adv_mode_label.setObjectName("graph_sub_adv_mode_label")
-        self.graph_sub_adv_mode_label.setText("Mode")
+        self.lang.set("labeling", "graph_sub","graphSubMode", self.graph_sub_adv_mode_label)
 
         self.graph_sub_adv_mode_toggle = AnimatedToggle(
             pulse_checked_color="transparent",
@@ -155,14 +156,14 @@ class graph_sub_Form(QtWidgets.QWidget):
         
         self.graph_sub_etc_group = QtWidgets.QGroupBox(Form)
         self.graph_sub_etc_group.setObjectName("graph_sub_etc_group")
-        self.graph_sub_etc_group.setTitle("Etc")
+        self.lang.set("labeling", "graph_sub", "graphSubEtc", self.graph_sub_etc_group)
 
         self.graph_sub_etc_vertical = QtWidgets.QVBoxLayout(self.graph_sub_etc_group)
         self.graph_sub_etc_vertical.setObjectName("graph_sub_etc_vertical")
 
         self.graph_sub_etc_save_btn = QtWidgets.QPushButton(self.graph_sub_etc_group)
         self.graph_sub_etc_save_btn.setObjectName("graph_sub_etc_save_btn")
-        self.graph_sub_etc_save_btn.setText("Graph Save")
+        self.lang.set("labeling", "graph_sub", "graphSubSave", self.graph_sub_etc_save_btn)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
 

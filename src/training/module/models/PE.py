@@ -75,6 +75,7 @@ class PA_Encoder(nn.Module):
 		self.factor=factor
 		self.fuse = False
 		self.c = nn.Parameter(torch.zeros(self.rep_dim, requires_grad=False))
+		self.modelType = "AD"
 
 		#Encoder
 		self.encoder = P_Encoder(n_band, n_w, w_s, s, n_layer, w_rep_dim, dropout, act_verbose, factor)

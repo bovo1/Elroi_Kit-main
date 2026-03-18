@@ -4,11 +4,13 @@ import copy
 import spectral
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import QFileDialog, QListView, QTreeView, QAbstractItemView, QMessageBox
+from PyQt5.QtWidgets import QFileDialog, QListView, QTreeView, QAbstractItemView
 
 from training.stylesheet.stylesheet_dataset_main import stylesheet
 
 from utils.shared import config_path
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_INFORMATION
 
 class DatasetFrame(QtWidgets.QFrame):
     def __init__(self, dataset_type, dataset_form):
@@ -677,17 +679,15 @@ class Dataset_Form(QtWidgets.QWidget):
 
             if not ignore_message:
                 # messagebox
+                """
+                    History
+                        Yugyeong Hong(2026.02.25): Refactor message box with util method and language support
+                """
                 if invalid_message_list != []:
-                    msgbox = QMessageBox()
-                    msgbox.setIcon(QMessageBox.Information)
-                    msgbox.setStandardButtons(QMessageBox.Ok)
-                    msgbox.setWindowTitle(self.lang.get("training", "dataset_main", "dataset_file_error_title"))
-                    msgbox.setText("\n".join(invalid_message_list))
-                    msgbox_widget = QtWidgets.QWidget()
-                    msgbox_widget.setFixedWidth(int(10 * max((len(x)) for x in invalid_message_list)))
-                    msgbox.layout().addWidget(msgbox_widget, 3, 0, 1, 3)
-                    msgbox.exec_()
-
+                    messageBox(mode=MESSAGE_BOX_INFORMATION,
+                               title=self.lang.get("training", "dataset_main", "dataset_file_error_title"),
+                               text="\n".join(invalid_message_list),
+                               buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             # update dataset info
             if path_list != []:
                 self.update_dataset(dataset_type)

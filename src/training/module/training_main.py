@@ -81,7 +81,7 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
     else:
         device = torch.device("cpu")
 
-    cudaInfo = {"useCuda": current_model_use_cuda, "deviceName": current_model_cuda_device_name, "cudaDevice": current_model_cuda_device, "cudaCapability": f"{str(deviceComputeCapability[0]) + '.' + str(deviceComputeCapability[1])}" if current_model_use_cuda and current_model_cuda_supported and torch.cuda.is_available() else (0.0), "CUDAVersion" : torch.version.cuda if torch.cuda.is_available() else "N/A"}
+    cudaInfo = {"useCuda": current_model_use_cuda, "deviceName": current_model_cuda_device_name, "cudaDevice": current_model_cuda_device, "cudaCapability": f"{deviceComputeCapability[0]}.{deviceComputeCapability[1]}" if current_model_use_cuda and current_model_cuda_supported and torch.cuda.is_available() else (0.0), "CUDAVersion" : torch.version.cuda if torch.cuda.is_available() else "N/A"}
     try:
         # dataset
         # training - verbose 1,2 > (train, val, test)
@@ -92,6 +92,8 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
         data_path_dict = {}    
         num_classes = 2
         num_bands = 0
+        dataInputHeight = 0
+        dataType = None
         # verbose = current_model_params_dict["loader"]["verbose"]["value"]
         if is_train:
             # Train
@@ -139,6 +141,8 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
         if "classifier" in current_model_settings_dict["params_dict"]["main_trainer"]:
             binary = not current_model_settings_dict["params_dict"]["main_trainer"]["classifier"]["value"]
         if "train" in datas:
+            dataInputHeight = np.shape(datas["train"][0])[1]
+            dataType = datas["train"][0].dtype
             num_bands = np.shape(datas["train"][0])[-1]
         if not binary and "train" in labels:
             num_classes = int(np.max([np.max(label) for label in labels["train"]]) + 1)
@@ -189,8 +193,9 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
         "cudaInfo": cudaInfo,
         "metaData": metaData,
         "labelData": labelData,
-        "elroikitVersion": f"{version.major}.{version.minor}.{version.patch}",
-        # "label_info": label_info
+        "dataInputHeight": dataInputHeight,
+        "dataType": dataType,
+        "elroikitVersion": f"{version.major}.{version.minor}.{version.patch}"
         }
 
         if is_train:

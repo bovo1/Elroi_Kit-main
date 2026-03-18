@@ -1,7 +1,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-class label_sub_ess_option_Form(QtWidgets.QWidget):
+class label_sub_ess_option_Form(QtWidgets.QDialog):
     def __init__(self, Sync=None, lang=None, parent=None) -> None:
         super().__init__()
         self.init(Sync=Sync, lang=lang, parent=parent)
@@ -29,7 +29,7 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("ESS_Setting_Form")
         Form.resize(318, 199)
-        Form.setWindowTitle("ESS Setting")
+        self.lang.set("labeling","labelSubESSOption", "labelESSTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -39,7 +39,7 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_global_groupbox = QtWidgets.QGroupBox()
         self.label_sub_ess_sub_global_groupbox.setObjectName("label_sub_ess_sub_global_groupbox")
-        self.label_sub_ess_sub_global_groupbox.setTitle("Global Setting")
+        self.lang.set("labeling", "labelSubESSOption", "labelESSGlobalSettingTitle", self.label_sub_ess_sub_global_groupbox)
 
         self.label_sub_ess_sub_global_vertical = QtWidgets.QVBoxLayout()
         self.label_sub_ess_sub_global_vertical.setObjectName("label_sub_ess_sub_global_vertical")
@@ -49,8 +49,8 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_global_label = QtWidgets.QLabel()
         self.label_sub_ess_sub_global_label.setObjectName("label_sub_ess_sub_global_label")
-        self.label_sub_ess_sub_global_label.setText("Specific Sparse Spectrum")
-
+        self.lang.set("labeling", "labelSubESSOption", "labelESSSpectrumLabel", self.label_sub_ess_sub_global_label)
+                      
         self.label_sub_ess_sub_global_null_label = QtWidgets.QLabel()
         self.label_sub_ess_sub_global_null_label.setObjectName("label_sub_ess_sub_global_null_label")
         self.label_sub_ess_sub_global_null_label.setText("")
@@ -62,13 +62,12 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_global_apply_btn = QtWidgets.QPushButton()
         self.label_sub_ess_sub_global_apply_btn.setObjectName("label_sub_ess_sub_global_apply_btn")
-        self.label_sub_ess_sub_global_apply_btn.setText("Apply")
-
+        self.lang.set("labeling", "labelSubESSOption", "labelESSApply", self.label_sub_ess_sub_global_apply_btn)
 
         self.label_sub_ess_sub_specific_groupbox = QtWidgets.QGroupBox()
         self.label_sub_ess_sub_specific_groupbox.setObjectName("label_sub_ess_sub_specific_groupbox")
-        self.label_sub_ess_sub_specific_groupbox.setTitle("Specific Setting")
-
+        self.lang.set("labeling", "labelSubESSOption", "labelESSSpecificSettingTitle", self.label_sub_ess_sub_specific_groupbox)
+                      
         self.label_sub_ess_sub_specific_vertical = QtWidgets.QVBoxLayout()
         self.label_sub_ess_sub_specific_vertical.setObjectName("label_sub_ess_sub_specific_vertical")
 
@@ -77,8 +76,8 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_specific_label = QtWidgets.QLabel()
         self.label_sub_ess_sub_specific_label.setObjectName("label_sub_ess_sub_specific_label")
-        self.label_sub_ess_sub_specific_label.setText("Specific Sparse Spectrum")
-
+        self.lang.set("labeling", "labelSubESSOption", "labelESSLabel", self.label_sub_ess_sub_specific_label)
+                      
         self.label_sub_ess_sub_specific_combo = QtWidgets.QComboBox()
         self.label_sub_ess_sub_specific_combo.setObjectName("label_sub_ess_sub_specific_combo")
         self.label_sub_ess_sub_specific_combo.addItem(f"Select Label")
@@ -90,13 +89,14 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_specific_apply_btn = QtWidgets.QPushButton()
         self.label_sub_ess_sub_specific_apply_btn.setObjectName("label_sub_ess_sub_specific_apply_btn")
-        self.label_sub_ess_sub_specific_apply_btn.setText("Apply")
-
+        self.lang.set("labeling", "labelSubESSOption", "labelESSApply", self.label_sub_ess_sub_specific_apply_btn)
+                      
         self.label_sub_ess_sub_specific_horizon_2 = QtWidgets.QHBoxLayout()
         self.label_sub_ess_sub_specific_horizon_2.setObjectName("label_sub_ess_sub_specific_horizon_2")
 
         self.label_sub_ess_sub_specific_checkbox = QtWidgets.QCheckBox()
-        self.label_sub_ess_sub_specific_checkbox.setText("Include Spectrum")
+        self.lang.set("labeling", "labelSubESSOption", "labelESSIncludeSpectrum", self.label_sub_ess_sub_specific_checkbox)
+                      
         self.label_sub_ess_sub_specific_checkbox.setIconSize(QtCore.QSize(16, 16))
         self.label_sub_ess_sub_specific_checkbox.setObjectName("label_sub_ess_sub_specific_checkbox")
 
@@ -109,11 +109,11 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_sub_ess_sub_default_btn = QtWidgets.QPushButton()
         self.label_sub_ess_sub_default_btn.setObjectName("label_sub_ess_sub_default_btn")
-        self.label_sub_ess_sub_default_btn.setText("Default")
+        self.lang.set("labeling", "labelSubESSOption", "labelESSDefault", self.label_sub_ess_sub_default_btn)
 
         self.label_sub_ess_sub_ok_btn = QtWidgets.QPushButton()
         self.label_sub_ess_sub_ok_btn.setObjectName("label_sub_ess_sub_ok_btn")
-        self.label_sub_ess_sub_ok_btn.setText("Save && Exit")
+        self.lang.set("labeling", "labelSubESSOption", "labelESSExit", self.label_sub_ess_sub_ok_btn)
 
     def setup_ui(self):
 
@@ -225,7 +225,7 @@ class label_sub_ess_option_Form(QtWidgets.QWidget):
 
         self.label_order_list = sorted(list(self.label_obj_dict.keys()))
         for label_num in self.label_order_list:
-            self.label_sub_ess_sub_specific_combo.addItem(f"Label: {str(label_num)}")
+            self.label_sub_ess_sub_specific_combo.addItem(f'{self.lang.get("labeling", "labelSubESSOption", "labelESSLabel")}: {str(label_num)}')
         self.label_sub_ess_sub_specific_combo.setCurrentIndex(0)
         label_number = self.label_order_list[0]
         self.label_sub_ess_sub_specific_spin.setValue(self.label_obj_dict[label_number]['center_num'])    

@@ -11,13 +11,13 @@ if __name__ == "__main__" :
     from adv_SAL_mode import advanced_sal_Form
     from advanced.ui.adv_pixel_based_labeling_mode import advanced_pixel_based_labeling_Form
     from adv_label_correction_mode import advanced_label_correction_Form
-    from adv_label_optimization_mode import advanced_label_optimization_Form
+    from adv_label_aggregation_mode import advanced_label_aggregation_Form
 else:
     from .adv_predictlabel_mode import advanced_predictlabel_Form
     from .adv_SAL_mode import advanced_sal_Form
     from .adv_pixel_based_labeling_mode import advanced_pixel_based_labeling_Form
     from .adv_label_correction_mode import advanced_label_correction_Form
-    from .adv_label_optimization_mode import advanced_label_optimization_Form
+    from .adv_label_aggregation_mode import advanced_label_aggregation_Form
 
 from advanced.stylesheet.stylesheet_adv_main import stylesheet
 
@@ -53,7 +53,7 @@ class Advanced_Main(QtWidgets.QWidget):
         self.advanced_sal_Form = advanced_sal_Form(Sync=self.Sync, lang=self.lang)
         self.advanced_pixel_based_labeling_Form = advanced_pixel_based_labeling_Form(Sync=self.Sync, lang=self.lang)
         self.advanced_label_correction_Form = advanced_label_correction_Form(Sync=self.Sync, lang=self.lang)
-        self.advanced_label_optimization_Form = advanced_label_optimization_Form(Sync=self.Sync, lang=self.lang)
+        self.advanced_label_aggregation_Form = advanced_label_aggregation_Form(Sync=self.Sync, lang=self.lang)
 
 
     def init_Ui_Advanced_Main(self, MainWindow):
@@ -82,13 +82,13 @@ class Advanced_Main(QtWidgets.QWidget):
         self.Advanced_tab_widget.addTab(self.advanced_sal_Form, "")
         self.Advanced_tab_widget.addTab(self.advanced_pixel_based_labeling_Form, "")
         self.Advanced_tab_widget.addTab(self.advanced_label_correction_Form, "")
-        self.Advanced_tab_widget.addTab(self.advanced_label_optimization_Form, "")
+        self.Advanced_tab_widget.addTab(self.advanced_label_aggregation_Form, "")
 
         self.lang.set("advanced", "advanced_main", "advanced_predictlabel_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_sal_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_pixel_based_labeling_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_label_correction_Form", self.Advanced_tab_widget)
-        self.lang.set("advanced", "advanced_main", "advanced_label_optimization_Form", self.Advanced_tab_widget)
+        self.lang.set("advanced", "advanced_main", "advanced_label_aggregation_Form", self.Advanced_tab_widget)
         
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 

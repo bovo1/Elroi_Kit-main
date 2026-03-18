@@ -77,11 +77,10 @@ from PyQt5.QtGui import QKeySequence
 from labeling.ui.labeling_mode_main import Label_Main
 from training.ui.training_mode_main import Train_Main
 from advanced.ui.adv_main import Advanced_Main
-from constants.constants import FONT_DEFAULT, FONT_PRETENDARD, FONT_NANUM_SQUARE_NEO, FONT_NANUM_GOTHIC
 
 from license_term import License_Form
 from utils.custom_ui import messageBox
-from constants.constants import MESSAGE_BOX_INFORMATION
+from constants.constants import MESSAGE_BOX_INFORMATION, FONT_DEFAULT, FONT_PRETENDARD, FONT_NANUM_SQUARE_NEO, FONT_NANUM_GOTHIC
 """
     description
     modified by MyoungHwan(20240605) : modification of Version Variable Information
@@ -186,19 +185,19 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.menuLanguage = QtWidgets.QMenu(self.menubar)
         self.menuLanguage.setObjectName("menuLanguage")
 
-        self.menuSetting = QtWidgets.QMenu(self.menubar)
-        self.menuSetting.setObjectName("menuSetting")
-
         self.statusbar = QtWidgets.QStatusBar(Mid_MainWindow)
         self.statusbar.setObjectName("statusbar")
         # self.statusbar.showMessage("Ready")
 
         self.statusbar.addWidget(VLine())
-        self.statusbar.addWidget(self.core_obj_dict['status_image_status'])
+        self.statusbar.addWidget(self.core_obj_dict['status_image_status'][0])
+        self.statusbar.addWidget(self.core_obj_dict['status_image_status'][1])
         self.statusbar.addWidget(VLine())
-        self.statusbar.addWidget(self.core_obj_dict['status_labeling_status'])
+        self.statusbar.addWidget(self.core_obj_dict['status_labeling_status'][0])
+        self.statusbar.addWidget(self.core_obj_dict['status_labeling_status'][1])
         self.statusbar.addWidget(VLine())
-        self.statusbar.addWidget(self.core_obj_dict['status_pointer_status'])
+        self.statusbar.addWidget(self.core_obj_dict['status_pointer_status'][0])
+        self.statusbar.addWidget(self.core_obj_dict['status_pointer_status'][1])
         self.statusbar.addWidget(VLine())
         self.statusbar.addPermanentWidget(self.core_obj_dict['status_training_status'])
         self.statusbar.addPermanentWidget(VLine())
@@ -213,10 +212,8 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
     def init_Ui_bar_menu(self, Mid_MainWindow):
         """상위 bar menu UI 생성을 위한 초기 선언문이다. menubar에 들어갈 항목을 추가하는 함수이다.
-                @Parameters
+                Parameters
                 1.   Mid_MainWindow(object): PyQt widget object
-                @history:
-                    1. modified by GaEun Hwang(2026.03.06): Add font settings menu in the settings menu
         """
         self.action_save = QtWidgets.QAction(Mid_MainWindow)
         self.action_save.setObjectName("action_save")
@@ -348,7 +345,6 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuinfo.menuAction())
-        self.menubar.addAction(self.menuSetting.menuAction())
 
         self.toolBar.addAction(self.actionLabeling_mode)
         self.toolBar.addAction(self.actionTraining_mode)
@@ -372,11 +368,11 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.action_info_about.triggered.connect(lambda : self.info_function(mode=0))
         self.action_info_license.triggered.connect(lambda : self.info_function(mode=1))
 
-        # Setting Menu list trigger
         self.actionSettingFont_Default.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_DEFAULT))
         self.actionSettingFont_Pretendard.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_PRETENDARD))
         self.actionSettingFont_NanumSquareNeo.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_SQUARE_NEO))
         self.actionSettingFont_NanumGothic.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_GOTHIC))
+        
 
     def setup_Ui_Main(self, Mid_MainWindow):
         """초기화된 ui의 디자인을 정의한다. Widget의 크기, layout 마진정의 및 정렬을 해당함수에서 정의한다.
@@ -394,7 +390,6 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.lang.set("main", "mid", "menuFile", self.menuFile)
         self.lang.set("main", "mid", "menuInfo", self.menuinfo)
         self.lang.set("main", "mid", "menuLanguage", self.menuLanguage)
-        self.lang.set("main", "mid", "menuSetting", self.menuSetting)
         self.lang.set("main", "mid", "actionLabeling_mode", self.actionLabeling_mode)
         self.lang.set("main", "mid", "actionTraining_mode", self.actionTraining_mode)
 
@@ -484,7 +479,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
             self.license_term.exec_()
         elif mode == 2:
             pass 
-    
+        
     def settingFontFunction(self, fontName):
         """
             @description: send signal with selected font

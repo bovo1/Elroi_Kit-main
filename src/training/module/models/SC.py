@@ -10,6 +10,7 @@ class SSGCA(nn.Module):
         self.device = device
         self.patch_size = patch_size
         self.dropout=dropout
+        self.modelType = "CLS"
     
         self.n_skip = 3
         self.init_dim = 24

@@ -1,30 +1,27 @@
 import os
 import glob
-import math
-import concurrent.futures
 
 import numpy as np
-import torch
+from sklearn.cluster import KMeans
+import pyqtgraph as pg
 import json
-from torch.cuda.amp import autocast
 from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import pyqtSlot
-import spectral
 from utils.viewer import Display_viewer
+from utils.custom_ui import custom_qtablewidget, ReDockOnCloseDockWidget
 import cv2
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.spatial.distance import cdist  
 
-from constants.constants import LABEL_CORRECTION_MODE_WORKER_1, LABEL_CORRECTION_MODE_WORKER_2, LABEL_CORRECTION_START, \
-LABEL_CORRECTION_STOP, LABEL_CORRECTION_CLEAR, LABEL_CORRECTION_DATALIST, LABEL_CORRECTION_THRESHOLD, LABEL_IGNORED
+from constants.constants import *
 
 from utils.worker import Threading_Worker
-from qtwidgets import AnimatedToggle
+from utils.custom_ui import messageBox
 from advanced.stylesheet.stylesheet_adv_label_correction_mode import stylesheet
 
-# Replace autocast with nullcontext if CUDA/AMP is unavailable
-# FP16 autocasting is only available with CUDA
-if not torch.cuda.is_available():  
-    from contextlib import nullcontext 
-    autocast = nullcontext
+if __name__ == "__main__" :
+    from adv_gen_module import gen_module
+else:
+    from .adv_gen_module import gen_module
 
 # ======================================================
 # SIGNAL CLASS
@@ -35,10 +32,11 @@ class SignalString(QtCore.QObject):
     @author : JiHoon Jung
     @history : 
         1. Hyunsu Kim(2025.06.13) : Added update_signal for image results tab updates 
+        2. Hyunsu Kim(2026.02.12) : Modified docstring for image results tab updates without thread
     """
     string_signal = QtCore.pyqtSignal(str)   # For status messages
     progress_signal = QtCore.pyqtSignal(int) # For progress bar updates
-    update_signal = QtCore.pyqtSignal(str)   # For image results tab updates
+    update_signal = QtCore.pyqtSignal(np.ndarray, str)   # For image results tab updates
 
 # ======================================================
 # MAIN WIDGET CLASS : advanced_label_correction_Form
@@ -54,52 +52,40 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
     def __init__(self, Sync=None, lang=None) -> None:
         """
         @description : Initialize widget, UI, variables, and signals
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
             Sync: synchronization object (default None)
             lang: language setting (default None)
         """
         super().__init__()
-        # 1) Initialize signals and worker
-        self._initialize_signals(Sync, lang)
-        # 2) Initialize internal parameters and state
-        self._initialize_variables()
-        # 3) Create UI widgets
-        self._initialize_ui(self)
-        # 4) Setup layout
-        self._initialize_layouts()
-        # 5) Connect signals and slots
-        self._connect_signals()
-        # 6) Populate parameter table
-        self._populate_table()
-
-        # Thread pool and device setup for background data loading
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-        # Use GPU if available, else CPU
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.init(Sync, lang)
+        self.init_variable()
+        self.init_ui(self)
+        self.setup_ui()
+        self.init_function()
+        self.fill_table()
 
         # Show form if executed as main module
         if __name__ == "__main__":
             self.show()
 
-    def _initialize_signals(self, Sync, lang):
+    def init(self, Sync, lang):
         """
         @description : Initialize and connect thread worker and signal objects
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
             Sync: synchronization object
             lang: language setting
         @history :
             1. Hyunsu Kim : Add thread worker to use in image results tab
+            2. Hyunsu Kim(2026.02.12) : Remove thread worker for image results tab to update without thread
         """
         self.Sync = Sync
         self.lang = lang
         # Threading_Worker for background execution
         self.worker_1 = Threading_Worker()
-        self.worker_2 = Threading_Worker()
         # Connect thread complete callback
-        self.worker_1.output.connect(lambda : self._on_thread_complete(mode = LABEL_CORRECTION_MODE_WORKER_1))
-        self.worker_2.output.connect(lambda : self._on_thread_complete(mode = LABEL_CORRECTION_MODE_WORKER_2))
+        self.worker_1.output.connect(lambda : self.recv_from_threading(mode = LABEL_CORRECTION_MODE_WORKER_1))
 
         # Create signals for status and progress updates
         self.signal_ = SignalString()
@@ -108,15 +94,18 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.update_signal = self.signal_.update_signal
         # Connect signal handlers
         self.string_signal.connect(self.update_status)
-        self.progress_signal.connect(self._update_progress)
+        self.progress_signal.connect(self.update_progress)
         self.update_signal.connect(self.update_rgb_image)
 
-    def _initialize_variables(self):
+    def init_variable(self):
         """
         @description : Initialize UI parameters and internal variables
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @history :
             1. Hyunsu Kim(2025.06.13) : Added variables for image results tab
+            2. Hyunsu Kim(2026.02.09) : Added randomSeed variable and analysis variables for KMeans reproducibility and live plot rendering
+            3. Hyunsu Kim(2026.02.12) : Add variables for handling image results tab updates without thread
+            4. Hyunsu Kim(2026.02.13) : Add variable for tooltips for similarity mode options
         """
         # Dictionary for parameter headers and widget references
         self.header_dict_ = {}
@@ -129,7 +118,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             1: {"type": "Similarity Threshold",
                 "tip": ["label:2. Similarity Threshold"],
                 "value": [1.0],
-                "obj_list": ["spinbox:0,100,0"]},
+                "obj_list": ["doublespinbox:0.0,100.0,0.0"]},
             2: {"type": "Calibration",
                 "tip": ["label:3. Calibration"],
                 "value": [True],
@@ -137,15 +126,18 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             3: {"type": "Calibration Ratio",
                 "tip": ["label:4. Calibration Ratio"],
                 "value": [1.0],
-                "obj_list": ["spinbox:0.0,1.0,1.0"]},
+                "obj_list": ["doublespinbox:0.0,1.0,1.0"]},
             4: {"type": "Label Source",
                 "tip": ["label:5. Label Source"],
                 "value": ["Create"],
                 "obj_list": ["combobox:Create,Overwrite"]},
+            5: {"type": "Cluster Count (KMeans)",
+                "tip": ["label:6. Cluster Count (min - 2, max - 15, recommended 8)"],
+                "value": [5],
+                "obj_list": ["spinbox:2,15,5"]},
         }
         self.adv_data_list_info = {}  # Selected data list info
         self.worker_id = -1           # Current worker ID
-        self.worker_id2 = -1          # Worker ID for image results tab
         self.dash = "-"               # Separator string for logs
         self.mode = "Label Correction Mode"
         self.interrupt_ = False       # Interrupt flag
@@ -156,29 +148,49 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.total_nonzero_pixel = {} # Dictionary to store total non-zero pixels for each image
         self.update_total_nonzero_pixel = {} # Dictionary to store updated non-zero pixels for each image
         self.rgb_image = {}           # Dictionary to store RGB images for each image
-        self.wrong_process = False
+        self.randomSeed = 42
+        self.label = {}
+        self.data = {}
+        self.similarity = {}
+        self.refLabel = {}
+        self.updateImage = {}            # Dictionary to store updated RGB images for live updates in image results tab
+        self.normalLabelColor = {} 
+        # Diagnostics plot data for live PyQtGraph rendering
+        self.similarityHistData = {}            # {data_name: {centers, counts, vmin, vmax, thr, method}}
+        self.spectrumBeforeAfterData = {}      # {data_name: {bands, mb, sb, ma, sa, method}}
+
+        self.similarity_tooltips = [
+            "Area 기반 유사도 (마스크/영역 크기 비교, 스케일 차이 민감)",
+            "SAM 스펙트럼 각도 기반 유사도 (조도 변화에 강건, 패턴 형태 중심)", 
+            "Cosine 방향 기반 유사도 (SAM과 유사)", 
+            "L2 거리 (밝기 차이, 이상치에 민감, 가장 직관적)", 
+            "Chebyshev 거리 (최대 차이 기준, 특정 파장대의 급격한 차이에 민감)", 
+            "Canberra 거리 (파장별 상대적 비율 차이, 저신호 영역에 민감)", 
+            "Jeffrey divergence 기반 거리 (통계적 분포 차이, 패턴 차이 정밀 반영)", 
+        ]
 
     # --------------------------------------------------
     # UI Widget Creation and Style Setup
     # --------------------------------------------------
-    def _initialize_ui(self, MainWindow):
+    def init_ui(self, mainWindow):
         """
-        @description : Create widgets and containers needed for MainWindow
-        @author : JiHoon Jung
+        @description : Create widgets and containers needed for mainWindow
+        @author : Hyunsu Kim
         @parameters :
-            MainWindow: top-level widget object
+            mainWindow: top-level widget object
         @history :
             1. Hyunsu Kim(2025.06.13) : Add image results tab widget and related widgets
             2. Hyunsu Kim(2025.09.04) : enable drag & drop inside the image display widget
             3. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            4. Hyunsu Kim(2026.02.09) : Modify data list table widget to use custom_qtablewidget and Add analysis plot widgets in image results tab
         """
-        MainWindow.setObjectName("adv_setting_form")
-        MainWindow.resize(840, 640)
-        MainWindow.setWindowTitle("Advanced Setting")
-        MainWindow.setStyleSheet(stylesheet)  # Custom CSS stylesheet
+        mainWindow.setObjectName("adv_setting_form")
+        mainWindow.resize(LABEL_CORRECTION_WINDOW_WIDTH, LABEL_CORRECTION_WINDOW_HEIGHT)
+        mainWindow.setWindowTitle("Advanced Setting")
+        mainWindow.setStyleSheet(stylesheet)  # Custom CSS stylesheet
 
         # Main horizontal/vertical layouts
-        self.advanced_label_correction_main_horizon = QtWidgets.QHBoxLayout(MainWindow)
+        self.advanced_label_correction_main_horizon = QtWidgets.QHBoxLayout(mainWindow)
         self.advanced_label_correction_main_vertical = QtWidgets.QVBoxLayout()
 
         # "Setting" groupbox and layout
@@ -192,20 +204,13 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_datalist_vertical = QtWidgets.QVBoxLayout()
 
         # Data list tableview setup
-        self.advanced_label_correction_datalist_tableview = QtWidgets.QTableWidget()
-        self.advanced_label_correction_datalist_tableview.setColumnCount(3)
-        self.advanced_label_correction_datalist_tableview.setRowCount(4)
+        self.advanced_label_correction_datalist_tableview = custom_qtablewidget(obj_name="advanced_label_correction_datalist_tableview", col=3, row=4)
         self.lang.set("advanced", "advanced_label_correction_main", "advanced_label_correction_datalist_tableview", self.advanced_label_correction_datalist_tableview)
-        header = self.advanced_label_correction_datalist_tableview.horizontalHeader()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-        self.advanced_label_correction_datalist_tableview.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.advanced_label_correction_datalist_tableview.setDragEnabled(False)
-        self.advanced_label_correction_datalist_tableview.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
-        vheader = self.advanced_label_correction_datalist_tableview.verticalHeader()
-        vheader.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        vheader.hide()
-
+        self.advanced_label_correction_datalist_tableview_setting_header_labels = ["Index", "Data", "Use"]
+        self.advanced_label_correction_datalist_tableview.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.advanced_label_correction_datalist_tableview.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        self.create_obj = self.advanced_label_correction_datalist_tableview.create_obj
+       
         # "Search" / "Clear" buttons and layout
         self.advanced_label_correction_datalist_global_horizon = QtWidgets.QHBoxLayout()
         self.advanced_label_correction_datalist_global_search_btn = QtWidgets.QPushButton()
@@ -216,11 +221,6 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_datalist_global_clear_btn.setObjectName(
             "advanced_label_correction_datalist_global_clear_btn")
         self.lang.set("advanced", "advanced_label_correction_main", "advanced_label_correction_datalist_global_clear_btn", self.advanced_label_correction_datalist_global_clear_btn)
-        self.advanced_label_correction_datalist_global_horizon.addWidget(
-            self.advanced_label_correction_datalist_global_search_btn)
-        self.advanced_label_correction_datalist_global_horizon.addStretch()
-        self.advanced_label_correction_datalist_global_horizon.addWidget(
-            self.advanced_label_correction_datalist_global_clear_btn)
 
         # Start/Stop buttons
         self.advanced_label_correction_setting_horizon = QtWidgets.QHBoxLayout()
@@ -271,21 +271,21 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_image_groupbox_Layout = QtWidgets.QVBoxLayout(self.advanced_label_correction_image_groupbox)
         self.advanced_label_correction_image_groupbox_Layout.setObjectName("advanced_label_correction_image_groupbox_Layout")
 
-        self.ResultControlWidget = QtWidgets.QWidget()
-        self.ResultControlWidget.setObjectName("ResultControlWidget")
+        self.resultControlWidget = QtWidgets.QWidget()
+        self.resultControlWidget.setObjectName("resultControlWidget")
 
-        self.ResultControlLayout = QtWidgets.QHBoxLayout(self.ResultControlWidget)
-        self.ResultControlLayout.setObjectName("ResultControlLayout")
+        self.resultControlLayout = QtWidgets.QHBoxLayout(self.resultControlWidget)
+        self.resultControlLayout.setObjectName("resultControlLayout")
 
         # Image selection controller
-        self.ImageSelectorMainWidget = QtWidgets.QWidget()
-        self.ImageSelectorMainWidget.setObjectName("ImageSelectorMainWidget")
+        self.imageSelectorMainWidget = QtWidgets.QWidget()
+        self.imageSelectorMainWidget.setObjectName("imageSelectorMainWidget")
 
-        self.ImageSelectorMainLayout = QtWidgets.QHBoxLayout(self.ImageSelectorMainWidget)
-        self.ImageSelectorMainLayout.setObjectName("ImageSelectorMainLayout")
+        self.imageSelectorMainLayout = QtWidgets.QHBoxLayout(self.imageSelectorMainWidget)
+        self.imageSelectorMainLayout.setObjectName("imageSelectorMainLayout")
 
-        self.ImageSelectorComboBox = QtWidgets.QComboBox()
-        self.ImageSelectorComboBox.setObjectName("ImageSelectorComboBox")
+        self.imageSelectorComboBox = QtWidgets.QComboBox()
+        self.imageSelectorComboBox.setObjectName("imageSelectorComboBox")
 
         self.advanced_label_correction_image_groupbox_HorizontalLine = QtWidgets.QFrame()
         self.advanced_label_correction_image_groupbox_HorizontalLine.setObjectName("advanced_label_correction_image_groupbox_HorizontalLine")
@@ -293,81 +293,136 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_image_groupbox_HorizontalLine.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         # Vertical line (Image selection controller <-> Pred map controller)
-        self.ResultControlVerticalLine1 = QtWidgets.QFrame()
-        self.ResultControlVerticalLine1.setObjectName("ResultControlVerticalLine1")
-        self.ResultControlVerticalLine1.setFrameShape(QtWidgets.QFrame.VLine)
-        self.ResultControlVerticalLine1.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.resultControlVerticalLine1 = QtWidgets.QFrame()
+        self.resultControlVerticalLine1.setObjectName("resultControlVerticalLine1")
+        self.resultControlVerticalLine1.setFrameShape(QtWidgets.QFrame.VLine)
+        self.resultControlVerticalLine1.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         # Threshold controller
-        self.ThresholdMainWidget = QtWidgets.QWidget()
-        self.ThresholdMainWidget.setObjectName("ThresholdMainWidget")
+        self.thresholdMainWidget = QtWidgets.QWidget()
+        self.thresholdMainWidget.setObjectName("thresholdMainWidget")
 
-        self.ThresholdMainLayout = QtWidgets.QHBoxLayout(self.ThresholdMainWidget)
-        self.ThresholdMainLayout.setObjectName("ThresholdMainLayout")
+        self.thresholdMainLayout = QtWidgets.QHBoxLayout(self.thresholdMainWidget)
+        self.thresholdMainLayout.setObjectName("thresholdMainLayout")
         
-        self.ThresholdLabel = QtWidgets.QLabel()
-        self.ThresholdLabel.setObjectName("ThresholdLabel")
-        self.lang.set("advanced", "advanced_label_correction_main", "ThresholdLabel", self.ThresholdLabel)
+        self.thresholdLabel = QtWidgets.QLabel()
+        self.thresholdLabel.setObjectName("thresholdLabel")
+        self.lang.set("advanced", "advanced_label_correction_main", "thresholdLabel", self.thresholdLabel)
 
-        self.ThresholdLineEdit = QtWidgets.QLineEdit()
-        self.ThresholdLineEdit.setObjectName("ThresholdLineEdit")
+        self.thresholdLineEdit = QtWidgets.QLineEdit()
+        self.thresholdLineEdit.setObjectName("thresholdLineEdit")
 
-        intValidator = QtGui.QIntValidator(0, 100)
-        self.ThresholdLineEdit.setValidator(intValidator)
-
-        self.ThresholdButton = QtWidgets.QPushButton()
-        self.ThresholdButton.setObjectName("ThresholdButton")
-        self.ThresholdButton.setCheckable(True)
-        self.ThresholdButton.setEnabled(False)  # Initially disabled until threshold is set
-        self.lang.set("advanced", "advanced_label_correction_main", "ThresholdButton", self.ThresholdButton)
+        self.thresholdButton = QtWidgets.QPushButton()
+        self.thresholdButton.setObjectName("thresholdButton")
+        self.thresholdButton.setCheckable(True)
+        self.thresholdButton.setEnabled(False)  # Initially disabled until threshold is set
+        self.lang.set("advanced", "advanced_label_correction_main", "thresholdButton", self.thresholdButton)
 
         # Reduced Pixel controller
-        self.ReducedPixelMainWidget = QtWidgets.QWidget()
-        self.ReducedPixelMainWidget.setObjectName("ReducedPixelMainWidget")
+        self.reducedPixelMainWidget = QtWidgets.QWidget()
+        self.reducedPixelMainWidget.setObjectName("reducedPixelMainWidget")
 
-        self.ReducedPixelMainLayout = QtWidgets.QHBoxLayout(self.ReducedPixelMainWidget)
-        self.ReducedPixelMainLayout.setObjectName("ReducedPixelMainLayout")
-        self.ReducedPixelLabel = QtWidgets.QLabel()
-        self.ReducedPixelLabel.setObjectName("ReducedPixelLabel") 
-        self.lang.set("advanced", "advanced_label_correction_main", "ReducedPixelLabel", self.ReducedPixelLabel)
+        self.reducedPixelMainLayout = QtWidgets.QHBoxLayout(self.reducedPixelMainWidget)
+        self.reducedPixelMainLayout.setObjectName("reducedPixelMainLayout")
+        self.reducedPixelLabel = QtWidgets.QLabel()
+        self.reducedPixelLabel.setObjectName("reducedPixelLabel") 
+        self.lang.set("advanced", "advanced_label_correction_main", "reducedPixelLabel", self.reducedPixelLabel)
 
-        self.ReducedPixelValue = QtWidgets.QLabel("0 (0 %)")
-        self.ReducedPixelValue.setObjectName("ReducedPixelValue")  
+        self.reducedPixelValue = QtWidgets.QLabel("0 (0 %)")
+        self.reducedPixelValue.setObjectName("reducedPixelValue")  
 
-        # image display widget
-        self.OutputImageWidget = Display_viewer(usescrollbar=False)
-        # enable drag & drop inside the image display widget
-        self.OutputImageWidget.updateDrag(True)
+        # Image + diagnostics view (splitter)
+        self.outputImageBox = QtWidgets.QGroupBox("Image Results")
+        self.outputImageLayout = QtWidgets.QVBoxLayout(self.outputImageBox)
+        self.outputImageWidget = Display_viewer(usescrollbar=False)
+        self.outputImageWidget.updateDrag(True)
+        self.outputImageWidget.setBackgroundBrush(pg.mkColor(RESULT_BACKGROUD_COLOR))
+
+        # Split vertically on screen (left/right)
+        self.outputSplitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.outputSplitter.setObjectName("outputSplitter")
+        # Outer border around both diagnostic plots
+        self.analysisGroupBox = QtWidgets.QGroupBox("Analysis")
+        self.analysisGroupBox.setObjectName("analysisGroupBox")
+
+        self.analysisGroupBoxLayout = QtWidgets.QVBoxLayout(self.analysisGroupBox)
+        self.analysisGroupBoxLayout.setContentsMargins(4, 4, 4, 4)
+
+        self.analysisWidget = QtWidgets.QWidget()
+        self.analysisWidget.setObjectName("analysisWidget")
+        self.analysisLayout = QtWidgets.QVBoxLayout(self.analysisWidget)
+        self.analysisLayout.setContentsMargins(0, 0, 0, 0)
+
+        # Dockable analysis (only plots): embed a QMainWindow as a dock host.
+        self.analysisDockHost = QtWidgets.QMainWindow()
+        self.analysisDockHost.setObjectName("analysisDockHost")
+        self.analysisDockHost.setDockOptions(
+            QtWidgets.QMainWindow.AllowTabbedDocks
+            | QtWidgets.QMainWindow.AnimatedDocks
+            | QtWidgets.QMainWindow.AllowNestedDocks
+        )
+        self.analysisDockHost.setTabPosition(
+            QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea,
+            QtWidgets.QTabWidget.North,
+        )
+
+        # Plot viewers (dock contents)
+        self.histPlotViewer = pg.PlotWidget()
+        self.histPlotViewer.setMinimumHeight(160)
+        self.histPlotViewer.setBackground(pg.mkColor(RESULT_BACKGROUD_COLOR))
+        self.histPlotViewer.setLabel("left", "Count", color="w", **{"font-size": "12px"})
+        self.histPlotViewer.setLabel("bottom", "Similarity score", color="w", **{"font-size": "12px"})
+        self.histPlotViewer.getAxis("left").setTextPen(pg.mkPen("w", width=2))
+        self.histPlotViewer.getAxis("bottom").setTextPen(pg.mkPen("w", width=2))
+        self.histPlotViewer.showGrid(x=True, y=True, alpha=0.25)
+        self.histPlotViewer.setMouseEnabled(x=False, y=True)
+        self.histPlotViewer.getViewBox().setLimits(yMin=0)
+
+        self.beforeAfterPlotViewer = pg.PlotWidget()
+        self.beforeAfterPlotViewer.setMinimumHeight(160)
+        self.beforeAfterPlotViewer.setBackground(pg.mkColor(RESULT_BACKGROUD_COLOR))
+        self.beforeAfterPlotViewer.setLabel("left", "Value", color="w", **{"font-size": "12px"})
+        self.beforeAfterPlotViewer.setLabel("bottom", "Band", color="w", **{"font-size": "12px"})
+        self.beforeAfterPlotViewer.getAxis("left").setTextPen(pg.mkPen("w", width=2))
+        self.beforeAfterPlotViewer.getAxis("bottom").setTextPen(pg.mkPen("w", width=2))
+        self.beforeAfterPlotViewer.showGrid(x=True, y=True, alpha=0.25)
+        self.beforeAfterPlotViewer.setMouseEnabled(x=False, y=True)
+        self.beforeAfterPlotViewer.getViewBox().setLimits(yMin=0)
+
+        self.histPlotDock = ReDockOnCloseDockWidget("Similarity Histogram", self.analysisDockHost)
+        self.histPlotDock.setObjectName("histPlotDock")
+        self.histPlotDock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable # move widgets between dock areas
+            | QtWidgets.QDockWidget.DockWidgetFloatable # detach widgets as independent widnows
+            | QtWidgets.QDockWidget.DockWidgetClosable # close widgets
+        )
+
+        self.beforeAfterPlotDock = ReDockOnCloseDockWidget("Before/After Distribution", self.analysisDockHost)
+        self.beforeAfterPlotDock.setObjectName("beforeAfterPlotDock")
+        self.beforeAfterPlotDock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable # move widgets between dock areas
+            | QtWidgets.QDockWidget.DockWidgetFloatable # detach widgets as independent widnows
+            | QtWidgets.QDockWidget.DockWidgetClosable # dock widgets can be closed
+        )
 
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
         self.progress_bar.setValue(0)
         self.progress_bar.hide()
-        # Custom progress bar style
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                color: white;
-                border: 1px solid grey;
-                border-radius: 5px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #778899;
-            }
-        """)
-
 
     # --------------------------------------------------
     # Layout Configuration
     # --------------------------------------------------
-    def _initialize_layouts(self):
+    def setup_ui(self):
         """
         @description : Arrange created widgets in the proper layouts
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @history :
             1. Hyunsu Kim(2025.06.13) : Add image results tab layout and widgets, modify status widget layout
             2. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            3. Hyunsu Kim(2026.02.09) : Modify data list table layout to use custom_qtablewidget and Add analysis plot widgets in image results tab
+            4. Hyunsu Kim(2026.02.13) : Add validator for handling threshold input
         """
         # Assign vertical layout to "Setting" groupbox
         self.advanced_label_correction_setting_groupbox.setLayout(self.advanced_label_correction_setting_vertical)
@@ -375,11 +430,13 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_setting_horizon.addWidget(self.advanced_label_correction_setting_start_btn)
         self.advanced_label_correction_setting_horizon.addWidget(self.advanced_label_correction_setting_stop_btn)
 
+        self.advanced_label_correction_datalist_global_horizon.addWidget(self.advanced_label_correction_datalist_global_search_btn)
+        self.advanced_label_correction_datalist_global_horizon.addStretch()
+        self.advanced_label_correction_datalist_global_horizon.addWidget(self.advanced_label_correction_datalist_global_clear_btn)
+
         # Add search buttons and table to "Data List" groupbox
-        self.advanced_label_correction_datalist_vertical.addLayout(
-            self.advanced_label_correction_datalist_global_horizon)
-        self.advanced_label_correction_datalist_vertical.addWidget(
-            self.advanced_label_correction_datalist_tableview)
+        self.advanced_label_correction_datalist_vertical.addLayout(self.advanced_label_correction_datalist_global_horizon)
+        self.advanced_label_correction_datalist_vertical.addWidget(self.advanced_label_correction_datalist_tableview)
         self.advanced_label_correction_datalist_groupbox.setLayout(self.advanced_label_correction_datalist_vertical)
 
         # Add Setting, Data List, and Start/Stop to main vertical layout
@@ -394,25 +451,54 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.advanced_label_correction_status_groupbox_Layout.addWidget(self.advanced_label_correction_status_textedit)
         self.advanced_label_correction_status_groupbox_Layout.addWidget(self.progress_bar)
 
+        validator = QtGui.QDoubleValidator()
+        validator.setBottom(0.0)
+        validator.setTop(100.0)
+        self.thresholdLineEdit.setValidator(validator)
+
         # Image results tab widget settings
-        self.ResultControlLayout.addWidget(self.ImageSelectorMainWidget)
-        self.ResultControlLayout.addWidget(self.ResultControlVerticalLine1)
-        self.ResultControlLayout.addWidget(self.ThresholdMainWidget)
-        self.ResultControlLayout.addWidget(self.ReducedPixelMainWidget)
-        self.ThresholdMainLayout.addWidget(self.ThresholdLabel)
-        self.ThresholdMainLayout.addWidget(self.ThresholdLineEdit)
-        self.ThresholdMainLayout.addWidget(self.ThresholdButton)
-        self.ReducedPixelMainLayout.addWidget(self.ReducedPixelLabel)
-        self.ReducedPixelMainLayout.addWidget(self.ReducedPixelValue)
-        self.ImageSelectorMainLayout.addWidget(self.ImageSelectorComboBox)
-        self.advanced_label_correction_image_groupbox_Layout.addWidget(self.ResultControlWidget, 0, QtCore.Qt.AlignLeft)
+        self.resultControlLayout.addWidget(self.imageSelectorMainWidget)
+        self.resultControlLayout.addWidget(self.resultControlVerticalLine1)
+        self.resultControlLayout.addWidget(self.thresholdMainWidget)
+        self.resultControlLayout.addWidget(self.reducedPixelMainWidget)
+        self.thresholdMainLayout.addWidget(self.thresholdLabel)
+        self.thresholdMainLayout.addWidget(self.thresholdLineEdit)
+        self.thresholdMainLayout.addWidget(self.thresholdButton)
+        self.reducedPixelMainLayout.addWidget(self.reducedPixelLabel)
+        self.reducedPixelMainLayout.addWidget(self.reducedPixelValue)
+        self.imageSelectorMainLayout.addWidget(self.imageSelectorComboBox)
+        # Keep the control bar compact; let the splitter take remaining space.
+        self.resultControlLayout.setContentsMargins(0, 0, 0, 0)
+        self.resultControlWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.advanced_label_correction_image_groupbox_Layout.addWidget(self.resultControlWidget, 0, QtCore.Qt.AlignLeft)
         self.advanced_label_correction_image_groupbox_Layout.addWidget(self.advanced_label_correction_image_groupbox_HorizontalLine)
+        self.outputImageLayout.addWidget(self.outputImageWidget)
+        self.outputSplitter.addWidget(self.outputImageBox)
+
+        self.histPlotDock.setWidget(self.histPlotViewer)
+        self.beforeAfterPlotDock.setWidget(self.beforeAfterPlotViewer)
+        self.analysisDockHost.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.histPlotDock)
+        # Split top/bottom (like a vertical splitter inside the dock area)
+        self.analysisDockHost.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.beforeAfterPlotDock)
+        self.analysisDockHost.splitDockWidget(self.histPlotDock, self.beforeAfterPlotDock, QtCore.Qt.Vertical)
+
+        self.analysisGroupBoxLayout.addWidget(self.analysisDockHost)
+        self.analysisLayout.addWidget(self.analysisGroupBox)
+
+        # analysisDockHost is already added to analysisLayout in init_ui
+        self.outputSplitter.addWidget(self.analysisWidget)
+        self.outputSplitter.setStretchFactor(0, 3)
+        self.outputSplitter.setStretchFactor(1, 2)
 
         # Placing the status window and image results window in the final main layout
         self.advanced_label_correction_status_mainwidgetLayout.addWidget(self.advanced_label_correction_status_groupbox)
-        self.advanced_label_correction_image_groupbox_Layout.addWidget(self.OutputImageWidget)
         self.advanced_label_correction_image_widget_Layout.addWidget(self.advanced_label_correction_image_groupbox)
         self.advanced_label_correction_image_widget_Layout.setContentsMargins(0, 0, 0, 0)
+        self.advanced_label_correction_image_groupbox_Layout.addWidget(self.outputSplitter)
+        # Ensure outputSplitter gets all extra vertical space.
+        self.advanced_label_correction_image_groupbox_Layout.setStretch(0, 0)
+        self.advanced_label_correction_image_groupbox_Layout.setStretch(1, 0)
+        self.advanced_label_correction_image_groupbox_Layout.setStretch(2, 1)
         self.advanced_label_correction_main_horizon.addLayout(self.advanced_label_correction_main_vertical)
         self.advancedMain.addTab(self.advanced_label_correction_status_mainwidget, "Status")
         self.advancedMain.addTab(self.advanced_label_correction_image_widget, "Image results")
@@ -422,55 +508,71 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
 
     def adjust_combo_box_width(self):
         """
-        description: Added dynamic width adjustment functionality to automatically resize ImageSelectorComboBox based on its content length
+        description: Added dynamic width adjustment functionality to automatically resize imageSelectorComboBox based on its content length
         modified by Chansik Kim 2024.12.16
         """
-        font_metrics = self.ImageSelectorComboBox.fontMetrics()
+        font_metrics = self.imageSelectorComboBox.fontMetrics()
         text_width = 100  # Default minimum width
-        if self.ImageSelectorComboBox.count() > 0:
-            text_width = max(font_metrics.horizontalAdvance(self.ImageSelectorComboBox.itemText(i)) 
-                           for i in range(self.ImageSelectorComboBox.count()))
+        if self.imageSelectorComboBox.count() > 0:
+            text_width = max(font_metrics.horizontalAdvance(self.imageSelectorComboBox.itemText(i)) 
+                           for i in range(self.imageSelectorComboBox.count()))
         
         # Add padding for dropdown arrow and margins
-        self.ImageSelectorComboBox.setFixedWidth(text_width + 30)
+        self.imageSelectorComboBox.setFixedWidth(text_width + 30)
 
     # --------------------------------------------------
     # Signal-Slot Connections
     # --------------------------------------------------
-    def _connect_signals(self):
+    def init_function(self):
         """
         @description : Connect buttons and other widgets to their event handlers
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @history :
             1. Hyunsu Kim(2025.06.13) : Add connections for image results tab widgets
+            2. Hyunsu Kim(2026.02.12) : Add connection for handling image size changes via splitter movement
         """
         self.advanced_label_correction_datalist_global_search_btn.clicked.connect(
-            lambda: self._on_datalist_event(mode=LABEL_CORRECTION_DATALIST))
+            lambda: self.button_event(mode=LABEL_CORRECTION_DATALIST))
         self.advanced_label_correction_datalist_global_clear_btn.clicked.connect(
-            lambda: self._on_datalist_event(mode=LABEL_CORRECTION_CLEAR))
+            lambda: self.button_event(mode=LABEL_CORRECTION_CLEAR))
         self.advanced_label_correction_setting_start_btn.clicked.connect(
-            lambda: self._on_button_event(mode=LABEL_CORRECTION_START))
+            lambda: self.button_event(mode=LABEL_CORRECTION_START))
         self.advanced_label_correction_setting_stop_btn.clicked.connect(
-            lambda: self._on_button_event(mode=LABEL_CORRECTION_STOP))
-        self.ImageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(self.ImageSelectorComboBox.currentText()))
-        self.ThresholdButton.clicked.connect(lambda: self._on_button_event(mode=LABEL_CORRECTION_THRESHOLD))
+            lambda: self.button_event(mode=LABEL_CORRECTION_STOP))
+        self.imageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(self.imageSelectorComboBox.currentText()))
+        self.thresholdButton.clicked.connect(lambda: self.button_event(mode=LABEL_CORRECTION_THRESHOLD))
+        self.outputSplitter.splitterMoved.connect(lambda pos, index: self.outputImageWidget.fitInView())
 
     # --------------------------------------------------
     # Parameter Table Creation and Initialization
     # --------------------------------------------------
-    def _populate_table(self):
+    def fill_table(self):
         """
         @description : Create widgets and items for parameter settings and set initial state
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @history :
             1. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            2. Hyunsu Kim(2026.02.09) : Modify double spinbox in parameter setting to use custom_qtablewidget
+            3. Hyunsu Kim(2026.02.13) : Add tooltips for similarity mode options
         """
         for idx, info in self.adv_model_info.items():
             # Create tooltip(label) and parameter setting widgets
             self.header_dict_[idx] = {
-                "obj_tip": self._create_widget(idx, obj_type="widget", obj_list=info["tip"]),
-                "obj_set": self._create_widget(idx, obj_type="widget", obj_list=info["obj_list"])
+                "obj_tip": self.create_obj(idx, obj_type="widget", obj_list=info["tip"]),
+                "obj_set": self.create_obj(idx, obj_type="widget", obj_list=info["obj_list"])
             }
+            if idx == 0:
+                # Set tooltip for similarity mode combobox
+                combobox_widget = self.header_dict_[idx]["obj_set"]["combobox"]
+                for i in range(combobox_widget.count()):
+                    combobox_widget.setItemData(i, self.similarity_tooltips[i], QtCore.Qt.ToolTipRole)
+            if idx == 5:
+                # Set spinbox range for cluster count
+                spinbox_widget = self.header_dict_[idx]["obj_set"]["spinbox"]
+                spinbox_widget.setMinimum(2)
+                spinbox_widget.setMaximum(15)
+            if info["obj_list"][0].startswith("doublespinbox:"):
+                self.header_dict_[idx]["obj_set"]["spinbox"].setButtonSymbols(QtWidgets.QAbstractSpinBox.PlusMinus)
             # Add both widgets to a horizontal container
             container = QtWidgets.QHBoxLayout()
             container.setContentsMargins(3, 3, 3, 3)
@@ -483,14 +585,14 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         # Set initial state and signal connection for "Calibration" toggle
         calibration_toggle = self.header_dict_[2]["obj_set"]["toggle"]
         calibration_toggle.setChecked(self.adv_model_info[2]["value"][0])
-        calibration_toggle.toggled.connect(lambda state: self._on_toggle_event(idx=2, ch=state))
+        calibration_toggle.toggled.connect(lambda state: self.toggle_event(idx=2, ch=state))
 
         # Set initial value and signal connection for "Calibration Ratio" spinbox
         ratio_spinbox = self.header_dict_[3]["obj_set"]["spinbox"]
         ratio_spinbox.setDecimals(2)
         ratio_spinbox.setValue(round(self.adv_model_info[3]["value"][0], 2))
         ratio_spinbox.setSingleStep(0.01)
-        ratio_spinbox.valueChanged.connect(lambda val: self._on_value_change(idx=3, value=round(val, 2)))
+        ratio_spinbox.valueChanged.connect(lambda val: self.valuechange_event(idx=3, value=round(val, 2)))
 
 
         # 1. similarity mode
@@ -510,105 +612,12 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.lang.set("advanced", "advanced_label_correction_main", "advanced_label_correction_labelsource_combobox", self.header_dict_[4]["obj_set"]["combobox"])
 
     # --------------------------------------------------
-    # Widget Creation Helper
-    # --------------------------------------------------
-    def _create_widget(self, idx, obj_type="widget", obj_list=None):
-        """
-        @description : Create widgets or table items as specified by type
-        @author : JiHoon Jung
-        @parameters :
-            idx: index of the widget to create
-            obj_type: "widget" or "item"
-            obj_list: list of widget type and parameter info
-        """
-        if obj_list is None:
-            obj_list = ["button:test"]
-        result = {}
-        if obj_type == "item":
-            # Table item
-            item = QtWidgets.QTableWidgetItem(obj_list)
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            return item
-
-        # Composite widget: add multiple components to a HBox layout
-        widget = QtWidgets.QWidget()
-        layout = QtWidgets.QHBoxLayout()
-        for spec in obj_list:
-            obj, val = spec.split(":")
-            if obj == "button":
-                btn = QtWidgets.QPushButton(val)
-                btn.setObjectName(f"{idx}_btn")
-                result["button"] = btn
-                layout.addWidget(btn)
-
-            elif obj == "toggle":
-                toggle = AnimatedToggle(
-                    pulse_checked_color="transparent",
-                    pulse_unchecked_color="transparent"
-                )
-                toggle.setObjectName(f"{idx}_toggle")
-                toggle.setFixedWidth(100)
-                result["toggle"] = toggle
-                layout.addWidget(toggle)
-
-            elif obj == "spinbox":
-                try:
-                    minv, maxv, curv = list(map(int, val.split(",")))
-                    sb = QtWidgets.QSpinBox()
-                    sb.setRange(minv, maxv)
-                    sb.setValue(curv)
-                    sb.setFixedWidth(100)
-                    sb.setAlignment(QtCore.Qt.AlignCenter)
-                    sb.setButtonSymbols(QtWidgets.QAbstractSpinBox.PlusMinus)
-                    result.setdefault("spinbox", []).append(sb)
-                    layout.addWidget(sb)
-                except ValueError:
-                    minv, maxv, curv = list(map(float, val.split(",")))
-                    dsb = QtWidgets.QDoubleSpinBox()
-                    dsb.setRange(minv, maxv)
-                    dsb.setValue(curv)
-                    dsb.setFixedWidth(100)
-                    dsb.setDecimals(2)
-                    dsb.setSingleStep(0.01)
-                    dsb.setAlignment(QtCore.Qt.AlignCenter)
-                    result["spinbox"] = dsb
-                    layout.addWidget(dsb)
-            
-            elif obj == "label":
-                lbl = QtWidgets.QLabel(val)
-                lbl.setObjectName(f"{idx}_lbl")
-                result["label"] = lbl
-                layout.addWidget(lbl)
-            
-            elif obj == "lineedit":
-                le = QtWidgets.QLineEdit(val)
-                le.setReadOnly(True)
-                le.setMinimumWidth(350)
-                le.setAlignment(QtCore.Qt.AlignCenter)
-                result["lineedit"] = le
-                layout.addWidget(le)
-
-            elif obj == "combobox":
-                items = val.split(",")
-                cb = QtWidgets.QComboBox()
-                cb.addItems(items)
-                cb.setFixedWidth(100)
-                cb.setEditable(True)
-                cb.lineEdit().setAlignment(QtCore.Qt.AlignCenter)
-                cb.lineEdit().setReadOnly(True)
-                result["combobox"] = cb
-                layout.addWidget(cb)
-        widget.setLayout(layout)
-        result["widget"] = widget
-        return result
-
-    # --------------------------------------------------
     # Toggle Event Handling (Calibration Mode & Data List "Use" Toggle)
     # --------------------------------------------------
-    def _on_toggle_event(self, idx, ch, obj=None):
+    def toggle_event(self, idx, ch, obj=None):
         """
         @description : Called when a toggle widget is changed; handles calibration mode and data list usage toggle.
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
             idx: Index of the toggled widget (2 is calibration mode)
             ch: Toggle state (True/False)
@@ -627,33 +636,183 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
     # --------------------------------------------------
     # Value Change Event Handling (Spinbox)
     # --------------------------------------------------
-    def _on_value_change(self, idx, value):
+    def valuechange_event(self, idx, value):
         """
         @description : Called when a spinbox value is changed; updates internal variable.
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
             idx: Index of the changed spinbox
             value: New value
+        @history :
+            1. Hyunsu Kim(2025.09.23) : Remove unnecessary if statements
         """
-        if self.signal_sw and self.adv_model_info[idx]["value"][0] != value:
-            self.signal_sw = False
-            self.adv_model_info[idx]["value"][0] = value
-            self.signal_sw = True
+        self.adv_model_info[idx]["value"][0] = value
 
     # --------------------------------------------------
-    # Data List Event Handling (Search/Clear)
+    # Status Update and Progress Bar Handling
     # --------------------------------------------------
-    def _on_datalist_event(self, mode):
+    def update_status(self, string_):
         """
-        @description : Handles events for searching/clearing the data list.
-        @author : JiHoon Jung
+        @description : Append string to the status output pane.
+        @author : Hyunsu Kim
         @parameters :
-            mode: 0 for add folder, 1 for clear list
+            string_: String to output
         @history :
-            1. Hyunsu Kim(2025.06.13) : Added mode parameter to handle image results tab updates and modify constants
-            2. Hyunsu Kim(2025.06.17) : clear the image results tab data when clearing the data list
+            1. Hyunsu Kim(2025.09.23) : Remove unnecessary try-except statements
         """
-        if mode == LABEL_CORRECTION_DATALIST:  # Directory add
+        self.advanced_label_correction_status_textedit.appendPlainText(string_)
+
+    def update_progress(self, value):
+        """
+        @description : Update the progress bar value.
+        @author : Hyunsu Kim
+        @parameters :
+            value: Progress bar value (0~100)
+        """
+        self.progress_bar.setValue(value)
+
+    # --------------------------------------------------
+    # Restore UI State After Worker Thread Completion
+    # --------------------------------------------------
+    def recv_from_threading(self, mode):
+        """
+        @description : Restore UI state after worker thread completes.
+        @author : Hyunsu Kim
+        @parameters :
+            output: Result of thread work
+        @history :
+            1. Hyunsu Kim(2025.06.13) : Added mode parameter to handle image results tab updates
+            2. Hyunsu Kim(2025.09.23) : Remove image results tab updates
+        """
+        if mode == LABEL_CORRECTION_MODE_WORKER_1:
+            self.worker_id = -1
+            if self.advanced_label_correction_setting_start_btn.isChecked():
+                self.advanced_label_correction_setting_start_btn.toggle()
+            self.advanced_label_correction_setting_start_btn.setEnabled(True)
+            self.advanced_label_correction_setting_stop_btn.setEnabled(False)
+            self.advanced_label_correction_setting_groupbox.setEnabled(True)
+            self.advanced_label_correction_datalist_groupbox.setEnabled(True)
+            self.imageSelectorComboBox.setEnabled(True)
+            self.thresholdButton.setEnabled(True)
+            self.progress_signal.emit(0)
+            self.progress_bar.hide()
+
+    # --------------------------------------------------
+    # Start/Stop Button Event Handling
+    # --------------------------------------------------
+    def button_event(self, mode):
+        """
+        @description : Handle Start/Stop button click events.
+        @author : Hyunsu Kim
+        @parameters :
+            mode: 0 for start, 1 for stop
+        @history :
+            1. Hyunsu Kim
+             - The mode value is one of LABEL_CORRECTION_START, LABEL_CORRECTION_STOP, or LABEL_CORRECTION_THRESHOLD.
+             - LABEL_CORRECTION_START: Start label calibration
+             - LABEL_CORRECTION_STOP: Stop label calibration
+             - LABEL_CORRECTION_THRESHOLD: Apply similarity threshold
+             - using string signal to print messages in the status output window
+            2. Hyunsu Kim(2025.09.04) : Prevent simultaneous use of the start button and threshold button
+            3. Hyunsu Kim(2025.09.23) : reset Image Results tab when starting label correction
+            4. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            5. Hyunsu Kim(2026.02.09) : 
+                - when stopping label correction, toggle off the start button if it's still checked
+                - when starting label correction or applying threshold, clear previous analysis plot data
+                - merge button datalist event and button event
+            6. Hyunsu Kim(2026.02.13) : Change the processing to not use thread when pressing the apply button
+            7. Yugyeong Hong(2026.02.14) : Refactor message box with util method and language support
+            8. Hyunsu Kim(2026.03.13) : Correct the button event to update the UI state After apply_threshold function
+        """
+        if mode == LABEL_CORRECTION_START:  # Start
+            # Disable UI buttons and groups
+            self.interrupt_ = False
+            self.advanced_label_correction_setting_start_btn.setEnabled(False)
+            self.advanced_label_correction_setting_stop_btn.setEnabled(True)
+            self.advanced_label_correction_setting_groupbox.setEnabled(False)
+            self.advanced_label_correction_datalist_groupbox.setEnabled(False)
+            self.imageSelectorComboBox.clear()
+            self.imageSelectorComboBox.setEnabled(False)
+            self.thresholdButton.setEnabled(False)
+            self.outputImageWidget.initPhoto()
+            self.advanced_label_correction_status_textedit.clear()
+            self.histPlotViewer.clear()
+            self.beforeAfterPlotViewer.clear()
+
+            # Print current parameter settings in the output window
+            header = f"{self.mode}\n{self.dash * 30}"
+            self.string_signal.emit(header)
+            self.string_signal.emit("Parameter Setting\n")
+            for idx, info in self.adv_model_info.items():
+                param_type = info["type"]
+                obj_set = self.header_dict_[idx]["obj_set"]
+                if "spinbox" in obj_set:
+                    val = obj_set["spinbox"].value()
+                elif "toggle" in obj_set:
+                    val = obj_set["toggle"].isChecked()
+                elif "combobox" in obj_set:
+                    val = obj_set["combobox"].currentText()
+                else:
+                    val = "(unknown type)"
+                self.string_signal.emit(
+                    f"{idx+1}. {param_type} : {val}\n"
+                )
+            self.string_signal.emit(self.dash * 30)
+            self.string_signal.emit("Data List\n")
+
+            # Print number of selected datasets
+            selected_count = sum(
+                1 for v in self.adv_data_list_info.values() if v["obj_set"]["toggle"].isChecked()
+            )
+            self.string_signal.emit(f"Total: {selected_count}\n")
+            self.string_signal.emit("Processing Start....\n")
+
+            # Show progress bar and launch background work
+            self.progress_bar.setValue(0)
+            self.progress_bar.show()
+
+            self.worker_1.staging(self.correct_label_mode)
+            self.worker_id = self.worker_1.cur_id
+            self.worker_1.start()
+        elif mode == LABEL_CORRECTION_STOP: # Stop
+            # Confirm stop with dialog
+            response = messageBox(mode=MESSAGE_BOX_CONFIRMATION, 
+                          title=self.lang.get("advanced", "advanced_label_correction_main", "advanced_label_correction_msg_stop_title"), 
+                          text=self.lang.get("advanced", "advanced_label_correction_main", "advanced_label_correction_msg_stop_message"),
+                          buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
+            if response == "accept":
+                self.interrupt_ = True
+                self.worker_id = -1
+                if self.advanced_label_correction_setting_start_btn.isChecked():
+                    self.advanced_label_correction_setting_start_btn.toggle()
+                self.advanced_label_correction_setting_start_btn.setEnabled(True)
+                self.advanced_label_correction_setting_stop_btn.setEnabled(False)
+                self.advanced_label_correction_setting_groupbox.setEnabled(True)
+                self.advanced_label_correction_datalist_groupbox.setEnabled(True)
+                if len(self.rgb_image):
+                    data_name = next(iter(self.rgb_image.keys()))
+                    self.update_rgb_image(data_name)
+                self.string_signal.emit(f"\n{'-' * 50}\nProcess stopped by user.\n{'-' * 50}")
+        # Image results function works when button is clicked
+        elif mode == LABEL_CORRECTION_THRESHOLD:
+                self.interrupt_ = False
+                self.beforeAfterPlotViewer.clear()
+                self.advanced_label_correction_setting_start_btn.setEnabled(False)
+                self.imageSelectorComboBox.setEnabled(False)
+                self.thresholdButton.setEnabled(False)
+                self.advanced_label_correction_datalist_global_clear_btn.setEnabled(False)
+                finishApplyThr = self.apply_threshold()
+                if finishApplyThr:
+                    self.apply_threshold_change = False
+                else:
+                    self.string_signal.emit("error occured doing apply_threshold.\n")
+                if self.thresholdButton.isChecked():
+                    self.thresholdButton.toggle()
+                self.thresholdButton.setEnabled(True)
+                self.advanced_label_correction_setting_start_btn.setEnabled(True)
+                self.advanced_label_correction_datalist_global_clear_btn.setEnabled(True)
+                self.imageSelectorComboBox.setEnabled(True)
+        elif mode == LABEL_CORRECTION_DATALIST:  # Directory add
             file_dialog = QtWidgets.QFileDialog()
             file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
             file_dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
@@ -679,9 +838,9 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 for i, p in enumerate(new_paths):
                     r = base_row + i
                     # Add index and path info to table
-                    idx_item = self._create_widget(r, obj_type="item", obj_list=str(r))
-                    path_item = self._create_widget(r, obj_type="item", obj_list=p)
-                    toggle_widget = self._create_widget(r, obj_type="widget", obj_list=["toggle:"])
+                    idx_item = self.create_obj(r, obj_type="item", obj_list=str(r))
+                    path_item = self.create_obj(r, obj_type="item", obj_list=p)
+                    toggle_widget = self.create_obj(r, obj_type="widget", obj_list=["toggle:"])
                     self.advanced_label_correction_datalist_tableview.setItem(r, 0, idx_item)
                     self.advanced_label_correction_datalist_tableview.setItem(r, 1, path_item)
                     self.advanced_label_correction_datalist_tableview.setCellWidget(r, 2, toggle_widget["widget"])
@@ -692,243 +851,64 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                         "obj_idx": idx_item,
                         "obj_path": path_item,
                         "obj_set": toggle_widget,
-                        "wrong_process": False
+                        "wrongProcess": False
                     }
                     # Connect toggle event to handler
                     toggle_widget["toggle"].toggled.connect(
                         lambda ch, path=p, info=self.adv_data_list_info[p]:
-                        self._on_toggle_event(idx=path, ch=ch, obj=info)
+                        self.toggle_event(idx=path, ch=ch, obj=info)
                     )
-        else:
+        elif mode == LABEL_CORRECTION_CLEAR:
             # Clear: reset table and internal info
             self.advanced_label_correction_datalist_tableview.clear()
-            self.advanced_label_correction_datalist_tableview.setRowCount(4)
-            self.advanced_label_correction_datalist_tableview.setHorizontalHeaderLabels(
-                ["Index", "Data", "Use"])
+            self.advanced_label_correction_datalist_tableview.setting_headerlabels(["Index", "Data", "Use"])
             self.adv_data_list_info.clear()
             """
-               clear the image results tab data
+            clear the image results tab data
             """
-            self.ImageSelectorComboBox.clear()
+            self.imageSelectorComboBox.clear()
             self.rgb_image.clear()
             self.update_total_nonzero_pixel.clear()
             self.total_nonzero_pixel.clear()
+            self.similarityHistData.clear()
+            self.spectrumBeforeAfterData.clear()
             self.apply_threshold_change = False
             self.thr = -1
-            self.worker_id2 = -1
-            self.ReducedPixelValue.setText("0 (0 %)")  # Reset reduced pixel value display
-            self.OutputImageWidget.initPhoto()
-            self.ThresholdLineEdit.setText("0")
-
-    # --------------------------------------------------
-    # Status Update and Progress Bar Handling
-    # --------------------------------------------------
-    def update_status(self, string_):
-        """
-        @description : Append string to the status output pane.
-        @author : JiHoon Jung
-        @parameters :
-            string_: String to output
-        """
-        try:
-            msg = f"{float(string_):.2f}" if string_.replace('.', '', 1).isdigit() else string_
-        except ValueError:
-            msg = string_
-        self.advanced_label_correction_status_textedit.appendPlainText(msg)
-
-    def _update_progress(self, value):
-        """
-        @description : Update the progress bar value.
-        @author : JiHoon Jung
-        @parameters :
-            value: Progress bar value (0~100)
-        """
-        self.progress_bar.setValue(value)
-
-    # --------------------------------------------------
-    # Restore UI State After Worker Thread Completion
-    # --------------------------------------------------
-    def _on_thread_complete(self, mode):
-        """
-        @description : Restore UI state after worker thread completes.
-        @author : JiHoon Jung
-        @parameters :
-            output: Result of thread work
-        @history :
-            1. Hyunsu Kim(2025.06.13) : Added mode parameter to handle image results tab updates
-        """
-        if mode == LABEL_CORRECTION_MODE_WORKER_1:
-            self.worker_id = -1
-            self.advanced_label_correction_setting_start_btn.toggle()
-            self.advanced_label_correction_setting_start_btn.setEnabled(True)
-            self.advanced_label_correction_setting_stop_btn.setEnabled(False)
-            self.advanced_label_correction_setting_groupbox.setEnabled(True)
-            self.advanced_label_correction_datalist_groupbox.setEnabled(True)
-            self.ImageSelectorComboBox.setEnabled(True)
-            self.ThresholdButton.setEnabled(True)
-            self.progress_signal.emit(0)
-            self.progress_bar.hide()
-        # Update UI when image results function operation is completed
-        elif mode == LABEL_CORRECTION_MODE_WORKER_2:
-            self.ThresholdButton.toggle()
-            self.ThresholdButton.setEnabled(True)
-            self.advanced_label_correction_setting_start_btn.setEnabled(True)
-            self.advanced_label_correction_datalist_global_clear_btn.setEnabled(True)
-            self.ImageSelectorComboBox.setEnabled(True)
-            self.worker_id2 = -1
-            self.apply_threshold_change = False
-
-    # --------------------------------------------------
-    # Start/Stop Button Event Handling
-    # --------------------------------------------------
-    def _on_button_event(self, mode):
-        """
-        @description : Handle Start/Stop button click events.
-        @author : JiHoon Jung
-        @parameters :
-            mode: 0 for start, 1 for stop
-        @history :
-            1. Hyunsu Kim
-             - The mode value is one of LABEL_CORRECTION_START, LABEL_CORRECTION_STOP, or LABEL_CORRECTION_THRESHOLD.
-             - LABEL_CORRECTION_START: Start label calibration
-             - LABEL_CORRECTION_STOP: Stop label calibration
-             - LABEL_CORRECTION_THRESHOLD: Apply similarity threshold
-             - using string signal to print messages in the status output window
-            2. Hyunsu Kim(2025.09.04) : Prevent simultaneous use of the start button and threshold button
-            3. Hyunsu Kim(2025.09.23) : reset Image Results tab when starting label correction
-            4. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
-        """
-        if mode == LABEL_CORRECTION_START:  # Start
-            # Warn if work is already running
-            if self.worker_id != -1:
-                QtWidgets.QMessageBox.information(
-                    self,
-                    self.lang.get(
-                        "advanced", "advanced_label_correction_main", "advanced_label_correction_msg_warning_already_allocated_title"),
-                        f"{self.lang.get('advanced', 'advanced_label_correction_main', 'advanced_label_correction_msg_warning_already_allocated_title')} Worker ID:{self.worker_id}"
-                    )
-                return
-
-            # Disable UI buttons and groups
-            self.interrupt_ = False
-            self.advanced_label_correction_setting_start_btn.setEnabled(False)
-            self.advanced_label_correction_setting_stop_btn.setEnabled(True)
-            self.advanced_label_correction_setting_groupbox.setEnabled(False)
-            self.advanced_label_correction_datalist_groupbox.setEnabled(False)
-            self.ImageSelectorComboBox.clear()
-            self.ImageSelectorComboBox.setEnabled(False)
-            self.ThresholdButton.setEnabled(False)
-            self.OutputImageWidget.initPhoto()
-            self.ReducedPixelLabel.setText("Reduced Pixel : ")
-            self.ReducedPixelValue.setText("0 (0 %)")
-            self.advanced_label_correction_status_textedit.clear()
-
-            # Print current parameter settings in the output window
-            header = f"{self.mode}\n{self.dash * 30}"
-            self.string_signal.emit(header)
-            self.string_signal.emit("Parameter Setting\n")
-            for idx, info in self.adv_model_info.items():
-                param_type = info["type"]
-                obj_set = self.header_dict_[idx]["obj_set"]
-                if "spinbox" in obj_set:
-                    val = obj_set["spinbox"]
-                    val = val[0].value() if isinstance(val, list) else val.value()
-                elif "toggle" in obj_set:
-                    val = obj_set["toggle"].isChecked()
-                elif "combobox" in obj_set:
-                    val = obj_set["combobox"].currentText()
-                else:
-                    val = "(unknown type)"
-                self.string_signal.emit(
-                    f"{idx+1}. {param_type} : {val}\n"
-                )
-            self.string_signal.emit(self.dash * 30)
-            self.string_signal.emit("Data List\n")
-
-            # Print number of selected datasets
-            selected_count = sum(
-                1 for v in self.adv_data_list_info.values() if v["obj_set"]["toggle"].isChecked()
-            )
-            self.string_signal.emit(f"Total: {selected_count}\n")
-            self.string_signal.emit("Processing Start....\n")
-
-            # Show progress bar and launch background work
-            self.progress_bar.setValue(0)
-            self.progress_bar.show()
-
-            self.worker_1.staging(self._predict_label_mode)
-            self.worker_id = self.worker_1.cur_id
-            self.worker_1.start()
-        elif mode == LABEL_CORRECTION_STOP: # Stop
-            # Confirm stop with dialog
-            if self._yes_no_message(
-                self.lang.get("advanced", "advanced_label_correction_main", "advanced_label_correction_msg_stop_title"),
-                self.lang.get("advanced", "advanced_label_correction_main", "advanced_label_correction_msg_stop_message")
-            ):
-                self.interrupt_ = True
-                self.worker_id = -1
-                self.advanced_label_correction_setting_start_btn.setEnabled(True)
-                self.advanced_label_correction_setting_stop_btn.setEnabled(False)
-                self.advanced_label_correction_setting_groupbox.setEnabled(True)
-                self.advanced_label_correction_datalist_groupbox.setEnabled(True)
-                if len(self.rgb_image):
-                    data_name = next(iter(self.rgb_image.keys()))
-                    self.OutputImageWidget.updatePhoto(QtGui.QPixmap(QtGui.QImage(self.rgb_image[data_name], self.rgb_image[data_name].shape[1], self.rgb_image[data_name].shape[0], QtGui.QImage.Format_RGB888)), True)
-                self.string_signal.emit(f"\n{'-' * 50}\nProcess stopped by user.\n{'-' * 50}")
-        # Image results function works when button is clicked
-        elif mode == LABEL_CORRECTION_THRESHOLD:
-            if self.worker_id2 == -1:
-                self.interrupt_ = False
-                self.advanced_label_correction_setting_start_btn.setEnabled(False)
-                self.ImageSelectorComboBox.setEnabled(False)
-                self.ThresholdButton.setEnabled(False)
-                self.advanced_label_correction_datalist_global_clear_btn.setEnabled(False)
-                self.worker_2.staging(self.apply_threshold)
-                self.worker_id2 = self.worker_2.cur_id
-                self.worker_2.start()
-    # --------------------------------------------------
-    # Yes/No Message Box Utility
-    # --------------------------------------------------
-    def _yes_no_message(self, title, message):
-        """
-        @description : Show a Yes/No message box and return the user's choice.
-        @author : JiHoon Jung
-        @parameters :
-            title: Message box title
-            message: Message box content
-        """
-        msgbox = QtWidgets.QMessageBox()
-        msgbox.setIcon(QtWidgets.QMessageBox.Warning)  # Warning icon
-        msgbox.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        msgbox.setDefaultButton(QtWidgets.QMessageBox.No)
-        msgbox.setWindowTitle(title)
-        msgbox.setText(message)
-        return msgbox.exec_() == QtWidgets.QMessageBox.Yes
+            self.reducedPixelValue.setText("0 (0 %)")  # Reset reduced pixel value display
+            self.outputImageWidget.initPhoto()
+            self.histPlotViewer.clear()
+            self.beforeAfterPlotViewer.clear()
+            self.thresholdLineEdit.setText("0")
 
     # --------------------------------------------------
     # Main Label Correction Processing (Worker Thread)
     # --------------------------------------------------
-    def _predict_label_mode(self) -> None:
+    def correct_label_mode(self) -> None:
         """
         @description : Sequentially process selected folders and run label correction.
                        (Called from worker thread)
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @history :
             1. Hyunsu Kim (2025.06.17)
-              - add folder name to ImageSelectorComboBox
+              - add folder name to imageSelectorComboBox
               - Displaying the first result via update_signal
               - process parameter for image results tab
             2. Hyunsu Kim (2025.10.17)
               - add check variable for wrong process
               - Update to the first image among the data excluding the image in which the error occurred
+            3. Hyunsu Kim (2026.02.09)
+              - Add gen module instance creation for data loading
+            4. Hyunsu Kim (2026.02.12)
+              - Change the parameters sent to the signal to use the image results tab feature without using threads.
         """
         try:
+            self.gen = gen_module()
             # Extract only the data paths with "Use" toggled on
             data_path_list = [
                 key for key, val in self.adv_data_list_info.items()
                 if val["obj_set"]["toggle"].isChecked()
             ]
-            self.wrong_process = [False for _ in range(len(data_path_list))]
+            self.wrongProcess = [False for _ in range(len(data_path_list))]
             if not data_path_list:
                 raise Exception("No data selected for processing. Please check 'Use' toggles.")
 
@@ -939,13 +919,13 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                     break
                 header = f"\n{'=' * 100}\nProcessing folder: {data_path}\n{'=' * 100}"
                 self.string_signal.emit(header)
-                self._process_folder(data_path, pathIndex=pathIndex)
+                self.correct_data(data_path, pathIndex=pathIndex, gen=self.gen)
                 # Add to combo box after processing folder
-                if self.wrong_process[pathIndex] == False and self.ImageSelectorComboBox.findText(data_path.split("/")[-1]) == -1:
-                    self.ImageSelectorComboBox.addItem(data_path.split("/")[-1])
+                if self.wrongProcess[pathIndex] == False and self.imageSelectorComboBox.findText(data_path.split("/")[-1]) == -1:
+                    self.imageSelectorComboBox.addItem(data_path.split("/")[-1])
                     self.adjust_combo_box_width()
-                if self.wrong_process[pathIndex]:
-                    self.adv_data_list_info[data_path]["wrong_process"] = True
+                if self.wrongProcess[pathIndex]:
+                    self.adv_data_list_info[data_path]["wrongProcess"] = True
                 if self.interrupt_:
                     self.string_signal.emit("\nProcess interrupted by user after folder process.\n")
                     break
@@ -954,286 +934,347 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 self.string_signal.emit(f"\n{'-' * 50}\nProcessing Complete!\n{'-' * 50}")
                 # Displaying the first result via update_signal
                 for data_path, info in self.adv_data_list_info.items():
-                    if info["wrong_process"] == False:
+                    if info["wrongProcess"] == False:
                         data_name = data_path.split("/")[-1]
-                        self.signal_.update_signal.emit(data_name)
-                        self.ThresholdLineEdit.setText("0")  # Reset threshold input
+                        self.update_signal.emit(self.updateImage[data_name], data_name)
+                        self.thresholdLineEdit.setText("0")  # Reset threshold input
                         break
         except Exception as e:
             self.string_signal.emit(f"\nError Occurred: {str(e)}\n{'-' * 50}\n")
 
-    def _process_folder(self, data_path: str, threshold = -1, pathIndex = -1) -> None:
+    def correct_data(self, data_path: str, threshold = -1, pathIndex = -1, gen=None):
         """
         @description : Load hyperspectral data and perform label correction.
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
-            data_path: Path to the folder containing hyperspectral data
+             - data_path: Path to the folder containing hyperspectral data
+             - threshold: Similarity threshold to use (-1 to use default from UI)
+             - pathIndex: Index of the data path in the processing list
+             - gen: gen_module instance for data loading
         @history :
             1. Hyunsu Kim (2025.06.17) : add process parameter for image select box
-            2. Hyunsu Kim (2025.10.17) : Set wrong_process to True if an error occurs during the process
+            2. Hyunsu Kim (2025.10.17) : Set wrongProcess to True if an error occurs during the process
+            3. Hyunsu Kim (2026.02.09) : 
+                - Modify to use gen module instance for data loading
+                - Improving how features work using clustering
+            4. Hyunsu Kim (2026.02.12) :
+                - Change the variable to use the image results tab feature without using threads.
         """
-        cal_on = self.adv_model_info[2]["value"][0]  # Calibration mode (on/off) for preprocessing the data
-        cal_rate = self.adv_model_info[3]["value"][0]  # Calibration rate or parameter value
-        data = self.load_hyperspectral_data(data_path, cal_on, cal_rate)  # Hyperspectral data data (H, W, B)
-        if data is None:
-            self.wrong_process[pathIndex] = True
-            self.string_signal.emit(f"  - Data loading failed for {data_path}.\n")
-            return
+        try:
+            # data load, kmeans fit, find closet pixels, calculate similarity, update label & save results, finish
+            totalSteps = 6 
+            # number of clusters for k-means
+            clusters = self.header_dict_[5]["obj_set"]["spinbox"].value()
+            cal_on = self.header_dict_[2]["obj_set"]["toggle"].isChecked()
+            cal_rate = self.header_dict_[3]["obj_set"]["spinbox"].value()
+            data_name = data_path.split("/")[-1]
+            self.data[data_name] = gen.load_data(data_path, calibration=cal_on, calibration_rate=cal_rate)
+            width, height, _ = self.data[data_name].shape
+            if self.data[data_name] is None:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit(f"  - Data loading failed for {data_path}.\n")
+                return
 
-        label = self.load_or_initialize_label(data_path, data.shape[:2])  # 2D label mask (H, W)
-        data_name = data_path.split("/")[-1]
-        if label is None:
-            self.wrong_process[pathIndex] = True
-            return
-        else: # Store non-zero number of labels
-            if np.isin(label.cpu().numpy(), [1, 2]).any() == False:
-                self.wrong_process[pathIndex] = True
+            # Load label as a 2D map (width, height)
+            if os.path.isfile(data_path + "/label.npy"):
+                self.label[data_name] = np.load(data_path + "/label.npy")
+            else:
+                # Initialize empty label map (width, height)
+                self.label[data_name] = np.zeros((width, height), dtype=np.int16)
+
+            if np.isin(self.label[data_name], NORMAL_LABELS).any() == False:
+                self.wrongProcess[pathIndex] = True
                 self.string_signal.emit(f"  - No reference pixels found in {data_name}. Skip.\n")
                 return
-            self.total_nonzero_pixel[data_name] = np.count_nonzero(label.cpu().numpy())
+            self.total_nonzero_pixel[data_name] = np.count_nonzero(self.label[data_name])
+            self.rgb_image[data_name], self.normalLabelColor[data_name] = self.load_rgb_data(data_path)  # create an RGB image based on the label for visualization
+            self.updateImage[data_name] = self.rgb_image[data_name].copy()  # Store a copy of the original RGB image for updates
+            if self.interrupt_:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit("  - Process interrupted before starting.\n")
+                return
 
-        H, W = label.shape                 # H: image height (pixels), W: image width (pixels)
-        B = data.shape[-1]                 # B: number of spectral bands (channels) per pixel
+            method = self.header_dict_[0]["obj_set"]["combobox"].currentText()  # String: similarity method
+            # If no threshold is specified, use spinbox value
+            if threshold != -1:
+                thr = threshold
+            else:
+                thr = self.header_dict_[1]["obj_set"]["spinbox"].value()     # Float: similarity threshold
+            self.string_signal.emit(f"  - Similarity = {method}, Threshold = {thr}")
+            curStep = 1
+            self.progress_signal.emit(int(curStep / totalSteps * 100))
 
-        coords = torch.nonzero((label == 1) | (label == 2), as_tuple=False).to(self.device)
-        # coords: (N_ref, 2), pixel coordinates (row, col) where label is 1 or 2 (reference pixels)
-        if coords.numel() == 0:
-            self.wrong_process = True
-            self.string_signal.emit("  - No pixels with label 1/2. Skip.\n")
-            return
+            refData = self.data[data_name][np.where(self.label[data_name] >= 1)] # (N_ref, B), spectra of reference pixels
+            coords = np.argwhere((self.label[data_name] >= 1)) # (N_ref, 2), coordinates of reference pixels
+            self.refLabel[data_name] = coords[:, 0] * height + coords[:, 1]  # (N_ref,), flat indices of reference pixels
 
-        method = self.header_dict_[0]["obj_set"]["combobox"].currentText()  # String: similarity metric/method
-        # If no threshold is specified, use spinbox value
-        if threshold != -1:
-            thr = threshold
-        else:
-            thr = self.header_dict_[1]["obj_set"]["spinbox"][0].value()     # Float: similarity threshold
-        self.string_signal.emit(f"  - Similarity = {method}, Threshold = {thr}")
-        self.progress_signal.emit(0)
+            kmeans = KMeans(init="k-means++", n_clusters=clusters, random_state=self.randomSeed).fit(refData)
 
-        # Precompute all labeled pixels (label>=1) as coordinates and their flat indices for the whole process
-        all_labeled_coords = torch.nonzero(label >= 1, as_tuple=False).to(self.device)  # (N_labeled, 2), all labeled pixels
-        all_labeled_flat = all_labeled_coords[:, 0] * W + all_labeled_coords[:, 1]      # (N_labeled,), flat indices for labeled pixels
-        marked_for_removal = torch.zeros(H * W, dtype=torch.bool, device=self.device)    # (H*W,), mask: True if pixel is to be removed
-        data_flat = data.reshape(-1, B)          # (H*W, B), pixel spectra flattened for fast indexing
-        label_flat = label.reshape(-1)           # (H*W,), 1D version of the label mask
+            if self.interrupt_:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit("  - Process interrupted during k-means fitting.\n")
+                return
+            
+            curStep = 2
+            self.progress_signal.emit(int(curStep / totalSteps * 100))
+            dists = kmeans.transform(refData)
+            labels = kmeans.predict(refData)
+            closetPixels = []
+            for idx in range(clusters):
+                idxCluster = np.where(labels == idx)[0]
+                closet = idxCluster[np.argmin(dists[idxCluster, idx])]
+                closetPixels.append(closet)
+            closetPixel = refData[closetPixels]
+            
+            if self.interrupt_:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit("  - Process interrupted during finding closest pixels.\n")
+                return
 
-        batch_size = 256                         # Number of reference pixels to process per batch
-        total_refs = coords.size(0)              # Total number of reference pixels (label==1 or 2) 
-        processed = 0                            # Counter for processed reference pixels
+            curStep = 3
+            self.progress_signal.emit(int(curStep / totalSteps * 100))
 
-        while batch_size >= 8:
-            try:
-                for batch_start in range(0, total_refs, batch_size):
-                    if self.interrupt_:
-                        self.wrong_process = True
-                        self.string_signal.emit("  - User interrupt detected. Stopping batch.\n")
-                        return
-                    torch.cuda.empty_cache()
+            self.similarity[data_name] = np.zeros((width * height), dtype=np.float32)  # (width*height,), flattened similarity map
+            dists = self.calculate_similarity(closetPixel, refData, mode=method)
+            self.similarity[data_name][self.refLabel[data_name]] = np.max(dists, axis=0)  # Fill similarity scores for reference pixels
 
-                    batch_end = min(batch_start + batch_size, total_refs)  # End index for this batch (exclusive) 
-                    
-                    ref_batch = coords[batch_start:batch_end]              # (batch, 2), reference coordinates for this batch
-                    ref_flat_idx = ref_batch[:, 0] * W + ref_batch[:, 1]   # (batch,), flat indices for batch refs
+            if self.interrupt_:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit("  - Process interrupted during similarity calculation.\n")
+                return
 
-                    valid_ref_mask = ~marked_for_removal[ref_flat_idx]     # (batch,), True for valid refs not yet removed
-                    ref_batch = ref_batch[valid_ref_mask]                  # (<=batch, 2), valid ref coordinates
-                    ref_flat_idx = ref_flat_idx[valid_ref_mask]            # (<=batch,), valid ref indices
+            curStep = 4
+            self.progress_signal.emit(int(curStep / totalSteps * 100))
 
-                    if ref_batch.numel() == 0:
-                        processed += (batch_end - batch_start)
-                        self.progress_signal.emit(int(processed / total_refs * 100))
-                        continue
+            labelAfterRemoval = self.label[data_name].copy()
+            labelAfterRemoval[np.where(self.similarity[data_name].reshape(width, height) >= thr)] = 0          # Final label update: set label=0 for all removed pixels
+            self.update_total_nonzero_pixel[data_name] = np.count_nonzero(labelAfterRemoval) # Update the number of non-zero pixels in the label after process processing
+            
+            self.updateImage[data_name][np.where(labelAfterRemoval > 0)] = self.normalLabelColor[data_name]
+            # Save histogram of similarity scores (based on initially labeled pixels)
+            self.similarityHistogram(
+                data_name=data_name,
+                similarityFlat=self.similarity[data_name],
+                labeledFlatIdx=self.refLabel[data_name],
+                method=method,
+                thr=thr
+            )
 
-                    ref_indices = torch.arange(batch_start, batch_end, device=self.device)[valid_ref_mask]
-                    # ref_indices: (<=batch,), batch indices of valid references in this batch
-                    min_idx = ref_indices[-1] + 1 if ref_indices.numel() > 0 else batch_end
-                    # min_idx: Int, for slicing to avoid redundant comparisons (targets only after this index)
+            # Save before/after distribution (similarity score distribution of labeled pixels)
+            self.similarityBeforeAfterDistribution(
+                data_name=data_name,
+                before=self.data[data_name][np.where(self.label[data_name] > 0)],
+                after=self.data[data_name][np.where(labelAfterRemoval > 0)],
+                method=method
+            )
 
-                    # === Target selection: only consider labeled pixels (label>=1) after min_idx, and not marked for removal ===
-                    target_coords = all_labeled_coords[min_idx:]           # (N_target, 2), candidate target coordinates
-                    tgt_flat_idx = all_labeled_flat[min_idx:]              # (N_target,), candidate target flat indices
-                    valid_tgt_mask = ~marked_for_removal[tgt_flat_idx]     # (N_target,), True for valid targets
-                    target_coords = target_coords[valid_tgt_mask]          # (N_valid_targets, 2), coordinates of valid targets
-                    tgt_flat_idx = tgt_flat_idx[valid_tgt_mask]            # (N_valid_targets,), flat indices of valid targets
+            if self.interrupt_:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit("  - Process interrupted during label update.\n")
+                return
+            
+            curStep = 5
+            self.progress_signal.emit(int(curStep / totalSteps * 100))
+            if not self.interrupt_:
+                # Prevent saving labels and outputting status messages when updating in the image results tab
+                if self.apply_threshold_change == False:
+                    curStep = totalSteps
+                    self.progress_signal.emit(int(curStep / totalSteps * 100))
+                    if self.header_dict_[4]["obj_set"]["combobox"].currentText() == "Create":
+                        np.save(data_path + f"/label_similarity_{method}_{thr}.npy", labelAfterRemoval)
+                    else:
+                        np.save(data_path + "/label.npy", labelAfterRemoval)
 
-                    if target_coords.numel() == 0:
-                        processed += (batch_end - batch_start)
-                        self.progress_signal.emit(int(processed / total_refs * 100))
-                        continue
-
-                    ref_spectra = data_flat[ref_flat_idx]                  # (n_refs, B), spectra for current batch refs
-                    target_spectra = data_flat[tgt_flat_idx]               # (n_targets, B), spectra for valid target pixels
-
-                    if self.interrupt_:
-                        self.wrong_process = True
-                        self.string_signal.emit("  - User interrupt detected. Exiting before batch similarity.\n")
-                        return
-
-                    # Compute similarity between refs and targets
-                    with autocast():
-                        sim_ref_target = self.calculate_batch_similarity(ref_spectra, target_spectra, method)
-                    # sim_ref_target: (n_refs, n_targets), similarity values
-
-                    del_target_mask = torch.any(sim_ref_target >= thr, dim=0)  # (n_targets,), True if any ref is too similar
-                    del_tgt_flat = tgt_flat_idx[del_target_mask]               # (n_del_targets,), indices to be marked for removal
-                    marked_for_removal[del_tgt_flat] = True                   # Mark those targets for removal
-
-                    # Intra-batch redundancy: remove refs in this batch that are too similar to each other
-                    with autocast():
-                        sim_ref_ref = self.calculate_batch_similarity(ref_spectra, ref_spectra, method)
-                    # sim_ref_ref: (n_refs, n_refs), similarity between refs
-
-                    R = sim_ref_ref.size(0)                                   # Number of references in this batch
-                    if R > 1:
-                        tri_i, tri_j = torch.triu_indices(R, R, offset=1, device=self.device)
-                        # tri_i, tri_j: indices for upper triangle (no self-comparison)
-                        sim_upper = sim_ref_ref[tri_i, tri_j]                # (num_upper,), upper triangle values
-                        remove_pair_mask = sim_upper >= thr                  # (num_upper,), True if similarity is high
-                        del_ref_j_indices = tri_j[remove_pair_mask]          # Indices in this batch of refs to remove
-                        if del_ref_j_indices.numel() > 0:
-                            unique_j = del_ref_j_indices.unique()            # Unique indices to avoid double marking
-                            del_ref_flat = ref_flat_idx[unique_j]            # Final flat indices to mark for removal
-                            marked_for_removal[del_ref_flat] = True
-
-                    processed += (batch_end - batch_start)
-                    self.progress_signal.emit(int(processed / total_refs * 100))
-
-                break  # All batches processed
-
-            except RuntimeError as e:
-                if "out of memory" in str(e):
-                    self.string_signal.emit(f"CUDA OOM detected at batch_size={batch_size}. Reducing batch size and retrying.")
-                    batch_size //= 2
-                    self.string_signal.emit(f"New batch_size set to {batch_size}.")
-                    torch.cuda.empty_cache()
-                    processed = 0
-                    continue
-                else:
-                    raise e
-
-        if batch_size < 8:
-            self.wrong_process = True
-            self.string_signal.emit("Batch size too small, stopping processing due to memory constraints.")
-            return
-
-        label_flat[marked_for_removal] = 0  # Final label update: set label=0 for all removed pixels
-        self.update_total_nonzero_pixel[data_name] = np.count_nonzero(label_flat.cpu().numpy()) # Update the number of non-zero pixels in the label after process processing
-        label_reshape = label_flat.reshape(H, W)                                                # Reshape the label back to its original 2D shape
-        self.rgb_image[data_name] = self.load_rgb_data(data_path, label_reshape.cpu().numpy())  # create an RGB image
-
-        if not self.interrupt_:
-            # Prevent saving labels and outputting status messages when updating in the image results tab
-            if self.apply_threshold_change == False:
-                self.progress_signal.emit(100)
-                self.save_label(data_path, label)
-            self.string_signal.emit("  - Folder processing completed.\n")
-        else:
-            # Prevent outputting status messages when updating in the image results tab
-            if self.apply_threshold_change == False:
-                self.wrong_process = True
-                self.string_signal.emit("  - Folder processing interrupted.\n")
-
-
+                self.string_signal.emit("  - Folder processing completed.\n")
+            else:
+                # Prevent outputting status messages when updating in the image results tab
+                if self.apply_threshold_change == False:
+                    self.wrongProcess[pathIndex] = True
+                    self.string_signal.emit("  - Folder processing interrupted.\n")
+        except Exception as e:
+            self.wrongProcess[pathIndex] = True
+            self.string_signal.emit(f"  - Error during processing: {str(e)}\n")
 
     # --------------------------------------------------
-    # Batch Similarity Computation Function
+    # Similarity Computation Function
     # --------------------------------------------------
-    def calculate_batch_similarity(self, refs: torch.Tensor, targets: torch.Tensor, mode: str) -> torch.Tensor:
+    def calculate_similarity(self, refs, targets, mode):
         """
         @description : Compute similarity matrix (R x N) between reference (refs) and target (targets) spectra.
-        @author : JiHoon Jung
+        @author : Hyunsu Kim
         @parameters :
-            refs: Tensor of reference spectra (R, B)
-            targets: Tensor of target spectra (N, B)
+            refs: Array of reference spectra (R, B)
+            targets: Array of target spectra (N, B)
             mode: One of "Area", "Cosine", "SAM", "L2", "Chebyshev", "Canberra", "Jeffrey"
         """
-        eps = 1e-12  # Small constant for numerical stability
+        eps = 1e-10  # Small constant for numerical stability
         # 1) Area mode: Sum of absolute differences between spectra, normalized
         if mode == "Area":
             # Broadcast refs and targets to (R, N, B) for batch difference computation
-            diff = torch.abs(refs[:, None, :] - targets[None, :, :])  # (R, N, B)
-            max_ = torch.maximum(refs[:, None, :], targets[None, :, :])  # (R, N, B)
+            diff = np.abs(refs[:, None, :] - targets[None, :, :])  # data shape : (R, N, B)
+            max_ = np.maximum(refs[:, None, :], targets[None, :, :])  # data shape : (R, N, B)
+            max_vals = np.max(max_, axis=-1)  # data shape : (R, N)
+            max_ = max_vals * refs.shape[1] 
             # Sum over bands, normalize, invert, and scale to [0, 100]
-            sim = (1 - diff.sum(-1) / (max_.sum(-1).clamp_min(eps))) * 100.0  # (R, N)
+            sim = (1 - diff.sum(-1) / max_) * 100.0  # data shape : (R, N)
             return sim
 
-        # 2) Cosine/SAM mode: Cosine similarity or Spectral Angle Mapper (SAM)
-        if mode in ["Cosine", "SAM"]:
-            refs = refs.float()
-            targets = targets.float()
-            # Normalize each spectrum to unit norm
-            refs_norm = refs / (torch.linalg.norm(refs, dim=1, keepdim=True) + eps)   # (R, B)
-            tgt_norm = targets / (torch.linalg.norm(targets, dim=1, keepdim=True) + eps)  # (N, B)
-            # Compute cosine similarity matrix, clamp for safe arccos
-            cos_sim = torch.matmul(refs_norm, tgt_norm.T).clamp(-1.0, 1.0)  # (R, N)
-
-            if mode == "Cosine":
-                weight_cosine = 30.0  # Larger value increases sensitivity to small differences
-                # Scale cosine value to [0, 1] and apply exponential to emphasize sharp transitions
-                cos_scaled = (cos_sim + 1.0) / 2.0
-                return (torch.exp(-weight_cosine * (1.0 - cos_scaled)) * 100.0)
-            else:
-                weight_sam = 11.0  # Higher value increases sensitivity for small angular differences
-                # SAM: Use angle (arccos), normalized by pi, then exponentiate
-                ang = torch.acos(cos_sim) / math.pi
-                return (torch.exp(-weight_sam * ang) * 100.0)
+        # 2) Cosine mode: Cosine similarity between spectra
+        if mode == "Cosine":
+            # Scale cosine value to [0, 1] and apply exponential to emphasize sharp transitions
+            similarity = cosine_similarity(refs, targets)
+            return similarity * 100.0
+        
+        # 3) SAM mode: Spectral Angle Mapper similarity
+        if mode == "SAM":
+            refs_norm = refs / (np.linalg.norm(refs, axis=1, keepdims=True) + eps)   # data shape : (R, B)
+            tgt_norm = targets / (np.linalg.norm(targets, axis=1, keepdims=True) + eps)  # data shape : (N, B)
+            cos_theta = np.matmul(refs_norm, tgt_norm.T)  # data shape : (R, N)
+            cos_theta = np.clip(cos_theta, -1.0, 1.0)
+            theta = np.arccos(cos_theta)
+            max_theta = np.pi / 2
+            ang = 1.0 - (theta / max_theta)
+            return ang * 100.0
 
         # 3) L2 mode: Euclidean distance similarity
         if mode == "L2":
             # Use cdist for fast pairwise L2 computation (R, N)
-            dist = torch.cdist(refs, targets, p=2)  # (R, N)
+            dist = cdist(refs, targets, metric='euclidean')
             # Define max possible distance from band count and data range
-            maxd = math.sqrt(refs.size(1)) * (targets.max() - targets.min() + eps)
+            maxd = np.sqrt(np.sum(np.maximum(refs[:, None, :], targets[None, :, :]) ** 2, axis=2))
             # Normalize and invert to get similarity in [0, 100]
-            return ((1 - dist / maxd).clamp(0, 1)) * 100.0
+            return ((1 - dist / maxd)) * 100.0
 
         # 4) Chebyshev mode: Maximum absolute band difference (L-infinity norm)
         if mode == "Chebyshev":
             # Take maximum absolute difference across bands (R, N)
-            dist = torch.amax(torch.abs(refs[:, None, :] - targets[None, :, :]), dim=2)
-            maxd = targets.max() - targets.min() + eps
-            return ((1 - dist / maxd).clamp(0, 1)) * 100.0
+            dist = np.max(np.abs(refs[:, None, :] - targets[None, :, :]), axis=2)
+            max_dist = np.max(np.maximum(refs[:, None, :], targets[None, :, :]), axis=2)
+            return ((1 - dist / max_dist)) * 100.0
 
         # 5) Canberra mode: Sum of per-band |x-y|/(|x|+|y|) differences
         if mode == "Canberra":
-            weight_canb = 2.0  # Sensitivity factor
-            num = torch.abs(refs[:, None, :] - targets[None, :, :])         # (R, N, B)
-            den = torch.abs(refs[:, None, :]) + torch.abs(targets[None, :, :]) + eps  # (R, N, B)
-            canb = num.div(den).sum(-1)                                     # (R, N)
-            B = refs.size(1)
-            norm_canb = canb / B
-            sim = torch.exp(-weight_canb * norm_canb).clamp(0, 1) * 100.0
+            num = np.abs(refs[:, None, :] - targets[None, :, :])         # data shape : (R, N, B)
+            den = refs[:, None, :] + targets[None, :, :]  # data shape : (R, N, B)
+            canb = np.sum(num / den, axis=-1)   
+            max_d = np.max(np.maximum(np.abs(refs[:, None, :]) / (refs[:, None, :] + targets[None, :, :]), np.abs(targets[None, :, :]) / (refs[:, None, :] + targets[None, :, :])), axis=-1)
+            B = refs.shape[1]
+            # Canberra distance per pair lies in [0, B]. Normalize to [0,1] and invert to similarity.
+            dist = canb / (max_d * B) # data shape : (R, N)
+            sim = (1.0 - dist) * 100.0                         # similarity in [0, 100]
             return sim
 
         # 6) Jeffrey mode: Symmetric KL divergence similarity
         if mode == "Jeffrey":
-            weight = 100.0  # Higher value increases sensitivity to small divergences
             # Normalize spectra as probability distributions
-            p = refs / (refs.sum(dim=1, keepdim=True) + eps)  # (R, B)
-            q = targets / (targets.sum(dim=1, keepdim=True) + eps)  # (N, B)
-            # Expand for (R, N, B) broadcasted computation
-            p_exp = p[:, None, :]  # (R, 1, B)
-            q_exp = q[None, :, :]  # (1, N, B)
-            m = 0.5 * (p_exp + q_exp)  # (R, N, B)
-            # KL(p||m) + KL(q||m) for each (R, N) pair
-            kl_pm = (p_exp * torch.log((p_exp + eps) / (m + eps))).sum(-1)
-            kl_qm = (q_exp * torch.log((q_exp + eps) / (m + eps))).sum(-1)
-            jdiv = kl_pm + kl_qm
-            # Exponential scaling, clamp, and convert to percentage
-            return torch.exp(-weight * jdiv).clamp(0, 1) * 100.0
+            p_exp = refs[:, None, :]  # data shape : (R, 1, B)
+            q_exp = targets[None, :, :]  # data shape : (1, N, B)
+            # Jeffreys divergence: KL(p||q) + KL(q||p) for each (R, N) pair
+            kl_pq = p_exp * np.log((p_exp + eps) / (q_exp + eps))
+            kl_qp = q_exp * np.log((q_exp + eps) / (p_exp + eps))
+            jdiv = np.sum(kl_pq + kl_qp, axis=-1)  # data shape : (R, N)
+            max_jdiv = np.max(kl_pq + kl_qp, axis=-1)
+            # Divergence → similarity in [0, 100] without extra weight parameter
+            sim = (1.0 - jdiv / (max_jdiv * refs.shape[1])) * 100.0
+            return sim
 
         # Raise error if unknown mode
         raise ValueError(f"Unknown similarity mode: {mode}")
+    
+    def similarityHistogram(
+        self,
+        data_name: str,
+        similarityFlat: np.ndarray,
+        labeledFlatIdx: np.ndarray,
+        method: str,
+        thr: float,
+        bins: int = 100,
+    ) -> None:
+        """
+        @description : Save histogram of similarity scores for analysis.
+        @author : Hyunsu Kim
+        @parameters :
+            data_name: Dataset display name
+            similarityFlat: Flattened similarity scores (width*height,)
+            labeledFlatIdx: Flat indices for pixels considered (e.g., initially label>=1). If None, uses all pixels.
+            method: Similarity metric name
+            thr: Threshold used
+            bins: Number of histogram bins in [min(values), max(values)]
+        """
+        values = similarityFlat[labeledFlatIdx]
 
-    def load_rgb_data(self, data_path, label):
+        # Build histogram data based on actual range
+        vmin = np.min(values)
+        vmax = np.max(values)
+        if vmax == vmin:
+            # Avoid zero-width bins
+            vmax = vmin + 1e-6
+
+        edges = np.linspace(vmin, vmax, bins + 1, dtype=np.float32)
+        counts, binEdges = np.histogram(values, bins=edges)
+
+        # Save data for live PyQtGraph plot
+        centers = (binEdges[:-1] + binEdges[1:]) / 2.0
+        self.similarityHistData[data_name] = {
+            "centers": centers,
+            "counts": counts,
+            "vmin": vmin,
+            "vmax": vmax,
+            "thr": thr,
+            "method": str(method),
+        }
+
+    def similarityBeforeAfterDistribution(
+        self,
+        data_name: str,
+        before: np.ndarray,
+        after: np.ndarray,
+        method: str
+    ) -> None:
+        """
+            @description : Save median and p5–p95 band spectrum comparison (Before vs After).
+            @author : Hyunsu Kim
+            @parameters :
+                data_name: Dataset display name
+                before: Spectra of pixels before removal (N_before, B)
+                after: Spectra of pixels after removal (N_after, B)
+                method: Similarity metric name
+            @history :
+                1. Hyunsu Kim (2026.02.12) : Modified to use percentile and median instead of standard deviation to properly analyze indicators.
+        """
+        bands = np.arange(before.shape[1], dtype=np.float32)
+
+        # Robust summary for multi-modal / heavy-tail distributions
+        medianBefore = np.median(before, axis=0)
+        p05Before, p95Before = np.percentile(before, [5, 95], axis=0)
+
+        # after can be empty (all pixels removed). In that case, plot BEFORE only.
+        medianAfter = None
+        p05After = None
+        p95After = None
+        if after is not None and after.size > 0:
+            medianAfter = np.median(after, axis=0)
+            p05After, p95After = np.percentile(after, [5, 95], axis=0)
+
+        self.spectrumBeforeAfterData[data_name] = {
+            "bands": bands,
+            "medianBefore": medianBefore,
+            "p05Before": p05Before,
+            "p95Before": p95Before,
+            "medianAfter": medianAfter,
+            "p05After": p05After,
+            "p95After": p95After,
+            "method": str(method),
+        }
+
+    def load_rgb_data(self, data_path):
         """
         @description : Load RGB image from given folder and apply color according to label
         @author : Hyunsu Kim
         @parameters :
             data_path: Folder path where data is saved
-            label: Label array to apply colors
         @history :
+                1. Hyunsu Kim (2026.02.12) : Modified to load RGB image and normal label color for using image results tab
         """
         rgb_data_name = 'image_calibration.png'
         if rgb_data_name not in os.listdir(data_path):
@@ -1243,218 +1284,167 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         with open(data_path + "/data.json", "r") as f:
             data_rgb_info = json.load(f)
         label_info = data_rgb_info["label_info"]
-        label_number = label_info.keys()
-        for num in label_number:
-            if int(num) == LABEL_IGNORED:
-                continue
-            indices = np.where(label == int(num))
-            rgb_data[indices] = label_info[num]["label_color"]
+        normalLabelColor = label_info[str(NORMAL_LABELS[1])]["label_color"]
+        
+        return rgb_data, normalLabelColor
 
-        return rgb_data
-
-    def update_rgb_image(self, data_name=None):
+    def update_rgb_image(self, rgb_image=None, data_name=None):
         """
-        @description : Update RGB image and reduced pixel value in the OutputImagewidget
+        @description : Update RGB image and reduced pixel value in the outputImagewidget
         @author : Hyunsu Kim
         @parameters :
             data_name: Name of the data being processed
+            rgb_image: RGB image data to be displayed
         @history :
+            1. Hyunsu Kim (2026.02.09) : Add the analysis result of the selected data
+            2. Hyunsu Kim (2026.02.12) : ADD the parameter to use the image results tab feature without using threads.
         """
         reduced_pixel = self.total_nonzero_pixel[data_name] - self.update_total_nonzero_pixel[data_name]
-        self.ReducedPixelValue.setText(f"{reduced_pixel} ({reduced_pixel / self.total_nonzero_pixel[data_name] * 100:.2f} %)")
-        self.OutputImageWidget.updatePhoto(QtGui.QPixmap(QtGui.QImage(self.rgb_image[data_name], self.rgb_image[data_name].shape[1], self.rgb_image[data_name].shape[0], QtGui.QImage.Format_RGB888)), True)
+        self.reducedPixelValue.setText(f"{reduced_pixel} ({reduced_pixel / self.total_nonzero_pixel[data_name] * 100:.2f} %)")
+        self.outputImageWidget.updatePhoto(QtGui.QPixmap(QtGui.QImage(rgb_image, rgb_image.shape[1], \
+                                                                      rgb_image.shape[0], QtGui.QImage.Format_RGB888)), True)
+
+        # Update diagnostics plots for the selected dataset
+        self.updateAnalysisPlots(data_name)
+
+
+    def updateAnalysisPlots(self, data_name: str):
+        """
+            @description : Update analysis plots (similarity histogram and before/after spectrum)
+            @author : Hyunsu Kim
+            @parameters :
+                data_name: Name of the data being processed
+            @history :
+                1. Hyunsu Kim (2026.02.12) :
+                    - Remove unnecessary if statements and Use Constants for plot colors
+        """
+        # --- Similarity histogram (PyQtGraph) ---
+        histPlot = getattr(self, "histPlotViewer", None)
+        if histPlot is not None:
+            histPlot.clear()
+            hist = self.similarityHistData.get(data_name)
+            width = float(hist["centers"][1] - hist["centers"][0])
+            bar = pg.BarGraphItem(
+                x=hist["centers"],
+                height=hist["counts"],
+                width=width * 0.95,
+                brush=pg.mkBrush(HISTOGRAM_BAR_BRUSH_COLOR),
+                pen=pg.mkPen(HISTOGRAM_BAR_PEN_COLOR, width=1),
+            )
+            histPlot.addItem(bar)
+
+            thr = hist.get("thr", None)
+            if thr is not None:
+                histPlot.addItem(
+                    pg.InfiniteLine(
+                        pos=float(thr),
+                        angle=90,
+                        pen=pg.mkPen(HISTOGRAM_BAR_THR_COLOR, width=2),
+                    )
+                )
+
+            vmin = float(hist.get("vmin", float(np.min(hist["centers"]))))
+            vmax = float(hist.get("vmax", float(np.max(hist["centers"]))))
+            histPlot.setXRange(vmin, vmax)
+            ymax = float(np.max(hist["counts"]))
+            histPlot.setYRange(0.0, max(1.0, ymax * 1.05))
+
+        # --- Spectrum before/after (PyQtGraph) ---
+        specPlot = getattr(self, "beforeAfterPlotViewer", None)
+        if specPlot is not None:
+            specPlot.clear()
+            spec = self.spectrumBeforeAfterData.get(data_name)
+            # legend (re-create if missing)
+            if getattr(specPlot.plotItem, "legend", None) is None:
+                specPlot.addLegend(labelTextColor=pg.mkColor("w"))
+            else:
+                specPlot.plotItem.legend.clear()
+            bands = np.asarray(spec.get("bands", []), dtype=np.float32)
+
+            beforePen = pg.mkPen(pg.mkColor(DISTRIBUTION_BEFORE_PEN_COLOR))
+            afterPen = pg.mkPen(pg.mkColor(DISTRIBUTION_AFTER_PEN_COLOR))
+            beforeBrush = pg.mkBrush(DISTRIBUTION_BEFORE_BRUSH_COLOR)
+            afterBrush = pg.mkBrush(DISTRIBUTION_AFTER_BRUSH_COLOR)
+            beforeMedianPen = pg.mkPen(pg.mkColor(DISTRIBUTION_BEFORE_MEDIAN_COLOR), width=2)
+            afterMedianPen = pg.mkPen(pg.mkColor(DISTRIBUTION_AFTER_MEDIAN_COLOR), width=2)
+
+            # BEFORE
+            medB = spec.get("medianBefore", None)
+            p05B = spec.get("p05Before", None)
+            p95B = spec.get("p95Before", None)
+            
+            medB = np.asarray(medB, dtype=np.float32)
+            p05B = np.asarray(p05B, dtype=np.float32)
+            p95B = np.asarray(p95B, dtype=np.float32)
+            upperCurveB = specPlot.plot(bands, p95B, pen=beforePen)
+            lowerCurveB = specPlot.plot(bands, p05B, pen=beforePen)
+            specPlot.addItem(pg.FillBetweenItem(upperCurveB, lowerCurveB, brush=beforeBrush))
+            specPlot.plot(bands, medB, pen=beforeMedianPen, name="Before median")
+
+            # AFTER (can be None if all pixels removed)
+            medA = spec.get("medianAfter", None)
+            p05A = spec.get("p05After", None)
+            p95A = spec.get("p95After", None)
+            if medA is not None and p05A is not None and p95A is not None:
+                medA = np.asarray(medA, dtype=np.float32)
+                p05A = np.asarray(p05A, dtype=np.float32)
+                p95A = np.asarray(p95A, dtype=np.float32)
+                upperCurveA = specPlot.plot(bands, p95A, pen=afterPen)
+                lowerCurveA = specPlot.plot(bands, p05A, pen=afterPen)
+                specPlot.addItem(pg.FillBetweenItem(upperCurveA, lowerCurveA, brush=afterBrush))
+                specPlot.plot(bands, medA, pen=afterMedianPen, name="After median")
+
+            specPlot.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
         
-    def apply_threshold(self) -> None:
+    def resizeEvent(self, e):
+        """
+            @description : Handle window resize events; PyQtGraph auto-manages view, so no manual adjustment needed.
+            @author : Hyunsu Kim
+        """
+        super().resizeEvent(e)
+        # PyQtGraph plots auto-manage their view; nothing required here.
+        
+    def apply_threshold(self):
         """
         @description : Apply threshold to the selected hyperspectral data
         @author : Hyunsu Kim
         @history :
             1. Hyunsu Kim (2025.10.17) : Add check for use toggle value in data list and process success check
+            2. Hyunsu Kim (2026.02.12) : Add calculations and variables to update the image results tab using existing data without threads.
+            3. Hyunsu Kim (2026.03.13) : Correct the if statement to check labelAfterRemoval > 0
         """
         try:
-            if self.worker_id2 == -1:
-                return
             self.apply_threshold_change = True
-            threshold = int(self.ThresholdLineEdit.text())
+            threshold = float(self.thresholdLineEdit.text())
+            data_path = ""
             if threshold < 0:
                 threshold = 0
             elif threshold > 100:
                 threshold = 100
-            self.ThresholdLineEdit.setText(str(threshold))
+            self.thresholdLineEdit.setText(str(threshold))
             for key, value in self.adv_data_list_info.items():
-                if value["idx"] == self.ImageSelectorComboBox.currentIndex() and value["use"] == True and value["wrong_process"] == False:
-                    self._process_folder(key, threshold=threshold)
-                    data_name = key.split("/")[-1]
-                    self.signal_.update_signal.emit(data_name)
+                data_name = key.split("/")[-1]
+                data_path = key
+                if value["idx"] == self.imageSelectorComboBox.currentIndex() and value["wrongProcess"] == False:
+                    labelAfterRemoval = self.label[data_name].copy()
+                    updateImage = self.rgb_image[data_name].copy()
+                    labelAfterRemoval[np.where(self.similarity[data_name].reshape(labelAfterRemoval.shape[0], labelAfterRemoval.shape[1]) >= threshold)] = 0
+                    self.update_total_nonzero_pixel[data_name] = np.count_nonzero(labelAfterRemoval)
+                    self.similarityHistData[data_name]["thr"] = threshold
+                    medianAfter = None
+                    p05After = None
+                    p95After = None
+                    if np.any(labelAfterRemoval > 0):
+                        medianAfter = np.median(self.data[data_name][np.where(labelAfterRemoval > 0)], axis=0)
+                        p05After, p95After = np.percentile(self.data[data_name][np.where(labelAfterRemoval > 0)], [5, 95], axis=0)
+                    self.spectrumBeforeAfterData[data_name]["medianAfter"] = medianAfter
+                    self.spectrumBeforeAfterData[data_name]["p05After"] = p05After
+                    self.spectrumBeforeAfterData[data_name]["p95After"] = p95After
+                    updateImage[np.where(labelAfterRemoval > 0)] = self.normalLabelColor[data_name]
+                    self.update_signal.emit(updateImage, data_name)
+            return True
         except:
-            self.string_signal.emit("  - Error occurred while applying threshold.\n")
-            self._on_thread_complete(LABEL_CORRECTION_MODE_WORKER_2)
-            return
-
-    # --------------------------------------------------
-    # Hyperspectral Data Loading and Calibration
-    # --------------------------------------------------
-    def load_hyperspectral_data(self, data_path, cal=True, rate=1.0):
-        """
-        @description : Load ENVI format hyperspectral data, perform calibration if requested, and return as Torch tensor.
-        @author : JiHoon Jung
-        @parameters :
-            data_path: Path to folder containing the data
-            cal: Whether to perform calibration (True/False)
-            rate: Calibration scale factor
-        """
-        # Launch ENVI data loading in the background
-        f = self.executor.submit(self.load_envi_data, data_path, "data.hdr", "data.raw")
-        data = f.result()
-        if data is None:
-            return None
-
-        if cal:
-            # Load mean DARKREF and WHITEREF reference spectra and apply calibration
-            dark = self.load_reference_data(data_path, "DARKREF")
-            white = self.load_reference_data(data_path, "WHITEREF")
-            if dark is not None and white is not None:
-                data = self.calibrate_data(data, dark, white, rate)
-
-        # Convert to Torch tensor and move to GPU (if available)
-        return torch.from_numpy(data).float().pin_memory().to(self.device, non_blocking=True)
-
-    def load_envi_data(self, base, hdr, raw):
-        """
-        @description : Open ENVI .hdr/.raw files and return as NumPy array.
-        @author : JiHoon Jung
-        @parameters :
-            base: Path to data folder
-            hdr: .hdr filename
-            raw: .raw filename
-        """
-        try:
-            img = spectral.io.envi.open(os.path.join(base, hdr), os.path.join(base, raw))
-            # On first load, save wavelength info for later use
-            if not hasattr(self, "wavelengths") or self.wavelengths is None:
-                self.wavelengths = [float(w) for w in img.metadata.get("wavelength", [])]
-            return img.load()
-        except FileNotFoundError as e:
-            self.string_signal.emit(f"Error loading data: {e}")
-            return None
-
-    def load_reference_data(self, base, name):
-        """
-        @description : Load the specified reference (DARKREF/WHITEREF) and return mean spectrum.
-        @author : JiHoon Jung
-        @parameters :
-            base: Folder with reference files
-            name: "DARKREF" or "WHITEREF"
-        """
-        ref = self.load_envi_data(base, f"{name}.hdr", f"{name}.raw")
-        # If present, return mean spectrum across H/W (shape: B)
-        return ref.mean(axis=0) if ref is not None else None
-
-    @staticmethod
-    def calibrate_data(data: np.ndarray, dark: np.ndarray, white: np.ndarray, rate: float):
-        """
-        @description : Apply reflectance calibration using dark and white reference spectra.
-        @author : JiHoon Jung
-        @parameters :
-            data: Raw hyperspectral data (H, W, B)
-            dark: DARKREF mean spectrum (B)
-            white: WHITEREF mean spectrum (B)
-            rate: Calibration scaling factor
-        """
-        # Normalize: (data - dark) / (white - dark), scale to [0, 4095]
-        norm = (data - dark) / (white - dark)
-        return np.clip(norm * 4095.0 * rate, 0, 4095.0).astype(np.float32)
-
-    # --------------------------------------------------
-    # Label Saving and Initialization Functions
-    # --------------------------------------------------
-    def save_label(self, data_path, label: torch.Tensor):
-        """
-        @description : Save or overwrite processed label file.
-        @author : JiHoon Jung
-        @parameters :
-            data_path: Folder to save the label file
-            label: Tensor to save
-        @history :
-            1. Hyeok Yoon(2025.10.31) : Modifying "if logic" compare string to index
-        """
-        mode = self.header_dict_[0]["obj_set"]["combobox"].currentText()
-        thr = self.header_dict_[1]["obj_set"]["spinbox"][0].value()
-        idx = self.header_dict_[4]["obj_set"]["combobox"].currentIndex() # get index not a string
-
-        fname = f"label_similarity_{mode}_{thr}.npy"
-        save_path = os.path.join(data_path, fname)
-
-        # comparing index not a string
-        if idx == 1: # Overwrite
-            # Overwrite label.npy and notify
-            np.save(os.path.join(data_path, "label.npy"), label.cpu().numpy())
-            self.string_signal.emit("  - Label file overwritten at 'label.npy'.")
-        else:  # Create new file if it doesn't already exist
-            if os.path.exists(save_path):
-                return
-            np.save(save_path, label.cpu().numpy())
-            self.string_signal.emit(f"  - Label file saved to '{save_path}'.")
-
-    def load_or_initialize_label(self, data_path, shape):
-        """
-        @description : Load existing label file or initialize with zeros if not found.
-        @author : JiHoon Jung
-        @parameters :
-            data_path: Folder containing label file
-            shape: Shape of label to initialize (H, W)
-        @history :
-            1. Hyunsu Kim : Load label.npy directly if threshold change is applied
-            2. Hyeok Yoon(2025.10.31) : Modifying "if logic" compare string to index
-        """
-        mode = self.header_dict_[0]["obj_set"]["combobox"].currentText()
-        thr = self.header_dict_[1]["obj_set"]["spinbox"][0].value()
-        idx = self.header_dict_[4]["obj_set"]["combobox"].currentIndex() # get index not a string
-
-        fname = f"label_similarity_{mode}_{thr}.npy"
-        save_path = os.path.join(data_path, fname)
-        label_path = os.path.join(data_path, "label.npy")
-
-        # If threshold change is applied, load label.npy directly
-        if self.apply_threshold_change:
-            return torch.tensor(np.load(label_path), device=self.device)
-
-        # comparing index not a string
-        if idx == 1: # Overwrite
-            # Overwrite mode: prefer label.npy
-            if os.path.exists(label_path):
-                self.string_signal.emit(f"  - Found: {label_path}")
-                return torch.tensor(np.load(label_path),
-                                    device=self.device, requires_grad=False)
-            else:
-                self.string_signal.emit("  - No label.npy, initializing zeros.\n")
-                return torch.zeros(shape, dtype=torch.int16, device=self.device)
-        else:  # Create mode
-            # If already processed, skip
-            if os.path.exists(save_path):
-                self.string_signal.emit(f"  - '{save_path}' already exists.\n")
-                return torch.tensor(np.load(label_path),
-                                    device=self.device)
-            # If label.npy exists, load it
-            if os.path.exists(label_path):
-                self.string_signal.emit(f"  - Found: {label_path}")
-                return torch.tensor(np.load(label_path),
-                                    device=self.device, requires_grad=False)
-            # Otherwise, initialize with zeros
-            self.string_signal.emit("  - No existing label, initializing zeros.\n")
-            return torch.zeros(shape, dtype=torch.int16, device=self.device)
-
-    # --------------------------------------------------
-    # On Close: Shutdown Thread Pool Executor
-    # --------------------------------------------------
-    def closeEvent(self, e):
-        """
-        @description : Called on window close; shuts down executor.
-        @author : JiHoon Jung
-        @parameters :
-            e: Event object
-        """
-        self.executor.shutdown(wait=False)
+            return False
 
 # ======================================================
 # MAIN EXECUTION

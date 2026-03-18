@@ -9,6 +9,7 @@ if __name__ == "__main__" :
     from pen_sub_minimap import Pen_minimap_Form
     from display_sub_rgb_change import Display_rgb_change_Form
     from pen_sub_adv_opacity_option import pen_sub_adv_opacity_option_Form
+    from pen_sub_semi_auto_labeling import PenSemiAutoLabelingForm
 
 else:
     from .pen_sub_minimap import Pen_minimap_Form
@@ -16,6 +17,7 @@ else:
     from .pen_sub_erase import Pen_eraser_Form
     from .display_sub_rgb_change import Display_rgb_change_Form
     from .pen_sub_adv_opacity_option import pen_sub_adv_opacity_option_Form
+    from .pen_sub_semi_auto_labeling import PenSemiAutoLabelingForm
 
 
 
@@ -45,6 +47,7 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_obj_dict = self.Sync.pen_obj_dict
         self.pen_to_core_signal = self.Sync.pen_to_core_signal
         self.pen_to_display_signal = self.Sync.pen_to_display_signal
+        self.penToSemiAutoLabelingSignal = self.Sync.penToSemiAutoLabelingSignal
         self.core_to_pen_signal = self.Sync.core_to_pen_signal
         self.core_to_pen_signal.connect(self.recv_from_core)
         self.pen_opacity_to_display_signal = self.Sync.pen_opacity_to_display_signal
@@ -63,15 +66,19 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_minimap_form = Pen_minimap_Form(Pen_Sync=self.Sync)
         self.display_rgb_change_form = Display_rgb_change_Form(Sync=self.Sync, lang=self.lang)
         self.pen_opacity_form = pen_sub_adv_opacity_option_Form(Sync=self.Sync, lang=self.lang, parent=self)
+        self.pen_semi_auto_labeling_form = PenSemiAutoLabelingForm(Pen_Sync=self.Sync, lang=self.lang, parent=self)
         self.sub_widget_dict['pen_style_form'] = self.pen_style_form
         self.sub_widget_dict['pen_eraser_form'] = self.pen_eraser_form
         self.sub_widget_dict['pen_minimap_form'] = self.pen_minimap_form
         self.sub_widget_dict['display_rgb_change_form'] = self.display_rgb_change_form
+        self.sub_widget_dict['penSemiAutoLabelingForm'] = self.pen_semi_auto_labeling_form
 
     def init_Ui_label_main_pen(self, Form):
         """Pen main 리스트 UI 생성을 위한 초기 선언문이다.
                 Parmeters
                 1.	Form(object): PyQt widget object
+                History:
+                    Yugyeong Hong(2026.02.04) - Add push button for Semi Auto Labeling
 
         """
         Form.setObjectName("Pen_Form")
@@ -271,6 +278,16 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_image.setObjectName("pen_image")
         self.lang.set("labeling", "pen_main", "pen_image", self.pen_image)
 
+        self.penSemiAutoLabeling = QtWidgets.QPushButton()
+        iconSemi = QtGui.QIcon()
+        iconSemi.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_semi_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        iconSemi.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_semi_yellow.png"), QtGui.QIcon.Active, QtGui.QIcon.On)
+        iconSemi.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_semi_disabled.png"), QtGui.QIcon.Disabled)
+        self.penSemiAutoLabeling.setIcon(iconSemi)
+        self.penSemiAutoLabeling.setCheckable(True)
+        self.penSemiAutoLabeling.setObjectName("penSemiAutoLabeling")
+        self.lang.set("labeling", "pen_main", "penSemiAutoLabeling", self.penSemiAutoLabeling)
+
         self.blank_widget = QtWidgets.QWidget()
         self.blank_widget.setObjectName("blank_widget")
         
@@ -297,12 +314,14 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_polygon.setIconSize(QtCore.QSize(20, 20))
         self.pen_opacity.setIconSize(QtCore.QSize(20, 20))
         self.pen_image.setIconSize(QtCore.QSize(20, 20))
+        self.penSemiAutoLabeling.setIconSize(QtCore.QSize(20, 20))
 
         self.pen_list_vertical.addStretch()
         self.pen_list_vertical.addWidget(self.pen_scale_up)
         self.pen_list_vertical.addWidget(self.pen_scale_down)
         # self.pen_list_vertical.addWidget(self.pen_part_scale_up)
         self.pen_list_vertical.addWidget(self.pen_draw_type)
+        self.pen_list_vertical.addWidget(self.penSemiAutoLabeling)
         self.pen_list_vertical.addWidget(self.pen_painting)
         self.pen_list_vertical.addWidget(self.pen_rectangle)
         self.pen_list_vertical.addWidget(self.pen_polygon)
@@ -385,6 +404,11 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_obj_dict['pen_image'] = {
             'obj':self.pen_image,
         }
+        self.pen_obj_dict['penSemiAutoLabeling'] = {
+            'obj':self.penSemiAutoLabeling,
+            'opened':False,
+            'sub_form' : self.pen_semi_auto_labeling_form
+        }
         """
             @Description: label opacity 기능 사용시 기존 pen object 비활성화 되는 문제 수정
             @author: Hyunsu
@@ -416,10 +440,13 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_polygon.clicked.connect(lambda ch=self.pen_polygon: self.pen_mode(ch = ch, mode=PEN_MODE_POLYGON))
         self.pen_opacity.clicked.connect(lambda ch=self.pen_opacity: self.pen_mode(ch = ch, mode=PEN_MODE_OPACITY))
         self.pen_image.clicked.connect(lambda ch=self.pen_image: self.pen_mode(ch=ch, mode=PEN_MODE_IMAGE))
+        self.penSemiAutoLabeling.clicked.connect(lambda ch=self.penSemiAutoLabeling: self.pen_mode(ch=ch, mode=PEN_MODE_SEMI_AUTO_LABELING))
         self.pen_draw_type.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.pen_draw_type.customContextMenuRequested.connect(lambda : self.pen_sub_open(mode=0))
         self.pen_eraser.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.pen_eraser.customContextMenuRequested.connect(lambda : self.pen_sub_open(mode=1))
+        self.penSemiAutoLabeling.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.penSemiAutoLabeling.customContextMenuRequested.connect(lambda : self.pen_sub_open(mode=PEN_SUB_MODE_SEMI_AUTO_LABELING))
 
     def close_pen_object(self, obj:str) -> None:
         """펜 객체의 서브 폼을 닫고 상태를 업데이트합니다."""
@@ -452,8 +479,14 @@ class Pen_Form(QtWidgets.QWidget):
                     - 10 : minimap 모드(사용 안 함)
                     - 11 : 90도 회전 모드
                     - 12 : 좌우 반전 모드
-                    - 13 : 사각형 모드
-                    - 14 : 다각형 모드
+                    - 13 : 상하 반전 모드
+                    - 14 : 사각형 모드
+                    - 15 : 다각형 모드
+                    - 16 : 불투명도 조절 모드
+                    - 17 : 이미지 추가 모드
+                    - 18 : Semi Auto Labeling Mode, activate pen semi auto labeling
+                History:
+                    Yugyeong Hong(2026.02.04) - Added Semi Auto Labeling click event handler
                     
         """
         pen_mode = mode
@@ -545,6 +578,15 @@ class Pen_Form(QtWidgets.QWidget):
                 pass
             elif pen_mode == PEN_MODE_VFLIP:
                 pass
+            elif pen_mode == PEN_MODE_SEMI_AUTO_LABELING:
+                if ch:
+                    tmp_dict = {}
+                    tmp_dict['from'] = 'pen'
+                    self.penToSemiAutoLabeling(tmp_dict)
+                    if self.pen_semi_auto_labeling_form.semiAutoLabelingDict['aMap'] is None:
+                        ch = False
+                else:
+                    pass
             tmp_dict = {}
             tmp_dict['from'] = "main"
             tmp_dict['mode'] = pen_mode
@@ -557,7 +599,9 @@ class Pen_Form(QtWidgets.QWidget):
                 1.  mode(int)
                     - 0 : pen sub style 모드, pen 크기 설정 
                     - 1 : pen sub eraser 모드, 지우개 크기 설정
-                    - 2 : display rgb change 모드, 이미지 rgb 값 변경      
+                    - 2 : display rgb change 모드, 이미지 rgb 값 변경
+                History:
+                    1. Yugyeong Hong(2026.02.04) - Add semi auto labeling mode for sub form open
         """
         peb_sub_mode = mode
         if peb_sub_mode == PEN_SUB_MODE_PEN:
@@ -566,9 +610,11 @@ class Pen_Form(QtWidgets.QWidget):
                 x, y = self.pen_draw_type.mapToGlobal(QPoint()).x(), self.pen_draw_type.mapToGlobal(QPoint()).y()
                 self.pen_style_form.move(x+45,y-80)
                 self.pen_obj_dict['pen_draw_type']['opened'] = True
-                if self.pen_obj_dict['pen_eraser']['opened'] == True:
+                if self.pen_obj_dict['pen_eraser']['opened'] == True or self.pen_obj_dict['penSemiAutoLabeling']['opened'] == True:
                     self.pen_obj_dict['pen_eraser']['opened'] = False
+                    self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
                     self.pen_eraser_form.close()
+                    self.pen_semi_auto_labeling_form.close()
             else:
                 self.pen_style_form.close()
                 self.pen_obj_dict['pen_draw_type']['opened'] = False
@@ -579,9 +625,11 @@ class Pen_Form(QtWidgets.QWidget):
                 x, y = self.pen_eraser.mapToGlobal(QPoint()).x(), self.pen_eraser.mapToGlobal(QPoint()).y()
                 self.pen_eraser_form.move(x+45,y-40)
                 self.pen_obj_dict['pen_eraser']['opened'] = True
-                if self.pen_obj_dict['pen_draw_type']['opened'] == True:
+                if self.pen_obj_dict['pen_draw_type']['opened'] == True or self.pen_obj_dict['penSemiAutoLabeling']['opened'] == True:
                     self.pen_obj_dict['pen_draw_type']['opened'] = False
+                    self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
                     self.pen_style_form.close()
+                    self.pen_semi_auto_labeling_form.close()
             else:
                 self.pen_eraser_form.close()
                 self.pen_obj_dict['pen_eraser']['opened'] = False
@@ -609,11 +657,25 @@ class Pen_Form(QtWidgets.QWidget):
             if self.pen_obj_dict['pen_opacity']['opened'] == False:
                 self.pen_obj_dict['pen_opacity']['opened'] = True
                 self.pen_opacity_form.exec_()
+        elif peb_sub_mode == PEN_SUB_MODE_SEMI_AUTO_LABELING:
+            if self.pen_obj_dict['penSemiAutoLabeling']['opened'] == False:
+                self.pen_semi_auto_labeling_form.show()
+                x, y = self.penSemiAutoLabeling.mapToGlobal(QPoint()).x(), self.penSemiAutoLabeling.mapToGlobal(QPoint()).y()
+                self.pen_semi_auto_labeling_form.move(x+45,y-80)
+                self.pen_obj_dict['penSemiAutoLabeling']['opened'] = True
+                if self.pen_obj_dict['pen_draw_type']['opened'] == True or self.pen_obj_dict['pen_eraser']['opened'] == True:
+                    self.pen_obj_dict['pen_draw_type']['opened'] = False
+                    self.pen_obj_dict['pen_eraser']['opened'] = False
+                    self.pen_style_form.close()
+                    self.pen_eraser_form.close()
+            else:
+                self.pen_semi_auto_labeling_form.close()
+                self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
 
+    
     @pyqtSlot(dict)
     def recv_from_core(self, output):
         pass
-
 
     def pen_to_core(self, input):
         """pen에서 core로 시그널을 보내기 위한 함수 선언문이다. Core DB에 대한 값을 업데이트하거나 조정하기 위한 함수로 쓰인다.
@@ -633,6 +695,13 @@ class Pen_Form(QtWidgets.QWidget):
 
     def pen_opacity_to_display(self, input):
         self.pen_opacity_to_display_signal.emit(input)
+    
+    def penToSemiAutoLabeling(self, input):
+        """
+            Description: Emits signal to SemiAutoLabeling
+            Author: Yugyeong Hong
+        """
+        self.penToSemiAutoLabelingSignal.emit(input)
 
 if __name__ == "__main__":
     import sys

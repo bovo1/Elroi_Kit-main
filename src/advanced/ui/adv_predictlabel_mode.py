@@ -25,11 +25,13 @@ from utils.viewer import Display_viewer
 from qtwidgets import AnimatedToggle
 
 from advanced.stylesheet.stylesheet_adv_predictlabel_mode import stylesheet
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
 
 class signal_(QtCore.QObject):
     string_signal = QtCore.pyqtSignal(str)
     image_signal = QtCore.pyqtSignal(str)
-    error_signal = QtCore.pyqtSignal(str, str, Enum)
+    error_signal = QtCore.pyqtSignal(str, object, str, str, object)
 
 class MessageBoxType(Enum):
     INFO = 0
@@ -62,7 +64,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
 
         self.string_signal.connect(self.update_status)
         self.image_signal.connect(self.update_predict_image)
-        self.error_signal.connect(self.message)
+        self.error_signal.connect(messageBox)
 
     def init_variable(self):
         """
@@ -523,10 +525,14 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
         @description : Apply threshold to the selected hyperspectral data
         @author : Hyunsu Kim (2025.12.04)
         @history :
+            1. Yugyeong Hong(2026.02.24) - Refactor message box with util method and language support
         """
         self.ThresholdButton.setEnabled(False)
         if not self.ThresholdLineEdit.text():
-            self.message("Threshold Error", "Please set a valid threshold value.", MessageBoxType.WARNING)
+            messageBox(mode=MESSAGE_BOX_WARNING, 
+                       title=self.lang.get("advanced", "advanced_predictlabel_main", "advancedPredictLabelThresholdErrorTitle"), 
+                       text=self.lang.get("advanced", "advanced_predictlabel_main", "advancedPredictLabelThresholdErrorMsg"),
+                       buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
             self.ThresholdButton.setEnabled(True)
             self.ThresholdButton.toggle()
             return
@@ -647,6 +653,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
             History:
                 1. Hyunsu Kim(2025.12.04) - Add widget control functions for image result tap
                 2. Hyeok Yoon(2025.10.31) - Modifying Widgets to supports language function
+                3. Yugyeong Hong(2026.02.24) - Refactor message box with util method and language support
         """
         if mode == 0: #start
             if self.worker_id == -1 :
@@ -682,9 +689,12 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
                 self.worker_id = self.worker_1.cur_id
                 self.worker_1.start()
             else:
-                QtWidgets.QMessageBox.information(self,
-                    self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_warning_already_allocated_title"),
-                    f"{self.lang.get('advanced', 'advanced_predictlabel_main', 'advanced_predictlabel_msg_warning_already_allocated_message')} Worker ID:{self.worker_id}"
+                messageBox(
+                    self,
+                    mode=MESSAGE_BOX_WARNING,
+                    title=self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_warning_already_allocated_title"),
+                    text=f'{self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_warning_already_allocated_message")} Worker ID:{self.worker_id}',
+                    buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"}
                 )
 
 
@@ -692,11 +702,13 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
             self.ImageSelectorComboBox.setEnabled(True)
             self.ThresholdButton.setEnabled(True)
             self.ThresholdLineEdit.setEnabled(True)
-            if self.message(
-                self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_stop_title"),
-                self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_stop_message"),
-                MessageBoxType.INFO
-            ):
+            response = messageBox(
+                mode=MESSAGE_BOX_CONFIRMATION,
+                title=self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_stop_title"),
+                text=self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_msg_stop_message"),
+                buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"}
+            )
+            if response == "accept":
                 self.interrupt_ = True
 
 
@@ -773,7 +785,10 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
                     yield [True, f"save complete predict({predict_label}) and dist({precit_dist}) result"]
                 except Exception as e:
                     tmp_str = f"Error Occured...{str(e)}"
-                    self.error_signal.emit("Processing Error", f"An error occurred during processing: {str(e)}", MessageBoxType.ERROR)
+                    self.error_signal.emit(MESSAGE_BOX_WARNING,
+                                           self.lang.get("advanced", "advanced_predictlabel_main", "advancedPredictLabelingErrorTitle"),
+                                           f'{self.lang.get("advanced", "advanced_predictlabel_main", "advancedPredictLabelingErrorMsg")}{str(e)}',
+                                           {self.lang.get("main", "messageBox", "msgOk"):"accept"})
                     yield [False, tmp_str]
 
 
@@ -790,34 +805,6 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
 
     def update_status(self, string_):
         self.advanced_predictlabel_status_textedit.appendPlainText(string_)
-
-    def message(self, title, message, type=None):
-        msgbox = QtWidgets.QMessageBox()
-        msgbox.setIcon(QtWidgets.QMessageBox.Warning)
-        if type == MessageBoxType.INFO:
-            msgbox.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-            msgbox.setDefaultButton(QtWidgets.QMessageBox.No)
-            msgbox.setWindowTitle(title)
-            msgbox.setText(message)
-            answer = msgbox.exec_()
-            if answer == QtWidgets.QMessageBox.Yes:
-                return True
-            else:
-                return False
-        elif type == MessageBoxType.WARNING:
-            msgbox.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            msgbox.setWindowTitle(title)
-            msgbox.setText(message)
-            msgbox.exec_()
-        elif type == MessageBoxType.ERROR:
-            msgbox.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            msgbox.setWindowTitle(title)
-            msgbox.setText(message)
-            msgbox.exec_()
-        else:
-            err_msg = f"Invalid message type: {type}. Allowed types: {[t.name for t in MessageBoxType]}"
-            print(traceback.format_exc())
-            raise ValueError(err_msg)
 
     def showEvent(self, e):
         pass

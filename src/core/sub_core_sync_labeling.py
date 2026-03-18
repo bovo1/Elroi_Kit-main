@@ -32,6 +32,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     image_sub_to_label_signal = QtCore.pyqtSignal(dict)
     image_sub_to_display_signal = QtCore.pyqtSignal(dict)
     image_sub_to_labeling_mode_main_signal = QtCore.pyqtSignal(dict)
+    imageToSemiAutoLabelingSignal = QtCore.pyqtSignal(dict)
     
 
     #label
@@ -61,6 +62,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     coreToGraphGroupSignal = QtCore.pyqtSignal(dict)
     core_to_graph_signal = QtCore.pyqtSignal(dict)
     core_to_graph_sub_signal = QtCore.pyqtSignal(dict)
+    coreToSemiAutoLabelingSignal = QtCore.pyqtSignal(dict)
 
     #display
     display_to_core_signal = QtCore.pyqtSignal(dict)
@@ -77,6 +79,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     # Pen
     pen_to_core_signal = QtCore.pyqtSignal(dict)
     pen_to_display_signal = QtCore.pyqtSignal(dict)
+    penToSemiAutoLabelingSignal = QtCore.pyqtSignal(dict)
 
     #Pen style
     pen_style_to_core_signal = QtCore.pyqtSignal(dict)
@@ -102,6 +105,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     graphGroupDict = {}
     labelViewGraphGroupDict = {}
 
+    semiAutoLabelingDict = {}
     image_obj_dict = {}
     label_obj_dict = {}
     pen_obj_dict = {}
@@ -170,7 +174,9 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
         'pen_graph_size':1,
         'pen_minimap_size':10,
         'pen_minimap_scale':150,
-        'pen_control_sw' : True
+        'pen_control_sw' : True,
+        'penSemiStrictness':90,
+        'penSemiTolerance':90
     }
     graph_control_dict ={
         'graph_control_sw' : True,
@@ -179,6 +185,8 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
         'oldSelectedGraphGroup': -1,
         'graph_view_mode' : 0
     }
+
+
 
     Core_DB_Labeling = {
 

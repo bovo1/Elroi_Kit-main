@@ -12,7 +12,7 @@ import torch.nn as nn
 from time import time
 from constants.constants import *
 
-from ..utils import ProgressManager, save_model, load_model, get_scores, get_images
+from ..utils import ProgressManager, save_model, load_model, get_scores, get_images, makeMetadata, modelMetadata
 
 from ..models.DN import DDCNN
 from ..models.SC import SSGCA
@@ -39,6 +39,9 @@ class T_CLS:
         self.shared_data = config["shared_data"]
         self._printer = config["_printer"]
         self.best_epoch = None
+        self.config = config
+        self.hyperparameter_shared_dict = config["hyperparameter_shared_dict"]
+        self.current_model_param_dict = config["current_model_param_dict"]
 
         self.current_model_type = config["hyperparameter_shared_dict"]["current_model_type"]
         current_model_settings_dict = config["hyperparameter_shared_dict"][self.current_model_type]
@@ -85,6 +88,15 @@ class T_CLS:
             self.scheduler = None
         elif scheduler_index == 1:
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optim, T_max=self.epochs)
+        
+        """
+            @description : Collect and save model metadata for CLS
+            @author : Hyunsu Kim(2026.03.03)
+        """
+        self.metadatas = {}
+        if self.is_train:
+            self.metadatas = makeMetadata(config, self.num_bands, not self.binary, self.batch_size, self.patch_size,\
+                                        self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.model.modelType)
 
     def train(self):
         # local varialbes
@@ -146,15 +158,20 @@ class T_CLS:
                     self._printer.print(f"Training early stop, Epoch: {epoch}/{self.epochs}, Loss: {mean_loss:.5f}")
                     self.progress_manager.step((len(self.train_loader) + len(self.val_loader)) * self.epochs)
                     break
+            """
+                description : Collect and save model metadata after each epoch
+                author : Hyunsu Kim(2026.03.03)
+            """
+            self.modelMetadata = modelMetadata.setMetadata(self.metadatas).to_dict()
             
             # Save the model if it achieves the best performance so far
             if is_best_model:
-                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"))
+                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}.el"), self.modelMetadata)
                 is_model_saved = True
             
             # Save model for each epoch if save_best_model_only is False
             if not self.save_best_model_only:
-                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}_{epoch}.el"))
+                self.save(os.path.join(self.current_model_save_path, f"{self.current_model_type.replace(' ', '_')}_{epoch}.el"), self.modelMetadata)
                 is_model_saved = True
 
             # Print save confirmation message if any model was saved
@@ -233,13 +250,13 @@ class T_CLS:
 
         return {"total_loss": np.sum(loss_total)}
 
-    def save(self, save_path):
+    def save(self, save_path, metaData=None):
         """
             Set dummy input shape based on patch_size for model tracing.
 
             Modified by Chansik Kim 2025.09.08
         """
-        save_model(self.model, save_path, self.num_bands, self.patch_size, self.batch_size, self.device)
+        save_model(self.model, save_path, self.num_bands, self.patch_size, self.batch_size, self.device, metaData)
         
     def load(self, load_path):
         """
@@ -251,7 +268,7 @@ class T_CLS:
 
         Modified by Chansik Kim 2025.09.08
         """
-        self.model.load_state_dict(load_model(load_path, device=self.device).state_dict())
+        self.model, self.modelMetadata = load_model(load_path, device=self.device)
 
     def visualization(self, indices, labels, preds):
         origin_images, pred_images, label_images = get_images(self.images, indices, labels, preds, os.path.join(self.current_model_save_path, f"result_images"), f"{self.current_model_type.replace(' ', '_')}", list(zip(*self.data_path_dict["test"]))[0])

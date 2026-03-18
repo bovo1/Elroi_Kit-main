@@ -15,6 +15,8 @@ import glob
 import math
 
 from advanced.stylesheet.stylesheet_adv_pixel_based_labeling_mode import stylesheet
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_INFORMATION, MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
 
 
 # ========================================================
@@ -666,21 +668,27 @@ class advanced_pixel_based_labeling_Form(QtWidgets.QWidget):
             mode: 0 for Start, 1 for Stop
         @history :
             1. Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            2. Yugyeong Hong(2026.02.24) : Refactor message box with util method and language support
         """
         if mode == 0:  # Start
             if self.worker_id != -1:
-                QtWidgets.QMessageBox.information(
-                    self,
-                    self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_warning_already_allocated_title"),
-                    f"{self.lang.get('advanced', 'advanced_pixel_based_labeling_main', 'advanced_pixel_based_labeling_msg_warning_already_allocated_message')} Worker ID:{self.worker_id}"
+                messageBox(
+                    mode=MESSAGE_BOX_WARNING,
+                    title=self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_warning_already_allocated_title"),
+                    text=f"{self.lang.get('advanced', 'advanced_pixel_based_labeling_main', 'advanced_pixel_based_labeling_msg_warning_already_allocated_message')} Worker ID:{self.worker_id}",
+                    buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"}
                 )
                 return
             self._start_processing()
         else:  # Stop
-            if self._yes_no_message(
-                self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_stop_title"),
-                self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_stop_message")
-            ):
+            response = messageBox(
+                mode=MESSAGE_BOX_CONFIRMATION,
+                title=self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_stop_title"),
+                text=self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_msg_stop_message"),
+                buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"}
+            )
+
+            if response == "accept":
                 self.interrupt_ = True
 
     # ----------------------------------------------------
@@ -1010,19 +1018,6 @@ class advanced_pixel_based_labeling_Form(QtWidgets.QWidget):
         except ValueError:
             msg = string_
         self.advanced_pixel_based_labeling_status_textedit.appendPlainText(msg)
-
-    def _yes_no_message(self, title, message):
-        """
-        @description : Show a Yes/No message box and return user selection
-        @author : JiHoon Jung
-        @parameters :
-            title: Message box title
-            message: Message content
-        """
-        box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Warning, title, message,
-                                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, self)
-        box.setDefaultButton(QtWidgets.QMessageBox.No)
-        return box.exec_() == QtWidgets.QMessageBox.Yes
 
     def showEvent(self, e):
         pass  # Override if needed

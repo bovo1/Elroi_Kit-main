@@ -12,6 +12,7 @@ class PLSDA(nn.Module):
         self.progress_manager = progress_manager
         self.dtype=dtype
         self.device = device
+        self.modelType = "CLS"
 
         self.T = None
         self.P = None

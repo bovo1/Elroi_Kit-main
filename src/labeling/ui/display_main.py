@@ -10,7 +10,6 @@ import copy
 import numpy as np
 from skimage.segmentation import flood
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import Qt, pyqtSlot
 from labeling.stylesheet.stylesheet_display_main import stylesheet
 from labeling.module.visualization import DLRGB, CMFRGB
@@ -18,6 +17,7 @@ from utils.viewer import Display_viewer
 from utils.shared import background_image_path
 from constants.constants import *
 from utils.custom_item import customPolygonItem
+from utils.custom_ui import messageBox
 
 ## generate random color
 random_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
@@ -240,6 +240,7 @@ class Display_Form(QtWidgets.QWidget):
                         self.pen_obj_dict['pen_painting']['obj'].setChecked(False)
                         self.pen_obj_dict['pen_rectangle']['obj'].setChecked(False)
                         self.pen_obj_dict['pen_polygon']['obj'].setChecked(False)
+                        self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
                         self.pen_control_dict['pen_control_sw'] = True
 
                     #기존 label로 point 찍힌 graph pointer 변경
@@ -340,6 +341,7 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(False)
                     self.pen_obj_dict['pen_rectangle']['obj'].setChecked(False)
                     self.pen_obj_dict['pen_polygon']['obj'].setChecked(False)
+                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
                     self.pen_control_dict['pen_control_sw'] = True
 
             elif label_mode == 'all_hide_show':
@@ -644,7 +646,8 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(True)
                 elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_PAINTING:
                     self.pen_obj_dict['pen_painting']['obj'].setChecked(True)
-                self.display_scrollAreaWidgetContents._modscale(mode=0)
+                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_SEMI_AUTO_LABELING:
+                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(True)
             
             #scale down
             elif pen_mode == PEN_MODE_ZOOM_OUT:
@@ -659,6 +662,8 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(True)
                 elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_PAINTING:
                     self.pen_obj_dict['pen_painting']['obj'].setChecked(True)
+                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_SEMI_AUTO_LABELING:
+                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(True)
                 self.display_scrollAreaWidgetContents._modscale(mode=1)
 
             elif pen_mode == PEN_MODE_PARTIAL_ZOOM:
@@ -672,7 +677,7 @@ class Display_Form(QtWidgets.QWidget):
                 else:
                     self.display_control_dict['drawing_mode'] = DRAWING_MODE_NONE
                     self.update_image_display(self.image_rgb)
-            elif pen_mode in [PEN_MODE_DRAWING, PEN_MODE_PAINTING, PEN_MODE_RECTANGLE, PEN_MODE_POLYGON]:
+            elif pen_mode in [PEN_MODE_DRAWING, PEN_MODE_PAINTING, PEN_MODE_RECTANGLE, PEN_MODE_POLYGON, PEN_MODE_SEMI_AUTO_LABELING]:
                 #drawing mode
                 print("drawing mode")
                 if toggle:
@@ -695,8 +700,8 @@ class Display_Form(QtWidgets.QWidget):
                     self.label_control_dict['old_select_label_number'] = self.label_control_dict['select_main_label_number']
                     self.label_control_dict['select_main_label_number'] = LABEL_UNSELECTED
                     self.switch_objects(['label'], enable=False, exclude=True)
-                
-                if pen_mode == PEN_MODE_DRAWING:
+                    
+                if pen_mode == PEN_MODE_DRAWING or pen_mode == PEN_MODE_SEMI_AUTO_LABELING:
                     tmp_dict = {}
                     tmp_dict['mode'] = 'select'
                     tmp_dict['type'] = 'main'
@@ -770,6 +775,8 @@ class Display_Form(QtWidgets.QWidget):
                 """
                     Description: Load image when image path exists
                     Author : Hyunsu Kim (2025.10.30)
+                    History
+                        Yugyeong Hong(2026.02.25): Refactor message box with util method and language support
                 """
                 if toggle == False:
                     self.splitter.setParent(None)
@@ -785,23 +792,20 @@ class Display_Form(QtWidgets.QWidget):
                                 image_path = os.path.join(file_path, file)
                                 imageCount +=1
                     if imageCount > 1:
-                        msgBox = QMessageBox()
-                        msgBox.setStandardButtons(QMessageBox.Ok)
-                        msgBox.setIcon(QMessageBox.Warning)
-                        msgBox.setWindowTitle("Warning")
-                        msgBox.setText("Multiple image files detected in the folder. Please ensure only one image file.")
-                        msgBox.exec_()
+                        messageBox(mode=MESSAGE_BOX_WARNING, 
+                                   title=self.lang.get("main", "messageBox", "msgWarning"),
+                                   text=self.lang.get("labeling", "display_main", "displayImageSelectWarningMsg"),
+                                   buttons={self.lang.get("main", "messageBox", "msgOK"): "accept"})
+            
                         self.pen_obj_dict['pen_image']['obj'].setChecked(False)
                         return
                     if image_path is not None:
                         self.LoadImage(self, path=image_path)
                     else:
-                        msgBox = QMessageBox()
-                        msgBox.setStandardButtons(QMessageBox.Ok)
-                        msgBox.setIcon(QMessageBox.Warning)
-                        msgBox.setWindowTitle("Warning")
-                        msgBox.setText("Image path is None!")
-                        msgBox.exec_()
+                        messageBox(mode=MESSAGE_BOX_WARNING,
+                                   title=self.lang.get("main", "messageBox", "msgWarning"),
+                                   text=self.lang.get("labeling", "display_main", "displayImagePathNoneMsg"),
+                                   buttons={self.lang.get("main", "messageBox", "msgOK"): "accept"})
                         self.pen_obj_dict['pen_image']['obj'].setChecked(False)
 
         elif recv_from == 'pen_sub':
@@ -920,6 +924,7 @@ class Display_Form(QtWidgets.QWidget):
         self.graphGroupDict = self.Sync.graphGroupDict
         self.labelViewGraphGroupDict = self.Sync.labelViewGraphGroupDict
         self.pen_control_dict = self.Sync.pen_control_dict
+        self.semiAutoLabelingDict = self.Sync.semiAutoLabelingDict
 
     def init_variable(self):
         """Diplay 초기 선언 시 변수 선언문이다. 각종 변수들이 이곳에서 선언된다.
@@ -1213,6 +1218,12 @@ class Display_Form(QtWidgets.QWidget):
         """
         self.pen_obj_dict['pen_eraser']['sub_form'].close()
         self.pen_obj_dict['pen_eraser']['opened'] = False
+
+    def closeSemiAutoLabelingSettingForm(self):
+        """마우스 우클릭을 통해 Semi Auto Labeling 상세 설정 창이 열린 상태에서 Display를 클릭했을 때 close하기 위한 함수이다.
+        """
+        self.pen_obj_dict['penSemiAutoLabeling']['sub_form'].close()
+        self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
 
     def toggle_all_controls(self, enable:bool=None) -> None:
         """
@@ -1714,6 +1725,7 @@ class Display_Form(QtWidgets.QWidget):
                 2. Modified by MyoungHwan(2024.05.29) : 마우스 위치에 따른 조건 추가
                 3. Improvemented by MyoungHwan (2024.12.13): label_obj_dict key 구조 수정
                 4. Improvemented by GaEun Hwang (2025.10.20): Improve polygon drawing function
+                5. Added by Yugyeong Hong(2026.02.04): Add Semi Auto Labeling drawing function
         """
         x, y = cur_point
         """
@@ -1728,6 +1740,9 @@ class Display_Form(QtWidgets.QWidget):
             elif self.pen_obj_dict['pen_eraser']['opened']:
                 self.sub_window_sw = True
                 self.close_eraser_setting_form()
+            elif self.pen_obj_dict['penSemiAutoLabeling']['opened']:
+                self.sub_window_sw = True
+                self.closeSemiAutoLabelingSettingForm()
             else:
                 if e.button() in [Qt.LeftButton, Qt.RightButton] : #현재상태 저장
                     """
@@ -1923,8 +1938,25 @@ class Display_Form(QtWidgets.QWidget):
                                 self.polygonInsidePoints = []
                             else:
                                 raise Exception("error, inside point in polygon is None")
-
-                    if indice is not None and len(indice) > 0 and drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING, DRAWING_MODE_PAINTING, DRAWING_MODE_RECTANGLE, DRAWING_MODE_POLYGON]:
+                    elif drawing_mode == DRAWING_MODE_SEMI_AUTO_LABELING:
+                        # Semi Auto Labeling mode
+                        selected_label_number = self.label_control_dict['select_main_label_number']
+                        if selected_label_number == LABEL_UNSELECTED:
+                            raise Exception("error select label number is None... please select label number....set change default label number(0)")
+                        
+                        # Display labelled pixels
+                        if 'aMap' in self.semiAutoLabelingDict and self.semiAutoLabelingDict['aMap'] is not None:
+                            indice = self.semiAutoLabelingDict['builder'].regionGrowing(
+                                data=self.semiAutoLabelingDict["data"],
+                                aMap=self.semiAutoLabelingDict['aMap'],
+                                seed=(y,x),
+                                strictnessPercentile=self.pen_control_dict['penSemiStrictness'], 
+                                thetaIntraPercentile=self.pen_control_dict['penSemiTolerance'])
+   
+                            self.update_drawing(label_number=selected_label_number, indice=indice)
+                            self.update_image_display(self.image_rgb)
+      
+                    if indice is not None and len(indice) > 0 and drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING, DRAWING_MODE_PAINTING, DRAWING_MODE_RECTANGLE, DRAWING_MODE_POLYGON, DRAWING_MODE_SEMI_AUTO_LABELING]:
                         tmp_dict = {}
                         tmp_dict['mode'] = 'modify'
                         tmp_dict['type'] = 'display'
@@ -2003,7 +2035,7 @@ class Display_Form(QtWidgets.QWidget):
             drawing_mode = self.display_control_dict['drawing_mode']
             if in_pixmap:
                 self.update_mouse_preview()
-                self.core_obj_dict["status_pointer_status"].setText(f"Pixel Coordinates : ({x},{y})")
+                self.core_obj_dict["status_pointer_status"][1].setText(f'({x},{y})')
                 if self.graph_obj_dict['graph_linedrawing']:
                     tmp_dict = {}
                     tmp_dict['mode'] = GRAPH_DISPLAY_PREVIEW

@@ -6,9 +6,10 @@ from .sub_core_labeling import Sub_Core_Labeling
 class Main_Core(QObject):
     """각 기등들 간 상태를 주고받기 위해 호출하는 클래스. Core DB를 통해 데이터 정보에 대해 저장할 수 있다.
     """
-    def __init__(self):
+    def __init__(self, lang=None):
         super().__init__()
-        self.Main_Core_Sync = Main_Core_Sync()
+        self.lang = lang
+        self.Main_Core_Sync = Main_Core_Sync(lang=self.lang)
 
         self.Sub_Core_Sync_Labeling = self.Main_Core_Sync.Sub_Core_Sync_Labeling
         self.Sub_Core_Sync_Training = self.Main_Core_Sync.Sub_Core_Sync_Training
@@ -17,7 +18,7 @@ class Main_Core(QObject):
 
 
         # self.Sub_Core_Labeling = Sub_Core_Labeling(Sub_Core_Sync_Labeling=self.Sub_Core_Sync_Labeling)
-        self.Sub_Core_Labeling = Sub_Core_Labeling(Sync=self.Main_Core_Sync)
+        self.Sub_Core_Labeling = Sub_Core_Labeling(Sync=self.Main_Core_Sync, lang=self.lang)
 
 
 

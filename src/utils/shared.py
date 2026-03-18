@@ -15,5 +15,6 @@ license_path = "C:\\ProgramData\\ElroiKit\\license" # license path
 license_txt_path = os.path.join(resource_path, "license.txt")
 temp_path = f"C:\\Users\\{os.getlogin()}\\Documents\\ElroiKit" # temp path (labeling, training)
 config_path = f"{os.path.join(shared_root_path)}\\config.json" # config path
+settings_path = f"{os.path.join(shared_root_path)}\\settings.json" # settings path
 background_image_path = os.path.join(icon_path, "labeling\\logo\\background.jpg")
 video_path = os.path.join(resource_path, f"videos\\training.gif") # video path

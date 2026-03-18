@@ -52,16 +52,24 @@ class Language():
                                 # print(component, value)
 
                                 for _component in component:
-                                    if isinstance(_component, QtWidgets.QAction) or isinstance(_component, QtWidgets.QLabel):
+                                    """
+                                        @history :
+                                            1. Yugyeong Hong(2026.03.13) : Add language parsing type for QCheckBox
+                                    """
+                                    if isinstance(_component, QtWidgets.QAction) or isinstance(_component, QtWidgets.QLabel) or isinstance(_component, QtWidgets.QCheckBox):
                                         _component.setText(value)
 
                                     if isinstance(_component, QtWidgets.QMenu) or isinstance(_component, QtWidgets.QGroupBox):
                                         # print(f"{component.objectName()}: {component}")
                                         _component.setTitle(value)
-
-                                    if isinstance(_component, QtWidgets.QToolBar):
-                                        _component.setWindowTitle(value)
                                     
+                                    """
+                                        @history :
+                                            1. Yugyeong Hong(2026.03.10) : Add language parsing type for QDialog
+                                    """
+                                    if isinstance(_component, QtWidgets.QToolBar) or isinstance(_component, QtWidgets.QDialog):
+                                        _component.setWindowTitle(value)
+
                                     if isinstance(_component, QtWidgets.QPushButton):
                                         _component.setText(value[0])
                                         _component.setToolTip(value[1])
@@ -94,3 +102,6 @@ class Language():
 
                                     if isinstance(_component, types.MethodType):
                                         _component()
+                                    
+                                    if isinstance(_component, QtWidgets.QLineEdit):
+                                        _component.setPlaceholderText(value)

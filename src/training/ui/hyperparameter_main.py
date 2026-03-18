@@ -11,7 +11,6 @@ import numpy as np
 
 from copy import deepcopy
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QFileDialog
 from qtwidgets import AnimatedToggle
@@ -19,6 +18,8 @@ from qtwidgets import AnimatedToggle
 # model_type: (Model 1 -> PLSDA), (Model 2 -> DDCNN), (Model 3 -> SSGCA), (Model 4 -> DSAD), (Model 5 -> PA2E)
 from training.module.hyperparameters import DA, DN, PD, PE, SC
 from utils.shared import temp_path, config_path
+from utils.custom_ui import messageBox
+from constants.constants import MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
 from training.stylesheet.stylesheet_hyperparameter_main import stylesheet
 
 """
@@ -714,14 +715,11 @@ class Hyperparameter_Form(QtWidgets.QWidget):
         self.save_config()
     
     def reset_hyperparameter(self):
-        msgbox = QMessageBox()
-        msgbox.setIcon(QMessageBox.Information)
-        msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msgbox.setDefaultButton(QMessageBox.No)
-        msgbox.setWindowTitle(self.lang.get("training", "hyperparameter_main", "hyperparameter_reset_info_title"))
-        msgbox.setText(self.lang.get("training", "hyperparameter_main", "hyperparameter_reset_info_msg"))
-        answer = msgbox.exec_()
-        if answer == QMessageBox.Yes:
+        response = messageBox(mode=MESSAGE_BOX_CONFIRMATION, 
+                             title=self.lang.get("training", "hyperparameter_main", "hyperparameter_reset_info_title"),
+                             text=self.lang.get("training", "hyperparameter_main", "hyperparameter_reset_info_msg"),
+                             buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
+        if response == "accept":
             hyperparameter_default = deepcopy(self.hyperparameter_default)
             for key in hyperparameter_default.keys():
                 self.hyperparameter_shared_dict[key] = hyperparameter_default[key]
@@ -766,15 +764,11 @@ class Hyperparameter_Form(QtWidgets.QWidget):
                             ref_list.append(f"{self.lang.get('training', 'hyperparameter_main', 'hyperparameter_file_error_missing_msg')} '{x}' > {_x}")
 
                     if ref_list != []:
-                        msgbox = QMessageBox()
-                        msgbox.setIcon(QMessageBox.Information)
-                        msgbox.setStandardButtons(QMessageBox.Ok)
-                        msgbox.setWindowTitle(self.lang.get("training", "hyperparameter_main", "hyperparameter_file_error_title"))
-                        msgbox.setText("\n".join(ref_list))
-                        msgbox_widget = QtWidgets.QWidget()
-                        msgbox_widget.setFixedWidth(int(10 * max((len(x)) for x in ref_list)))
-                        msgbox.layout().addWidget(msgbox_widget, 3, 0, 1, 3)
-                        msgbox.exec_()
+                        messageBox(mode=MESSAGE_BOX_WARNING,
+                                   title=self.lang.get("training", "hyperparameter_main", "hyperparameter_file_error_title"),
+                                   text="\n".join(ref_list),
+                                   buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"}
+                                   )
                         return
 
                     self.CommonSettingsLoadRefPathLineEdit.setText(path)
