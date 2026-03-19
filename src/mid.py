@@ -348,6 +348,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuinfo.menuAction())
+        self.menubar.addAction(self.menuSetting.menuAction())
 
         self.toolBar.addAction(self.actionLabeling_mode)
         self.toolBar.addAction(self.actionTraining_mode)
@@ -393,6 +394,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.lang.set("main", "mid", "menuFile", self.menuFile)
         self.lang.set("main", "mid", "menuInfo", self.menuinfo)
         self.lang.set("main", "mid", "menuLanguage", self.menuLanguage)
+        self.lang.set("main", "mid", "menuSetting", self.menuSetting)
         self.lang.set("main", "mid", "actionLabeling_mode", self.actionLabeling_mode)
         self.lang.set("main", "mid", "actionTraining_mode", self.actionTraining_mode)
 
