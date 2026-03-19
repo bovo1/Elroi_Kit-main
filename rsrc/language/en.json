@@ -19,6 +19,7 @@
             "menuFile": "File",
             "menuInfo": "Info",
             "menuLanguage": "Language",
+            "menuSetting": "Setting",
             "action_info_about": "About",
             "action_info_about_title": "About",
             "action_info_about_version_msg": "Version",
