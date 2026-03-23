@@ -1,8 +1,6 @@
 stylesheet = """
-QMainWindow {
-    background-color: rgb(83,83,83);
-    border: 1px solid black;
-    border-radius: 7px;
+QWidget#PenSemiAutoLabelingForm{
+    background-color: rgb(83, 83, 83);
 }
 QPushButton {
     background-color: transparent;

@@ -1,3 +1,3 @@
 major=1  
-minor=8
-patch=0
+minor=7
+patch=3

@@ -675,7 +675,11 @@ class Pen_Form(QtWidgets.QWidget):
     
     @pyqtSlot(dict)
     def recv_from_core(self, output):
-        pass
+        if output["from"] == "image":
+            if output["mode"] == "unchecked":
+                for obj in self.pen_obj_dict.keys():
+                    if "sub_form" in self.pen_obj_dict[obj]:
+                        self.pen_obj_dict[obj]["sub_form"].close()
 
     def pen_to_core(self, input):
         """pen에서 core로 시그널을 보내기 위한 함수 선언문이다. Core DB에 대한 값을 업데이트하거나 조정하기 위한 함수로 쓰인다.

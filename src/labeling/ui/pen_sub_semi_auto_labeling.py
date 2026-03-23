@@ -17,7 +17,7 @@ from utils.worker import Threading_Worker
 from utils.custom_ui import messageBox
 from labeling.module.semi_auto_labeling import semiAutoLabeling
 
-class PenSemiAutoLabelingForm(QtWidgets.QMainWindow):
+class PenSemiAutoLabelingForm(QtWidgets.QWidget):
     """
         Description: Semi Auto Labeling Class
         Author: Yugyeong Hong (2026.02.04)
@@ -124,19 +124,17 @@ class PenSemiAutoLabelingForm(QtWidgets.QMainWindow):
         return parameterWidget, slider, parameterWidgetEdit
 
 
-    def initUiLabelMainPenSemiAutoLabeling(self, Mainwindow):
+    def initUiLabelMainPenSemiAutoLabeling(self, Form):
         """
             Description:Semi Auto Labeling Init UI
             Author: Yugyeong Hong (2026.02.04)
         """
-        Mainwindow.setObjectName("PenSemiAutoLabelingMainWindow")
-        Mainwindow.resize(200, 200)
-        Mainwindow.setStyleSheet(stylesheet)
+        Form.setObjectName("PenSemiAutoLabelingForm")
+        Form.resize(200, 200)
+        Form.setStyleSheet(stylesheet)
 
-        self.centralWidget = QtWidgets.QWidget(Mainwindow)
-        self.centralWidget.setObjectName("CentralWidget")
 
-        self.penMainGrid = QtWidgets.QVBoxLayout(self.centralWidget)
+        self.penMainGrid = QtWidgets.QVBoxLayout(Form)
         self.penMainGrid.setObjectName("penMainGrid")
 
         # ================================= Build Endmember =============================
@@ -233,7 +231,6 @@ class PenSemiAutoLabelingForm(QtWidgets.QMainWindow):
         self.pWidget, self.pSlider, self.pEdit = self.initUiSlider(titleKey="penSemiAutoLabelingStrictness", guideKey="penSemiAutoLabelingStrictnessGuide")
         self.qWidget, self.qSlider, self.qEdit = self.initUiSlider(titleKey="penSemiAutoLabelingTolerance", guideKey="penSemiAutoLabelingToleranceGuide")
 
-        Mainwindow.setCentralWidget(self.centralWidget)
 
     def setupUiLabelMainPenSemiAutoLabeling(self):
         """
@@ -433,6 +430,6 @@ class PenSemiAutoLabelingForm(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QWidget()
+    Form = QtWidgets.QWidget()
     ui=PenSemiAutoLabelingForm()
     sys.exit(app.exec_())

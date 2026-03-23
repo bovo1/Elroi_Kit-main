@@ -10,7 +10,6 @@ QTabBar::tab{
 	padding-left: 10px;
 	padding-right: 10px;
     min-width: 140px;
-    width: 140px;
     margin-right: 5px;
 }
 

@@ -44,7 +44,7 @@ class Training_Thread(QThread):
         self.result_signal = result_signal
     
     def emit_result_signal(self, shared_data:dict) -> None:
-        list_result_signal = ["train_loss", "val_loss", "test_loss", "abnormal_avg_f1score", "origin_images", "pred_images", "label_images", "abnormal_scores", "abnormal_scores_without_ignored", "labels", "labels_without_ignored", "best_threshold", "position_indices", "position_indices_without_ignored", "save_path", "results", "cm", "is_classification", "is_anomaly_detection"]
+        list_result_signal = ["train_loss", "val_loss", "test_loss", "abnormal_avg_f1score", "origin_images", "pred_images", "label_images", "abnormal_scores", "abnormal_scores_without_ignored", "labels", "labels_without_ignored", "bestThreshold", "position_indices", "position_indices_without_ignored", "trainFeatureDistHist", "testFeatureDistHist","save_path", "results", "cm", "is_classification", "is_anomaly_detection"]
         for data in list_result_signal:
             if data in shared_data:
                 self.result_signal.emit({data: shared_data[data]})

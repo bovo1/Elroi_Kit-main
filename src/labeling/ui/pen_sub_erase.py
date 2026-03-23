@@ -5,7 +5,7 @@ from PyQt5.QtCore import QSize, Qt
 from labeling.stylesheet.stylesheet_pen_sub_erase import stylesheet
 from constants.constants import QT_MAX_SIZE
 
-class Pen_eraser_Form(QtWidgets.QMainWindow):
+class Pen_eraser_Form(QtWidgets.QWidget):
     """Pen sub eraser ui, 펜 설정에 대한 모든 기능을 처리하기 위한 클래스
     """
     def __init__(self, Pen_Sync, lang):
@@ -39,20 +39,18 @@ class Pen_eraser_Form(QtWidgets.QMainWindow):
 
 
         
-    def init_Ui_label_main_pen_eraser(self, Mainwindow):
+    def init_Ui_label_main_pen_eraser(self, Form):
         """Pen sub 리스트 UI 생성을 위한 초기 선언문이다.
                 Parmeters
                 1.	Form(object): PyQt widget object
 
         """
-        Mainwindow.setObjectName("pen_eraser_form")
-        Mainwindow.resize(150, 150)
-        Mainwindow.setStyleSheet(stylesheet)
-        
-        self.centralwidget = QtWidgets.QWidget(Mainwindow)
-        self.centralwidget.setObjectName("centralwidget")
+        Form.setObjectName("pen_sub_erase_form")
+        Form.resize(150, 150)
+        Form.setStyleSheet(stylesheet)
 
-        self.pen_main_grid = QtWidgets.QGridLayout(self.centralwidget)
+
+        self.pen_main_grid = QtWidgets.QGridLayout(Form)
         self.pen_main_grid.setObjectName("pen_main_grid")
 
         self.pen_eraser_main_title_widget = QtWidgets.QWidget()
@@ -111,8 +109,7 @@ class Pen_eraser_Form(QtWidgets.QMainWindow):
         self.pen_eraser_range_slider.setPageStep(1)
         self.pen_eraser_range_slider.setRange(1, 5)
 
-        QtCore.QMetaObject.connectSlotsByName(Mainwindow)
-        Mainwindow.setCentralWidget(self.centralwidget)
+        QtCore.QMetaObject.connectSlotsByName(Form)
 
 
     def setup_Ui_label_main_pen_eraser(self):
@@ -194,8 +191,8 @@ class Pen_eraser_Form(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    Mainwindow = QtWidgets.QWidget()
+    Form = QtWidgets.QWidget()
     ui = Pen_eraser_Form()
-    # ui.setupUi(Mainwindow)
-    # Mainwindow.show()
+    # ui.setupUi(Form)
+    # Form.show()
     sys.exit(app.exec_())

@@ -1,5 +1,5 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from labeling.stylesheet.stylesheet_label_sub_ess_option import stylesheet
 
 class label_sub_ess_option_Form(QtWidgets.QDialog):
     def __init__(self, Sync=None, lang=None, parent=None) -> None:
@@ -28,11 +28,12 @@ class label_sub_ess_option_Form(QtWidgets.QDialog):
 
     def init_ui(self, Form):
         Form.setObjectName("ESS_Setting_Form")
-        Form.resize(318, 199)
+        Form.setFixedSize(318, 199)
         self.lang.set("labeling","labelSubESSOption", "labelESSTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
+        Form.setStyleSheet(stylesheet)
         
         self.label_sub_ess_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.label_sub_ess_main_vertical.setObjectName("label_sub_ess_main_vertical")

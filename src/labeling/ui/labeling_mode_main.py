@@ -3,6 +3,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QHBoxLayout, QSplitter, QVBoxLayout
 from PyQt5.QtCore import Qt, pyqtSlot
 from labeling.stylesheet.stylesheet_labeling_mode_main import stylesheet
+from utils.custom_ui import ReDockOnCloseDockWidget, customTabBar
+
 from constants.constants import QT_MAX_SIZE
 if __name__ == "__main__" :
     from pen_main import Pen_Form
@@ -48,8 +50,10 @@ class Label_Main(QtWidgets.QMainWindow):
                 Parameters
                 1.   MainWindow(object): PyQt widget object
 
-                description : Add function to clear LDA Graph
-                modified by GaEun Hwang
+                @history: 
+                    1. Add function to clear LDA Graph modified by GaEun Hwang
+                    2. Imporve graph view using DockWidget modified by GaEun Hwang(2026.03.09)
+
         """
         MainWindow.setObjectName("Label_MainWindow")
         MainWindow.setWindowTitle("Label Main Window")
@@ -114,10 +118,25 @@ class Label_Main(QtWidgets.QMainWindow):
         self.function_list.append(self.update_graph_preview)
         
         self.Graph_tab_widget = QtWidgets.QTabWidget(self.centralwidget)
+        # apply customTabBar for graph tab widget to implement detachable tab
+        self.graphTabBar = customTabBar(self.Graph_tab_widget)
+        self.Graph_tab_widget.setTabBar(self.graphTabBar)
         self.Graph_tab_widget.setObjectName("Graph_tab_widget")
+        self.graphTabBar.setObjectName("graphTabBar")
         self.Graph_tab_widget.addTab(self.Graph_widget, "")
         self.lang.set("labeling", "labeling_mode_main", "Graph_tab_widget", self.Graph_tab_widget)
         self.Graph_tab_widget.setCurrentIndex(0)
+
+        self.graphDockingWindow = QtWidgets.QMainWindow()
+        self.graphDockingWindow.setObjectName("graphDockingWindow")
+        self.graphDock = ReDockOnCloseDockWidget("Graph", self.graphDockingWindow, hideTitleBarWhenDocked=True, hideTitleBarWhenFloating=False)
+        self.graphDockingWindow.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.graphDock)
+        self.graphDockingWindow.setDockOptions(QtWidgets.QMainWindow.DockOption.AnimatedDocks)
+        self.graphDock.setWidget(self.Graph_tab_widget)
+
+        # Connect signals from customTabBar to functions for floating and moving the graph dock
+        self.graphTabBar.requestDetachSignal.connect(self.floatGraphDock)
+        self.graphTabBar.moveSignal.connect(self.moveFloatingGraphDock)
 
         self.scrollAreaWidgetContents = Display_Form(Sync=self.Sync, function_list=self.function_list, lang=self.lang)
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
@@ -145,9 +164,13 @@ class Label_Main(QtWidgets.QMainWindow):
 
 
     def setup_Ui_label_main(self, MainWindow):
-        """초기화된 ui의 디자인을 정의한다. Widget의 크기, layout 마진정의 및 정렬을 해당함수에서 정의한다.
+        """
+            초기화된 ui의 디자인을 정의한다. Widget의 크기, layout 마진정의 및 정렬을 해당함수에서 정의한다.
                 Parameters
                 1.   MainWindow(object): PyQt widget object
+                @history:
+                    1. remove graph tab widget minimum size through dragging becomes stable even when the mainwindow is small modified by GaEun Hwang(2026.03.18)
+                       if graph tab widget's minimum size is bigger than docking area size, docking is not stable when dragging the graph tab widget
         """
         # MainWindow.resize(1085, 705)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -165,7 +188,7 @@ class Label_Main(QtWidgets.QMainWindow):
         self.image_tabwidget_horizon.addWidget(self.hsplitter)
 
         self.vsplitter.addWidget(self.imagelabel_tab_widget)
-        self.vsplitter.addWidget(self.Graph_tab_widget)
+        self.vsplitter.addWidget(self.graphDockingWindow)
         self.tab_widget_vertical.addWidget(self.vsplitter)
 
         self.grid_sub_window.addWidget(self.pen_widget, 0, 0, 1, 1)
@@ -183,7 +206,6 @@ class Label_Main(QtWidgets.QMainWindow):
         self.pen_widget.setMinimumSize(QtCore.QSize(45, 0))
         self.pen_widget.setMaximumSize(QtCore.QSize(45, QT_MAX_SIZE))
         
-        self.Graph_tab_widget.setMinimumSize(QtCore.QSize(350, 300))
         self.Graph_tab_widget.setMaximumSize(QtCore.QSize(QT_MAX_SIZE, QT_MAX_SIZE))
         
         self.imagelabel_tab_widget.setMinimumSize(QtCore.QSize(350, 300))
@@ -193,6 +215,29 @@ class Label_Main(QtWidgets.QMainWindow):
         
         self.image_scrollArea.setWidget(self.scrollAreaWidgetContents)
 
+    def floatGraphDock(self, globalPos, startPos):
+        """
+            @description: float graphDock when received requestDetachSignal from graphTabBar
+            @author: GaEun Hwang(2026.03.09)
+        """
+        if not self.graphDock.isFloating():
+            # hide dockwidget before floating to prevent it showing another place temporarily
+            self.graphDock.hide()
+            self.graphDock.setFloating(True)
+            self.moveFloatingGraphDock(globalPos, startPos)
+
+        self.graphDock.show()
+        self.graphDock.raise_() 
+
+
+    def moveFloatingGraphDock(self, globalPos, startPos):
+        """
+            @description: move floating graphDock when received move signal from graphTabBar
+            @author: GaEun Hwang(2026.03.09)
+        """
+        # calculate the position to move the floating dock to the cursor position
+        movedPos = self.graphDock.pos() + (globalPos - self.graphTabBar.mapToGlobal(startPos))
+        self.graphDock.move(movedPos)
 
     @pyqtSlot(dict)
     def recv_from_core(self, output):

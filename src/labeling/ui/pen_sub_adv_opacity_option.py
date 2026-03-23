@@ -1,5 +1,6 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+from labeling.stylesheet.stylesheet_pen_sub_adv_opacity_option import stylesheet
 """
     ELROILAB Kit
 
@@ -45,11 +46,12 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
             @author : MyoungHwan (2024.09.06)
         """
         Form.setObjectName("adv_opacity_setting_form")
-        Form.resize(318, 199)
+        Form.setFixedSize(318, 240)
         self.lang.set("labeling","penSubOpacity", "penOpacityTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
+        Form.setStyleSheet(stylesheet)
         
         self.pen_sub_adv_opacity_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.pen_sub_adv_opacity_main_vertical.setObjectName("pen_sub_adv_opacity_main_vertical")

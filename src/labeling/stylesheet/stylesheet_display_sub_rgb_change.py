@@ -1,5 +1,5 @@
 stylesheet = """
-QMainWindow{
+QWidget#display_rgb_change_form{
     background-color: rgb(83, 83, 83);
 }
 QLabel{

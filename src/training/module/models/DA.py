@@ -23,7 +23,12 @@ class DSAD(nn.Module):
 
     def forward(self, x):
         x = self.encoder(x)
-        dist = torch.sum((x - self.c)**2, dim=1)
+        """
+            description : Modify power operation to element-wise multiplication for better inference speed, as the original code's power operation can be computationally expensive.
+            modified by Chansik Kim 2026.03.18
+        """
+        diff = x - self.c
+        dist = (diff * diff).sum(dim=1)
         return dist
 
 class CDSAD(DSAD):
@@ -35,5 +40,10 @@ class CDSAD(DSAD):
     def forward(self, x):
         lv = self.encoder(x)
         fc = self.cls_head(lv)
-        dist = torch.sum((lv - self.c)**2, dim=1)
+        """
+            description : Modify power operation to element-wise multiplication for better inference speed, as the original code's power operation can be computationally expensive.
+            modified by Chansik Kim 2026.03.18
+        """
+        diff = lv - self.c
+        dist = (diff * diff).sum(dim=1)
         return fc, dist

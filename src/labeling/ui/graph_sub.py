@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 from qtwidgets import AnimatedToggle
-
+from labeling.stylesheet.stylesheet_graph_sub import stylesheet
 
 
 class graph_sub_Form(QtWidgets.QDialog):
@@ -75,12 +75,13 @@ class graph_sub_Form(QtWidgets.QDialog):
 
     def init_ui(self, Form):
         Form.setObjectName("graph_sub_form")
-        Form.setFixedSize(290, 340)
+        Form.setFixedSize(290, 250)
         self.lang.set("labeling", "graph_sub", "graphSubWindowTitle", Form)
         Form.setEnabled(False)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
+        Form.setStyleSheet(stylesheet)
         
         self.graph_sub_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.graph_sub_main_vertical.setObjectName("graph_sub_main_vertical")
@@ -153,17 +154,7 @@ class graph_sub_Form(QtWidgets.QDialog):
         # self.graph_sub_combobox_select_color.addItem("Label Color View")
         # self.graph_sub_combobox_select_color.setCurrentIndex(1)
         # self.graph_sub_combobox_select_color.setEnabled(False)
-        
-        self.graph_sub_etc_group = QtWidgets.QGroupBox(Form)
-        self.graph_sub_etc_group.setObjectName("graph_sub_etc_group")
-        self.lang.set("labeling", "graph_sub", "graphSubEtc", self.graph_sub_etc_group)
-
-        self.graph_sub_etc_vertical = QtWidgets.QVBoxLayout(self.graph_sub_etc_group)
-        self.graph_sub_etc_vertical.setObjectName("graph_sub_etc_vertical")
-
-        self.graph_sub_etc_save_btn = QtWidgets.QPushButton(self.graph_sub_etc_group)
-        self.graph_sub_etc_save_btn.setObjectName("graph_sub_etc_save_btn")
-        self.lang.set("labeling", "graph_sub", "graphSubSave", self.graph_sub_etc_save_btn)
+  
         QtCore.QMetaObject.connectSlotsByName(Form)
 
 
@@ -182,10 +173,6 @@ class graph_sub_Form(QtWidgets.QDialog):
 
         self.graph_sub_adv_vertical.addLayout(self.graph_sub_adv_horizon)
         self.graph_sub_main_vertical.addWidget(self.graph_sub_adv_group)
-
-        self.graph_sub_etc_vertical.addWidget(self.graph_sub_etc_save_btn)
-        self.graph_sub_main_vertical.addWidget(self.graph_sub_etc_group)
-
     
     def init_function(self):
         self.graph_sub_calib_mode_toggle.clicked.connect(lambda ch = self.graph_sub_calib_mode_toggle: self.graph_sub_mode(ch=ch, mode=1))

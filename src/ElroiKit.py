@@ -219,6 +219,9 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
         """
         mode = output['mode']
         if mode == "min" : #minimize
+            for _, obj in self.sub_widget_dict.items():
+                if obj.isVisible():
+                    obj.close()
             self.showMinimized()
         elif mode == "resize":
             if self.isMaximized():
@@ -351,7 +354,7 @@ if __name__ == "__main__":
     # temp directory
     if not os.path.exists(temp_path):
         os.mkdir(temp_path)
-
+    
     # settings
     defaultSettingsContent = {
         "font": FONT_DEFAULT

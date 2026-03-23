@@ -1,8 +1,9 @@
 stylesheet = """
-QMainWindow{
+QWidget#pen_sub_erase_form{
     background-color: rgb(83, 83, 83);
-    border: 1px solid black;
-    border-radius: 7px
+}
+QLineEdit{
+    background-color: rgb(255,255,255);
 }
 QLabel{
     background-color: transparent;

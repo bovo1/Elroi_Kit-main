@@ -25,6 +25,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     image_to_display_signal = QtCore.pyqtSignal(dict)
     image_to_display_sub_rgb_change_signal = QtCore.pyqtSignal(dict)
     imageToGraphGroupSignal = QtCore.pyqtSignal(dict)
+    imageToPenSignal = QtCore.pyqtSignal(dict)
     image_to_graph_signal = QtCore.pyqtSignal(dict)
     image_to_graph_sub_signal = QtCore.pyqtSignal(dict)
     image_to_labeling_mode_main_signal = QtCore.pyqtSignal(dict)

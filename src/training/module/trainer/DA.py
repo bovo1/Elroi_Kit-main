@@ -14,7 +14,8 @@ from sklearn.metrics import precision_recall_curve, average_precision_score, acc
 from constants.constants import *
 from ..models.Module import AutoEncoder
 from ..models.DA import DSAD, CDSAD
-from ..utils import ProgressManager, load_model, get_scores, get_images, save_model, format_confusion_matrix, makeMetadata, modelMetadata
+from ..utils import ProgressManager, load_model, get_scores, get_images, save_model, format_confusion_matrix, makeFeatureDistanceHist, makeMetadata, modelMetadata
+from ..model_utils import make_full_optimized_model
 
 
 """
@@ -69,6 +70,8 @@ class T_DSAD():
         self.ae_weight_decay = current_model_settings_dict["params_dict"]["ae_trainer"]["weight_decay"]["value"]
         self.eps = torch.tensor(torch.finfo(torch.float32).eps, device=self.device)
         self.best_epoch = None
+        self.trainFeatureDist = []
+        self.testFeatureDist = []
 
         # Loader
         self.train_loader = config["loader_dict"]["train"]
@@ -116,6 +119,7 @@ class T_DSAD():
             @author : Hyunsu Kim(2026.03.03)
         """
         self.metadatas = {}
+        self.metadatas["classScore"] = {}
         if self.is_train:
             self.metadatas = makeMetadata(config, self.num_bands, self.classifier, self.batch_size, self.patch_size,\
                                         self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.dsad_model.modelType)
@@ -302,7 +306,16 @@ class T_DSAD():
 
             if is_model_saved:
                 self._printer.print(f"Model has been saved in {self.current_model_save_path}")
-
+        """
+            @description : After training completion, if not classification model, compute and store feature distance histograms for the training set
+            @author : Hyunsu Kim (2026.03.10)
+        """
+        if not self.classifier:
+            try:
+                trainFeatureDist = makeFeatureDistanceHist(self.dsad_model, self.train_loader, self.bestThr, self.device)
+                self.shared_data.put({"trainFeatureDistHist": trainFeatureDist})
+            except Exception as e:
+                self._printer.print(f"[AD] Failed to build feature distance histograms: {e}")
         self._printer.print(f"Best Epoch: {self.best_epoch}/{self.epochs}")
 
     @torch.inference_mode()
@@ -325,8 +338,10 @@ class T_DSAD():
 
         mean_loss = 0.0
         aupr = 0.0
-        beta = 0.5
-        bestThr = bestThr
+        if self.is_train:
+            bestThr = bestThr
+        else:
+            bestThr = bestThr if self.modelMetadata["model"].get("bestThreshold") is None else float(self.modelMetadata["model"]["bestThreshold"][1])
         trained_cls_list = None
 
         # GPU accumulation buffers
@@ -644,6 +659,19 @@ class T_DSAD():
                 results = results_ad
                 cm = cm_ad
 
+                """
+                    @description : compute and store feature distance histograms for the test set
+                    @author : Hyunsu Kim (2026.03.10)
+                """
+                try:
+                    if labels_binary is not None and len(labels_binary) > 0:
+                        testFeatureDistHist = makeFeatureDistanceHist(self.dsad_model, data_loader, bestThr, self.device)
+                    else:
+                        testFeatureDistHist = None
+                    self.shared_data.put({"testFeatureDistHist": testFeatureDistHist})
+                except Exception as e:
+                    self._printer.print(f"[AD] Failed to build feature distance histograms: {e}")
+
             origin_images, pred_images, label_images = self.visualization(indices, vis_labels, vis_preds)
             self.shared_data.put({"results": results})
             self.shared_data.put({"cm": cm})
@@ -652,6 +680,7 @@ class T_DSAD():
             self.shared_data.put({"label_images": label_images})
             self.shared_data.put({"bestThreshold": bestThr})
             self.shared_data.put({"abnormal_scores": scores})
+            self.shared_data.put({"labels": labels_binary})
             self.shared_data.put({"position_indices": indices})
             if self.classifier:
                 self.shared_data.put({"is_classification": None})
@@ -668,7 +697,7 @@ class T_DSAD():
         return {"aupr": aupr, "loss": mean_loss, "bestThr": bestThr, "classScore": self.metadatas["classScore"], "cls_macro_f1": cls_macro_f1 if self.classifier else None}
 
 
-    def save(self, save_path, metaData=None):
+    def save(self, save_path, metaData=None, optimize_for_inference=True):
         """
             Set dummy input shape based on patch_size for model tracing.
 
@@ -676,8 +705,15 @@ class T_DSAD():
 
             History:
              - Modified by Hyunsu Kim : Transmit metadata (2025.10.16)
+             - Modified by Chansik Kim : Add option to save optimized model for inference (2026.03.18)
         """
-        save_model(self.dsad_model, save_path, self.num_bands, self.patch_size, self.batch_size, self.device, metaData)
+        model_for_save = self.dsad_model
+        if optimize_for_inference:
+            optimized_model = make_full_optimized_model(self.dsad_model)
+            model_for_save = optimized_model
+        
+        save_model(model_for_save,
+                    save_path, self.num_bands, self.patch_size, self.batch_size, self.device, metaData)
 
     def load(self, load_path: str) -> None:
         """

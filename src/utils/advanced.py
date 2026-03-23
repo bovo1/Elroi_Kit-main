@@ -217,95 +217,6 @@ def autoCommonLabel(data, label, path):
 
 	return predictData
 
-def fastsimifeat(data, label, k=10, pretrained=False):
-	dataset=HSIDataset([data], [label], patch_size=1, binary=False, ignored=[0])
-	train_loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=512, shuffle=False, drop_last=False)#, num_workers=4, persistent_workers=True)
-
-	print("fast fit")
-	# #Feature Extraction
-	h,w,c = np.shape(data)
-	n_class = np.max(label)+1
-	X=[]
-	Y=[]
-	pos=[]
-	for x, y, _, xy in train_loader:
-		X+=list(x.numpy())
-		Y+=list(y.numpy())
-		pos+=list(zip(*xy))
-	X = np.array(X).reshape(-1,c)
-	Y = np.array(Y).reshape(-1)
-
-
-	# X = np.array(data.reshape(-1,c))
-	# Y = np.array(label).reshape(-1)
-	print("X , Y shape", X.shape, Y.shape)
-
-	#KNN and estimate noisy ratio
-	pred_label = copy.deepcopy(Y)
-	for j in range(1):
-		knn_label_prob = knn_aug(X, pred_label, np.shape(X)[0], n_class, k=k)
-		pred_probs = torch.as_tensor(knn_label_prob)
-		pred_label= torch.argmax(pred_probs, 1)
-
-		if j ==0:
-			tmp_probs = pred_probs
-	t_voting = confusion_matrix(Y, pred_label, labels=[i for i in range(n_class)])
-	t_voting = t_voting/(t_voting.astype(float).sum(1)+1e-12)
-
-	#Score function
-	onehot = np.eye(n_class)[Y]
-	onehot=torch.as_tensor(onehot)
-	smoothing_label=[]
-	n_sample = np.shape(X)[0]
-	for j in range(n_sample):
-		tmp = copy.deepcopy(t_voting[Y[j]])
-		smoothing_label += list(tmp)
-
-	smoothing_label = np.array(smoothing_label).reshape((n_sample,-1))
-	smoothing_label = torch.as_tensor(smoothing_label)
-
-	score = torch.sum(onehot* torch.log((onehot+1e-12)/(knn_label_prob+1e-12)),1)
-	score2 = torch.sum(smoothing_label * torch.log((smoothing_label+1e-12)/(tmp_probs+1e-12)),1)
-
-	#Ranking-based noisy label detection
-	mask = torch.zeros((n_sample))
-	Y = torch.as_tensor(Y)
-	classes=np.unique(Y)
-	for j in classes:
-		thr = min(t_voting[j][j], 1.0)
-
-		if thr>= 1.0:
-			thr= 0.95
-		elif thr<= 0.0:
-			thr= 0.05
-
-		indices = torch.where(Y==j)
-
-		s = score[indices]
-		s2 = score2[indices]
-		top = torch.topk(torch.as_tensor(t_voting[j]),k=min(k+2,n_class)).values
-
-		if top[1] > torch.sum(top[2:]):
-			s = s-0.1*s2
-		else:
-			s = s+0.1*s2
-		q = torch.quantile(s, thr)
-
-		correct_label_masking = torch.where(s <q, 1,0)
-		mask[indices] = correct_label_masking.float()
-
-	#Masking only for anomaly
-	Y2 = torch.where((mask==1)|(Y<=2), Y, 0)
-	_, x, y = list(zip(*pos))
-	relabel = copy.deepcopy(label)
-	for i in range(len(x)):
-		x_pos = x[i]
-		y_pos = y[i]
-		relabel[x_pos][y_pos] = Y2[i]
-	relabel = np.array(relabel)
-	return relabel, _
-
-
 class Kmeans:
 	def __init__(self) -> None:
 		self.name = "Kmeans"
@@ -328,7 +239,7 @@ def simplelabeling(data, label, label_num=0, c_num=2):
 
 	"""
 	w, h, b= data.shape
-	data_f = data.reshape(-1, 224)
+	data_f = data.reshape(-1, b)
 	label_f = label.flatten()
 	"""
 		Description: Add Exception error

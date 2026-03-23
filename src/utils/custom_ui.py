@@ -256,22 +256,42 @@ class ReDockOnCloseDockWidget(QtWidgets.QDockWidget):
             When user wants to separate a dock into a floating window, give it a comfortable size and standard window buttons.
             When user clicks X on a floating dock, re-dock instead of hiding it.
         @author : Hyunsu Kim (2026.02.09)
+        @history:
+            1. Modified by GaEun Hwang(2026.03.09): Add variables, function about control titleBar visibility
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, hideTitleBarWhenDocked=False, hideTitleBarWhenFloating=False, **kwargs):
         super().__init__(*args, **kwargs)
         # Give floating docks a comfortable default size and standard window buttons.
         self.preferred_floating_size = QtCore.QSize(900, 700)
+        self.hideTitleBarWhenDocked = hideTitleBarWhenDocked
+        self.hideTitleBarWhenFloating = hideTitleBarWhenFloating
+        self.transparentTitleBar = QtWidgets.QWidget()
+
+        # Initialize title bar policy based on the initial state (docked or floating).
+        if self.isFloating():
+            self.setTitleBarWidget(self.transparentTitleBar if self.hideTitleBarWhenFloating else None)
+        else:
+            self.setTitleBarWidget(self.transparentTitleBar if self.hideTitleBarWhenDocked else None)
+        
         try:
             self.topLevelChanged.connect(self.on_top_level_changed)
         except Exception:
             pass
+    
+    def setTitleBarHidden(self, hideWhenDocked: bool, hideWhenFloating: bool):
+        self.hideTitleBarWhenDocked = hideWhenDocked
+        self.hideTitleBarWhenFloating = hideWhenFloating
 
     def setPreferredFloatingSize(self, w: int, h: int) -> None:
         self.preferred_floating_size = QtCore.QSize(int(w), int(h))
 
     def on_top_level_changed(self, floating: bool) -> None:
         if not floating:
+            # if it's docked, remove the title bar to save space and for ui consistency when isTitleBarHidden is True.
+            if self.hideTitleBarWhenDocked:
+                # setVisible(False) remains it's space, so use setTitleBarWidget with an empty widget to remove the title bar completely.
+                self.setTitleBarWidget(self.transparentTitleBar)
             return
         try:
             # Ensure the floating dock has normal window controls (min/max buttons).
@@ -280,6 +300,10 @@ class ReDockOnCloseDockWidget(QtWidgets.QDockWidget):
                 | Qt.WindowMinimizeButtonHint
                 | Qt.WindowMaximizeButtonHint
             )
+            # if hideTitleBarWhenFloating is True, repair native title bar for floating state
+            # the reason why repairing native title bar is moving the floating dock using title bar
+            if not self.hideTitleBarWhenFloating:
+                self.setTitleBarWidget(None)
             self.show()
             # If it's tiny, expand to a reasonable starting size.
             if self.width() < self.preferred_floating_size.width() or self.height() < self.preferred_floating_size.height():
@@ -346,3 +370,63 @@ def messageBox(mode=None, title=None, text=None, buttons=None):
     box.exec_()
     clicked = box.clickedButton()
     return buttonRoleMap.get(clicked)
+
+class customTabBar(QtWidgets.QTabBar):
+    """
+        @description: customTabbar is a QTabBar subclass that emits signals for detaching, moving, and finishing drag of tabs.
+        @author : GaEun Hwang(2026.03.09)
+    """
+    requestDetachSignal = QtCore.pyqtSignal(QtCore.QPoint, QtCore.QPoint)
+    moveSignal = QtCore.pyqtSignal(QtCore.QPoint, QtCore.QPoint)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDrawBase(False)
+        self.resetDetachState()
+    
+    def resetDetachState(self):
+        """
+            @description: Reset the state related to detaching tabs.
+            @author : GaEun Hwang(2026.03.09)
+        """
+        self.dragStartPos = None
+        self.isDetached = False
+    
+    def isAvailableDetach(self, event):
+        """
+            @description: return True if the drag distance is sufficient to consider for detach action, otherwise return False.
+            @author : GaEun Hwang(2026.03.09)
+        """
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            return False
+        if self.dragStartPos is None:
+            return False
+        
+        # startDragDistance() is the minimum distance for a drag to be recognized.
+        # manhattanLength() is used to calculate the distance between the current mouse position and the position where the drag started.
+        return (event.pos() - self.dragStartPos).manhattanLength() >= QtWidgets.QApplication.startDragDistance()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragStartPos = QtCore.QPoint(event.pos())
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.isDetached:
+            if event.buttons() & Qt.MouseButton.LeftButton:
+                # Even if the tab is already detached, we need to keep emitting move events to update the position of the floating dock.
+                self.moveSignal.emit(event.globalPos(), self.dragStartPos)
+                return
+        
+        # Check if the drag distance is sufficient to consider it a detach action.
+        isAvailableDetach = self.isAvailableDetach(event)
+        if isAvailableDetach:
+            self.requestDetachSignal.emit(event.globalPos(), self.dragStartPos)
+            self.isDetached = True
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self.resetDetachState()
+        super().mouseReleaseEvent(event)
+

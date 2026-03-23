@@ -176,6 +176,17 @@ VISUALIZATION_MODE_ADVANCED = 1
 RGB_SLIDER_CHANGE = 0
 RGB_COMBOBOX_CHANGE = 1
 
+# test result
+GROUND_LABEL = [255.0, 255.0, 0.0]
+OPACITY_ALPHA = 0.5
+FP_LABEL = [255.0, 0.0, 0.0]
+FN_LABEL = [0.0, 0.0, 255.0]
+GRAPH_PEN_RED = (255, 0, 0, 200)
+GRAPH_PEN_GREEN = (0, 255, 0, 200)
+GRAPH_BRUSH_RED = (255, 0, 0, 60)
+GRAPH_BRUSH_GREEN = (0, 255, 0, 60)
+GRAPH_LINE = (255, 255, 0, 230)
+
 # model parameter
 MODEL_SELECTION_AUPR = 0
 MODEL_SELECTION_LOSS = 1
@@ -262,6 +273,16 @@ commonAbnormalDict = {
     "23" : {"label_name": "유리_초록"}
 }
 
+
+mode_to_pen_obj_key_dict = {v: k for k, v in pen_obj_key_to_mode_dict.items()}
+
+# Advanced Label Aggregation Mode constants
+ADV_LABEL_AGGREGATION_WINDOW_SIZE = (840, 640)
+ADV_LABEL_AGGREGATION_BUTTON_SIZE = (150, 150)
+ADV_LABEL_AGGREGATION_GROUPBOX_MINIMUM_WIDTH = 300
+ADV_LABEL_AGGREGATION_LINEEDIT_MINIMUM_WIDTH = 200
+AGGREGATION_DATA = "Aggregation Data"
+
 # Font
 FONT_DEFAULT = "Default"
 FONT_PRETENDARD = "Pretendard"
@@ -273,15 +294,6 @@ FONT_DICTIONARY = {
     FONT_NANUM_SQUARE_NEO: "NanumSquareNeo.ttf",
     FONT_NANUM_GOTHIC: "NanumGothic.ttf"
 }
-
-mode_to_pen_obj_key_dict = {v: k for k, v in pen_obj_key_to_mode_dict.items()}
-
-# Advanced Label Aggregation Mode constants
-ADV_LABEL_AGGREGATION_WINDOW_SIZE = (840, 640)
-ADV_LABEL_AGGREGATION_BUTTON_SIZE = (150, 150)
-ADV_LABEL_AGGREGATION_GROUPBOX_MINIMUM_WIDTH = 300
-ADV_LABEL_AGGREGATION_LINEEDIT_MINIMUM_WIDTH = 200
-AGGREGATION_DATA = "Aggregation Data"
 
 def switch_pen_to_draw(value):
     """pen_mode를 drawing_mode로 또는 drawing_mode를 pen_mode로 변환합니다."""

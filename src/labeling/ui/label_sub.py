@@ -12,8 +12,9 @@ import copy
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
-from utils.advanced import fastsimifeat, simplelabeling, Kmeans, autoCommonLabel
+from utils.advanced import Kmeans, autoCommonLabel
 from utils.worker import AutoLabel_Worker, Threading_Worker
+from labeling.stylesheet.stylesheet_label_sub import stylesheet
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
@@ -50,6 +51,7 @@ class label_sub_Form(QtWidgets.QDialog):
             @history
                 1. Implemented by MyoungHwan (2024.09.06)
                 2. Added by Hyunsu Kim (2025.11.21) : Add the Worker for the Common Abnormal Auto Labeling
+                3. Removed by GaEun Hwang (2026.03.12) : Remove the Worker for Relabeling Mode
         """
         self.lang = lang
         self.Sync = Sync
@@ -71,10 +73,6 @@ class label_sub_Form(QtWidgets.QDialog):
         self.Core_DB_Labeling = self.Sync.Core_DB_Labeling
 
         self.label_sub_ess_option_Form = label_sub_ess_option_Form(Sync=self.Sync, lang=self.lang, parent=self)
-
-        self.worker_1 = AutoLabel_Worker()
-        self.worker_1.Func = fastsimifeat
-        self.worker_1.output.connect(self.recv_from_threading)
 
         self.worker_2 = AutoLabel_Worker()
         self.worker_2.Func = autoCommonLabel
@@ -101,18 +99,11 @@ class label_sub_Form(QtWidgets.QDialog):
 
             History
                 1. Added by Hyunsu Kim(2025.11.21) : Add the process for the Common Abnormal Auto Labeling
+                2. Removed by GaEun Hwang(2026.03.12) : Remove the process for Relabeling Mode
         """
         id_ = output['id']
         mode = output['mode']
-        mode_n = "Null"
-        if mode == 1: # fastsimifit
-            mode_n = "relabeling Mode"
-            path = output['path'] + '/relabel.npy'
-            result = output['result']
-            self.label_sub_adv_relabel_mode_btn.setEnabled(True)
-            np.save(path, result)
-            print(f"{mode_n} is clear")
-        elif mode == 2: # auto common labeling
+        if mode == 2: # auto common labeling
             path = output['path'] + '/auto_common_label.npy'
             result = output['result']
             self.label_sub_adv_autoCommonLabel_mode_btn.setEnabled(True)
@@ -150,11 +141,12 @@ class label_sub_Form(QtWidgets.QDialog):
                 2. Added by Hyunsu Kim (2025.11.21) : Add the UI for the Common Abnormal Auto Labeling
         """
         Form.setObjectName("label_sub_form")
-        Form.setFixedSize(320, 360)
+        Form.setFixedSize(320, 145)
         self.lang.set("labeling", "labelSub", "labelSubTitle", Form)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
+        Form.setStyleSheet(stylesheet)
         
         self.label_sub_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.label_sub_main_vertical.setObjectName("label_sub_main_vertical")
@@ -219,18 +211,12 @@ class label_sub_Form(QtWidgets.QDialog):
                 1. Implemented by MyoungHwan (2024.09.06)
                 2. Added by Hyunsu Kim (2025.11.21) : Add the UI for the Common Abnormal Auto Labeling
         """
-
-        self.label_sub_adv_relabel_horizon.addWidget(self.label_sub_adv_relabel_mode_label)
-        self.label_sub_adv_relabel_horizon.addWidget(self.label_sub_adv_relabel_mode_btn)
         self.label_sub_adv_autoCommonLabel_horizon.addWidget(self.label_sub_adv_autoCommonLabel_mode_label)
         self.label_sub_adv_autoCommonLabel_horizon.addWidget(self.label_sub_adv_autoCommonLabel_mode_btn)
         self.label_sub_anly_horizon.addWidget(self.label_sub_anly_ess_label)
         self.label_sub_anly_horizon.addWidget(self.label_sub_anly_ess_option_btn)
         self.label_sub_anly_horizon.addWidget(self.label_sub_anly_ess_btn)
 
-
-        self.label_sub_adv_vertical.addLayout(self.label_sub_adv_horizon)
-        self.label_sub_adv_vertical.addLayout(self.label_sub_adv_relabel_horizon)
         self.label_sub_adv_vertical.addLayout(self.label_sub_adv_autoCommonLabel_horizon)
         self.label_sub_adv_vertical.addStretch(1)
 
@@ -253,8 +239,8 @@ class label_sub_Form(QtWidgets.QDialog):
             @history
                 1. Implemented by MyoungHwan (2024.09.06)
                 2. Added by Hyunsu Kim (2025.11.21) : Add the function for the Common Abnormal Auto Labeling
+                3. Removed by GaEun Hwang (2026.03.12) : Remove the connect code about Relabeling Mode
         """
-        self.label_sub_adv_relabel_mode_btn.clicked.connect(lambda ch = self.label_sub_adv_relabel_mode_btn: self.label_sub_mode_adv(ch=ch, mode=1))
         self.label_sub_adv_autoCommonLabel_mode_btn.clicked.connect(lambda ch = self.label_sub_adv_autoCommonLabel_mode_btn: self.label_sub_mode_adv(ch=ch, mode=2))
         self.label_sub_anly_ess_btn.clicked.connect(lambda ch = self.label_sub_anly_ess_btn: self.label_sub_mode_anly(ch=ch, mode=0))
         self.label_sub_anly_ess_option_btn.clicked.connect(lambda ch = self.label_sub_anly_ess_option_btn: self.label_sub_mode_anly(ch=ch, mode=1))
@@ -264,18 +250,12 @@ class label_sub_Form(QtWidgets.QDialog):
 
 
     def label_sub_mode_adv(self, ch, mode):
-        if mode == 1: # RElabeling mode
-            image_number = self.image_control_dict['select_image_number']
-            raw_data = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_raw']
-            label = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_label']
-            path = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_path'] + '/' + self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_name']
-            self.worker_1.datapack = [raw_data, label, path]
-            self.worker_1.output_dict = {
-                'mode': 1
-            }
-            self.worker_1.start()
-            self.label_sub_adv_relabel_mode_btn.setEnabled(False)
-        elif mode == 2: # Auto Common Abnormal Labeling mode
+        """
+            @description: function using worker for advanced mode
+            @history:
+                1. Removed by GaEun Hwang (2026.03.12) : Remove the code about Relabeling Mode(was mode=1)
+        """
+        if mode == 2: # Auto Common Abnormal Labeling mode
             image_number = self.image_control_dict['select_image_number']
             raw_data = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_raw']
             label = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_label']

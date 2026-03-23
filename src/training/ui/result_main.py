@@ -1,39 +1,18 @@
 import os
 import copy
-import shutil
 import pyqtgraph
 import numpy as np
 
-import pickle
-
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtCore import QTimer#, pyqtSlot
+from PyQt5.QtCore import QTimer
 from qtwidgets import AnimatedToggle
-from sklearn.metrics import precision_score, recall_score, f1_score
-from constants.constants import MESSAGE_BOX_INFORMATION
-from utils.custom_ui import messageBox
-# from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-# from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-# import matplotlib.pyplot as plt
 
-# from functools import partial
-
-from pyqtgraph import ImageView, exporters, GraphicsLayoutWidget#, PlotDataItem, ImageItem, HistogramLUTItem, ColorMap
-
-from PIL import Image
-from fpdf import FPDF, HTMLMixin
-
-from datetime import datetime
 from training.stylesheet.stylesheet_result_main import stylesheet
 
 from sklearn.metrics import confusion_matrix
 
 from utils.viewer import Display_viewer
-from utils.tools import HSI
-
-class PyFPDF(FPDF, HTMLMixin):
-    pass
+from constants.constants import *
 
 class Result_Form(QtWidgets.QWidget):
     def __init__(self, Sync, lang) -> None:
@@ -77,16 +56,18 @@ class Result_Form(QtWidgets.QWidget):
         self.current_threshold = None
         self.position_indices = None
         self.save_path = None
+        self.fpMask = None
+        self.fnMask = None
+        self.gtMask = None
+        self.trainFeatureDistHist = {}
+        self.testFeatureDistHist = {}
         # self.cm = None
         
         self.prev_train_loss_length = 0
         self.prev_val_loss_length = 0
         self.prev_abnormal_avg_f1score_length = 0
 
-        self.TrainLossPlot.clear()
-        self.ValLossPlot.clear()
-        self.ValAvgF1Plot.clear()
-        # self.OutputImageWidget.clear()
+        self.clearGraph()
         self.OutputImageWidget.initPhoto(QtGui.QPixmap("./ico/labeling/logo/background.jpg"), init=True, dragmode=1)
         self.OutputImageWidget.updateDrag(mode=1)
         self.ThresholdLineEdit.setText("")
@@ -102,11 +83,9 @@ class Result_Form(QtWidgets.QWidget):
         self.FormLayout = QtWidgets.QVBoxLayout(Form)
         self.FormLayout.setObjectName("FormLayout")
 
-        self.OutputMain = QtWidgets.QSplitter(Form)
+        # Use tabs so only one (plot or image) is visible at a time.
+        self.OutputMain = QtWidgets.QTabWidget(Form)
         self.OutputMain.setObjectName("OutputMain")
-
-        self.OutputMainLayout = QtWidgets.QHBoxLayout(self.OutputMain)
-        self.OutputMainLayout.setObjectName("OutputMainLayout")
         
         self.OutputPlotMainWidget = QtWidgets.QWidget()
         self.OutputPlotMainWidget.setObjectName("OutputPlotMainWidget")
@@ -170,6 +149,26 @@ class Result_Form(QtWidgets.QWidget):
         self.PredictionMapToggle.setChecked(True)
         self.ResultControlLayout.addWidget(self.PredictionMapToggle)
 
+        # Vertical line (Pred map controller <-> Error map controller)
+        self.ResultControlVerticalLineErr = QtWidgets.QFrame()
+        self.ResultControlVerticalLineErr.setObjectName("ResultControlVerticalLineErr")
+        self.ResultControlVerticalLineErr.setFrameShape(QtWidgets.QFrame.VLine)
+        self.ResultControlVerticalLineErr.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.ResultControlLayout.addWidget(self.ResultControlVerticalLineErr)
+
+        # Error map controller (FP/FN overlay)
+        self.FpFnMapLabel = QtWidgets.QLabel()
+        self.FpFnMapLabel.setObjectName("FpFnMapLabel")
+        self.ResultControlLayout.addWidget(self.FpFnMapLabel)
+
+        self.FpFnMapToggle = AnimatedToggle(
+            pulse_checked_color="transparent",
+            pulse_unchecked_color="transparent"
+        )
+        self.FpFnMapToggle.setObjectName("FpFnMapToggle")
+        self.FpFnMapToggle.setChecked(False)
+        self.ResultControlLayout.addWidget(self.FpFnMapToggle)
+
         # Vertical line (Pred map controller <-> Threshold controller)
         self.ResultControlVerticalLine2 = QtWidgets.QFrame()
         self.ResultControlVerticalLine2.setObjectName("ResultControlVerticalLine2")
@@ -206,20 +205,11 @@ class Result_Form(QtWidgets.QWidget):
         self.OutputImageWidget = Display_viewer(usescrollbar=False)
 
         # Plot View
-        self.OutputPlotWidget = GraphicsLayoutWidget()
-
-        # Button Widgets
-        self.GlobalButtonContainer = QtWidgets.QWidget()
-        self.GlobalButtonContainer.setObjectName("GlobalButtonContainer")
-
-        self.GlobalButtonContainerLayout = QtWidgets.QHBoxLayout(self.GlobalButtonContainer)
-        self.GlobalButtonContainerLayout.setObjectName("GlobalButtonContainerLayout")
-
-        self.LoadButton = QtWidgets.QPushButton()
-        self.LoadButton.setObjectName("LoadButton")
-
-        self.ReportButton = QtWidgets.QPushButton()
-        self.ReportButton.setObjectName("ReportButton")
+        self.OutputPlotWidget = QtWidgets.QWidget()
+        self.OutputPlotGridLayout = QtWidgets.QGridLayout(self.OutputPlotWidget)
+        self.OutputPlotGridLayout.setContentsMargins(0, 0, 0, 0)
+        self.OutputPlotGridLayout.setHorizontalSpacing(10)
+        self.OutputPlotGridLayout.setVerticalSpacing(10)
 
     def setup_ui(self):
         # Language Settings
@@ -227,18 +217,26 @@ class Result_Form(QtWidgets.QWidget):
         self.lang.set("training", "result_main", "OutputImageGroupBox", self.OutputImageGroupBox)
         self.lang.set("training", "result_main", "update_result_text", self.update_result_text)
         self.lang.set("training", "result_main", "PredictionMapLabel", self.PredictionMapLabel)
+        self.lang.set("training", "result_main", "FpFnMapLabel", self.FpFnMapLabel)
         self.lang.set("training", "result_main", "ThresholdLabel", self.ThresholdLabel)
         self.lang.set("training", "result_main", "ThresholdButton", self.ThresholdButton)
-        self.lang.set("training", "result_main", "ReportButton", self.ReportButton)
-        self.lang.set("training", "result_main", "LoadButton", self.LoadButton)
 
         # ======================= Plot Area =======================
         # Plot View Settings
+        """
+            @description: Set up the plot area with 4 different plots (Loss, F1-Score, Train Feature Distance Distribution, Test Feature Distance Distribution) arranged in a 2x2 grid layout. Each plot is customized with titles, axis labels, grid lines, legends, and interaction settings to provide a clear and informative visualization of training results.
+            @author: Hyunsu Kim (2026.03.10)
+            @history:
+                - Modified by Hyunsu Kim (2026.03.19): 
+                    - Changed from GraphicsLayoutWidget to QGridLayout for smooth graph size adjustment
+                    - Set the plotwidget's right-click menu to be available for View all function
+        """
         style = {"color": "w", "font-size": "15px"}
-        self.OutputPlotWidget.setBackground(pyqtgraph.mkColor(83, 83, 83))
+        plotBackground = pyqtgraph.mkColor(83, 83, 83)
 
         # Loss Plot
-        self.LossPlot = self.OutputPlotWidget.addPlot(row=0, col=0)
+        self.LossPlot = pyqtgraph.PlotWidget()
+        self.LossPlot.setBackground(plotBackground)
         self.LossPlot.setLabel("left", "Loss", **style)
         self.LossPlot.getAxis("left").setTextPen(pyqtgraph.mkPen("w", width=2))
         self.LossPlot.setLabel("bottom", "Epochs", **style)
@@ -246,13 +244,29 @@ class Result_Form(QtWidgets.QWidget):
         self.LossPlot.showGrid(x=True, y=True)
         self.LossPlot.setMenuEnabled(False)
         self.LossPlot.setMouseEnabled(x=False, y=False)
-        self.LossPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
-        self.LossPlot.legend.setOffset(1)
+        lossLegend = self.LossPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
+        lossLegend.setOffset(1)
         self.TrainLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(255, 0, 0, 250), width=2), name="Train")
         self.ValLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(0, 255, 0, 150), width=2), name="Val")
-
+        
+        # Feature Distance Distribution to Center C (DA/PE)
+        self.trainFeatureDistPlot = pyqtgraph.PlotWidget()
+        self.trainFeatureDistPlot.setBackground(plotBackground)
+        self.trainFeatureDistPlot.setLabel("left", "Probability", **style)
+        self.trainFeatureDistPlot.getAxis("left").setTextPen(pyqtgraph.mkPen("w", width=2))
+        self.trainFeatureDistPlot.setLabel("bottom", "Feature Distance", **style)
+        self.trainFeatureDistPlot.getAxis("bottom").setTextPen(pyqtgraph.mkPen("w", width=2))
+        self.trainFeatureDistPlot.showGrid(x=True, y=True)
+        self.trainFeatureDistPlot.setMenuEnabled(True)
+        self.trainFeatureDistPlot.setMouseEnabled(x=True, y=True)
+        self.trainFeatureDistPlot.getViewBox().setLimits(yMin=0)
+        self.trainFeatureDistPlot.getViewBox().setLimits(xMin=0)
+        self.trainFeatureDistPlot.getViewBox().setLimits(yMax=1)
+        trainFeatureLegend = self.trainFeatureDistPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
+        trainFeatureLegend.setOffset((-10, 10))
         # F1 Plot
-        self.F1Plot = self.OutputPlotWidget.addPlot(row=1, col=0)
+        self.F1Plot = pyqtgraph.PlotWidget()
+        self.F1Plot.setBackground(plotBackground)
         self.F1Plot.setLabel("left", "F1-Score", **style)
         self.F1Plot.getAxis("left").setTextPen(pyqtgraph.mkPen("w", width=2))
         self.F1Plot.setLabel("bottom", "Epochs", **style)
@@ -261,6 +275,31 @@ class Result_Form(QtWidgets.QWidget):
         self.F1Plot.setMenuEnabled(False)
         self.F1Plot.setMouseEnabled(x=False, y=False)
         self.ValAvgF1Plot = self.F1Plot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(255, 255, 255, 255), width=2), name="F1-Score")
+
+        # Feature Distance Distribution to Center C (DA/PE)
+        self.testFeatureDistPlot = pyqtgraph.PlotWidget()
+        self.testFeatureDistPlot.setBackground(plotBackground)
+        self.testFeatureDistPlot.setLabel("left", "Probability", **style)
+        self.testFeatureDistPlot.getAxis("left").setTextPen(pyqtgraph.mkPen("w", width=2))
+        self.testFeatureDistPlot.setLabel("bottom", "Feature Distance", **style)
+        self.testFeatureDistPlot.getAxis("bottom").setTextPen(pyqtgraph.mkPen("w", width=2))
+        self.testFeatureDistPlot.showGrid(x=True, y=True)
+        self.testFeatureDistPlot.setMenuEnabled(True)
+        self.testFeatureDistPlot.setMouseEnabled(x=True, y=True)
+        self.testFeatureDistPlot.getViewBox().setLimits(yMin=0)
+        self.testFeatureDistPlot.getViewBox().setLimits(xMin=0)
+        self.testFeatureDistPlot.getViewBox().setLimits(yMax=1)
+        testFeatureLegend = self.testFeatureDistPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
+        testFeatureLegend.setOffset((-10, 10))
+
+        self.OutputPlotGridLayout.addWidget(self.LossPlot, 0, 0)
+        self.OutputPlotGridLayout.addWidget(self.trainFeatureDistPlot, 0, 1)
+        self.OutputPlotGridLayout.addWidget(self.F1Plot, 1, 0)
+        self.OutputPlotGridLayout.addWidget(self.testFeatureDistPlot, 1, 1)
+        self.OutputPlotGridLayout.setColumnStretch(0, 1)
+        self.OutputPlotGridLayout.setColumnStretch(1, 1)
+        self.OutputPlotGridLayout.setRowStretch(0, 1)
+        self.OutputPlotGridLayout.setRowStretch(1, 1)
 
         self.OutputPlotGroupBoxLayout.addWidget(self.OutputPlotWidget)
         # ======================= Plot Area =======================
@@ -295,35 +334,46 @@ class Result_Form(QtWidgets.QWidget):
         self.OutputImageMainWidgetLayout.addWidget(self.OutputImageGroupBox)
         self.OutputImageMainWidgetLayout.setContentsMargins(0, 0, 0, 0)
 
-        self.OutputMainLayout.addWidget(self.OutputPlotGroupBox)
-        self.OutputMainLayout.addWidget(self.OutputImageGroupBox)
-
-        self.OutputMain.setSizes([1, 2])
-
-        self.GlobalButtonContainerLayout.addWidget(self.ReportButton, 0, QtCore.Qt.AlignRight)
-        self.GlobalButtonContainerLayout.setContentsMargins(0, 0, 0, 0)
-        
-        self.FormLayout.addWidget(self.GlobalButtonContainer, 0, QtCore.Qt.AlignRight)
+        # Tabs: Plot / Image
+        self.OutputMain.addTab(self.OutputPlotMainWidget, "Plot")
+        self.OutputMain.addTab(self.OutputImageMainWidget, "Image")
+        self.lang.set("training", "result_main", "plotTab", self.OutputMain)
+        self.lang.set("training", "result_main", "imageTab", self.OutputMain)
+        # Default to Image tab for quick inspection
+        self.OutputMain.setCurrentWidget(self.OutputImageMainWidget)
         self.FormLayout.addWidget(self.OutputMain)
     
     def init_function(self):
-        self.ReportButton.clicked.connect(lambda: self.report_result())
-        self.LoadButton.clicked.connect(lambda: self.load_result())
-        self.PredictionMapToggle.clicked.connect(lambda: self.show_selected_image(self.ImageSelectorComboBox.currentIndex(), self.PredictionMapToggle.isChecked(), True))
-        self.ThresholdButton.clicked.connect(lambda: self.show_updated_pred_image(self.ImageSelectorComboBox.currentIndex(), float(self.ThresholdLineEdit.text()), self.PredictionMapToggle.isChecked()))
+        self.PredictionMapToggle.clicked.connect(lambda: self.show_selected_image(self.ImageSelectorComboBox.currentIndex(), self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True))
+        self.FpFnMapToggle.clicked.connect(lambda: self.show_selected_image(self.ImageSelectorComboBox.currentIndex(), self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True))
+        self.ThresholdButton.clicked.connect(lambda: self.show_updated_pred_image(self.ImageSelectorComboBox.currentIndex(), float(self.ThresholdLineEdit.text()), self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked()))
         self.ThresholdLineEdit.editingFinished.connect(self.ThresholdButton.click)
         # Connect multiple callbacks to combobox index change:
         # 1. Update displayed image based on new selection
         # 2. Adjust combobox width to fit content
         self.ImageSelectorComboBox.currentIndexChanged.connect(lambda: (
-            self.show_selected_image(self.ImageSelectorComboBox.currentIndex(), self.PredictionMapToggle.isChecked(), True), 
+            self.show_selected_image(self.ImageSelectorComboBox.currentIndex(), self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True), 
             self.adjust_combo_box_width()
         ))
 
     def update_result_text(self):
-        style = {"color": "w", "font-size": "15px"}
-        self.LossPlot.setTitle(self.lang.get("training", "result_main", "LossPlotTitle"), **style)
-        self.F1Plot.setTitle(self.lang.get("training", "result_main", "F1PlotTitle"), **style)
+        """
+            @history:
+                - Modified by Hyunsu Kim (2026.03.19):
+                    - Add best threshold information to the titles of feature distance distribution plots
+                    - Add the condition to update the feature distance distribution plot title
+        """
+        self.style = {"color": "w", "font-size": "15px"}
+        self.LossPlot.setTitle(self.lang.get("training", "result_main", "LossPlotTitle"), **self.style)
+        self.F1Plot.setTitle(self.lang.get("training", "result_main", "F1PlotTitle"), **self.style)
+
+        self.trainFeatureDistPlot.setTitle(self.lang.get("training", "result_main", "trainFeatureDistPlotTitle"), **self.style)
+        self.testFeatureDistPlot.setTitle(self.lang.get("training", "result_main", "testFeatureDistPlotTitle"), **self.style)
+
+        if self.trainFeatureDistHist or self.testFeatureDistHist:
+            self.clearGraph()
+            self.updateDistPlots()
+            return
 
     def update_plot(self):
         if self.train_loss != []:
@@ -372,35 +422,299 @@ class Result_Form(QtWidgets.QWidget):
         if is_anomaly_detection:
             self.ThresholdMainWidget.setVisible(True)
             self.ResultControlVerticalLine2.setVisible(True)
+            self.ResultControlVerticalLineErr.setVisible(True)
+            self.FpFnMapLabel.setVisible(True)
+            self.FpFnMapToggle.setVisible(True)
+            self.FpFnMapToggle.setEnabled(False)
             self.ThresholdLineEdit.setText(f"{self.pred_thresholds:.3f}")
         else:
             self.ThresholdMainWidget.setVisible(False)
             self.ResultControlVerticalLine2.setVisible(False)
+            self.ResultControlVerticalLineErr.setVisible(False)
+            self.FpFnMapLabel.setVisible(False)
+            self.FpFnMapToggle.setVisible(False)
 
-    def show_selected_image(self, image_index:int, show_pred_map:bool, fitinview:bool):
+    def changeToggle(self):
+        """
+            @description : Change the enabled/disabled state of PredictionMapToggle and FpFnMapToggle to ensure only one can be active at a time, 
+                            preventing conflicting overlays when viewing images. 
+                            If PredictionMapToggle is checked, disable FpFnMapToggle and vice versa. 
+                            If neither is checked, enable both toggles for user selection.
+            @author : Hyunsu Kim (2026.03.10)
+        """
+        if self.PredictionMapToggle.isChecked():
+            self.FpFnMapToggle.setChecked(False)
+            self.FpFnMapToggle.setEnabled(False)
+        else:
+            self.FpFnMapToggle.setEnabled(True)
+
+        if self.FpFnMapToggle.isChecked():
+            self.PredictionMapToggle.setChecked(False)
+            self.PredictionMapToggle.setEnabled(False)
+        else:
+            self.PredictionMapToggle.setEnabled(True)
+
+    def clearGraph(self):
+        """
+            @description : Clear Feature Distance plots in the graph.
+            @author : Hyunsu Kim (2026.03.20)
+        """
+        self.trainFeatureDistPlot.clear()
+        self.testFeatureDistPlot.clear()
+
+    def plotHistStep(self, plotItem, edges, data, pen, name, brush=None):
+        """
+            @description : Utility function to plot step histogram (for feature distance distribution) with optional fill and legend entry
+            @author : Hyunsu Kim (2026.03.10)
+            @parameter :
+                - plotItem: pyqtgraph PlotItem to plot on
+                - edges: array-like, bin edges for the histogram (length N+1 for N bins)
+                - data: array-like, probability values for each bin (length N)
+                - pen: pyqtgraph pen for the line color/style
+                - name: str, legend entry name (if None, no legend entry)
+                - brush: pyqtgraph brush for filling under the step curve (if None, no fill)
+        """
+        # pyqtgraph stepMode=True expects len(x) == len(y) + 1
+        if edges.size == data.size:
+            # Treat given x as bin centers; synthesize a final edge.
+            lastStep = float(edges[-1] - edges[-2]) if edges.size >= 2 else 1.0
+            edges = np.r_[edges, edges[-1] + lastStep]
+        elif edges.size != data.size + 1:
+            return
+        
+        # Plot the step histogram with optional fill and legend entry
+        plotItem.plot(
+            edges,
+            data,
+            stepMode=True,
+            fillLevel=0,
+            brush=brush,
+            pen=pyqtgraph.mkPen(None),
+            name=None,
+        )
+        plotItem.plot(
+            edges,
+            data,
+            stepMode=True,
+            fillLevel=0,
+            brush=None,
+            pen=pen,
+            name=name,
+        )
+
+    def updateDistPlots(self):
+        """
+            @description : Update feature distance distribution plots for both train and test sets using the latest histograms from the trainer, including best threshold and FP/FN counts in the titles
+            @author : Hyunsu Kim (2026.03.10)
+            @history:
+                - Modified by Hyunsu Kim (2026.03.19):
+                    - Move plotwidget legend and Add information about sample counts, data mean and std in the legend
+                    - Set to plot only when data exists
+                    - Change the plot title
+        """
+        # add legends
+        trainFeatureLegend = self.trainFeatureDistPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
+        testFeatureLegend = self.testFeatureDistPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
+        trainFeatureLegend.setOffset((-10, 10))
+        testFeatureLegend.setOffset((-10, 10))
+
+        featureDistHists = [self.trainFeatureDistHist, self.testFeatureDistHist]
+        featurePlots = [self.trainFeatureDistPlot, self.testFeatureDistPlot]
+        titles = [
+            self.lang.get("training", "result_main", "trainFeatureDistPlotTitle"),
+            self.lang.get("training", "result_main", "testFeatureDistPlotTitle"),
+        ]
+
+        # Feature distance distribution (+ best threshold)
+        for featureDistHist, featurePlot, title in zip(featureDistHists, featurePlots, titles):
+            if featureDistHist:
+                edges = featureDistHist.get("edges")
+                normal = featureDistHist.get("normal")
+                abnormal = featureDistHist.get("abnormal")
+                bestThreshold = featureDistHist.get("best_thr")
+                normalMean = featureDistHist.get("normalMean")
+                abnormalMean = featureDistHist.get("abnormalMean")
+                normalStd = featureDistHist.get("normalStd")
+                abnormalStd = featureDistHist.get("abnormalStd")
+                normalCount = featureDistHist.get("normalCount")
+                abnormalCount = featureDistHist.get("abnormalCount")
+
+                normalLegend = "Normal" if normalMean is None and normalStd is None else f"Normal (Sample: {normalCount}, Mean: {normalMean:.3f}, Std: {normalStd:.3f})"
+                abnormalLegend = "Abnormal" if abnormalMean is None and abnormalStd is None else f"Abnormal (Sample: {abnormalCount}, Mean: {abnormalMean:.3f}, Std: {abnormalStd:.3f})"
+
+                # Setting labels, title with best threshold and FP/FN counts, and axis ranges
+                featurePlot.setLabel("left", "Probability")
+                if bestThreshold is None:
+                    featurePlot.setTitle(title + "None", **self.style)
+                else:
+                    featurePlot.setTitle(title + f"{bestThreshold:.3f}", **self.style)
+                edges = np.asarray(edges)
+                featurePlot.setXRange(float(edges[0]), float(edges[-1]), padding=0.02)
+                featurePlot.enableAutoRange(axis="y", enable=True)
+
+                # Plot normal and abnormal distributions as step histograms with fill and legend entries
+                if normal is not None:
+                    normal = normal / normal.sum()
+                    self.plotHistStep(
+                        featurePlot,
+                        edges,
+                        normal,
+                        pen=pyqtgraph.mkPen(pyqtgraph.mkColor(GRAPH_PEN_GREEN), width=2),
+                        name=normalLegend,
+                        brush=pyqtgraph.mkBrush(GRAPH_BRUSH_GREEN),
+                    )
+                if abnormal is not None:
+                    abnormal = abnormal / abnormal.sum()
+                    self.plotHistStep(
+                        featurePlot,
+                        edges,
+                        abnormal,
+                        pen=pyqtgraph.mkPen(pyqtgraph.mkColor(GRAPH_PEN_RED), width=2),
+                        name=abnormalLegend,
+                        brush=pyqtgraph.mkBrush(GRAPH_BRUSH_RED),
+                    )
+
+                if bestThreshold is not None:
+                    thrPen = pyqtgraph.mkPen(pyqtgraph.mkColor(GRAPH_LINE), width=2, style=QtCore.Qt.DashLine)
+                    featurePlot.addItem(pyqtgraph.InfiniteLine(pos=bestThreshold, angle=90, pen=thrPen))
+
+    def show_selected_image(self, image_index:int, show_pred_map:bool, showErrorMap:bool, fitinview:bool):
+        """
+            @description : Display the selected image in the OutputImageWidget based on the current state of the PredictionMapToggle.
+            @parameter :
+                - image_index: Index of the selected image from the combobox.
+                - show_pred_map: Boolean indicating whether to show the prediction map overlay (red highlights for anomalies).
+                - showErrorMap: Boolean indicating whether to show the FP/FN error map overlay.
+                - fitinview: Boolean indicating whether to fit the image to the view after updating.
+            @history:
+                - Modified by Chansik Kim (2025.03.21) : Update inference image with new threshold only for anomaly detection task
+                - Modified by Hyunsu Kim (2026.03.10) : Add a FP/FN toggle for displaying the FP/FN map overlay
+                - Modified by Hyunsu Kim (2026.03.19) : Add a condition to prevent displaying previously saved fp/fn images when retraining the classification model.
+        """
         if image_index == -1: return
         image = None
-        # Update inference image with new threshold only for anomaly detection task
-        # Modified by Chansik Kim (2025.03.21)
+
+        self.changeToggle()
+
         if self.is_anomaly_detection:
             threshold_txt = float(self.ThresholdLineEdit.text())
             threshold = threshold_txt if threshold_txt != 0.0 else self.best_threshold
             self.update_pred_image(image_index, threshold)
+            self.getFpFnMask(image_index, threshold)
             self.ThresholdLineEdit.setText(f"{self.pred_thresholds:.3f}")
+        else:
+            showErrorMap = False
 
         if show_pred_map:
             if self.pred_images != []:
                 image = self.pred_images[image_index]#.transpose(1, 0, 2)
         else:
-            if self.origin_images != []:
-                image = self.origin_images[image_index]#.transpose(1, 0, 2)
+            """
+                @description : When toggling off the prediction map, if the error map is enabled, 
+                                show the error map instead of the original image to allow users to see FP/FN overlays without the red prediction overlay.
+                @author : Hyunsu Kim (2026.03.10)
+            """
+            if showErrorMap:
+                image = self.getFpFnImage(image_index)
+            else:
+                if self.origin_images != []:
+                    image = self.origin_images[image_index]
         
         if image is not None:
             self.OutputImageWidget.updatePhoto(QtGui.QPixmap(QtGui.QImage(image, image.shape[1], image.shape[0], QtGui.QImage.Format_RGB888)), fitinview)
 
-    def show_updated_pred_image(self, image_index:int, threshold:float, show_pred_map:bool):
+    def getFpFnImage(self, image_index:int):
+        """
+            @description : Generate an image with FP/FN error regions highlighted, 
+                            optionally overlaying on the original image with GT regions highlighted in yellow. 
+            @author : Hyunsu Kim (2026.03.10)
+            @history:
+                - Modified by Hyunsu Kim (2026.03.19):
+                    - Delete an unnecessary condition for gtMask
+        """
+        if image_index == -1: return
+        image = None
+
+        if self.origin_images != []:
+            image = copy.deepcopy(self.origin_images[image_index])
+
+            # 1) Labeled(GT) region: 50% transparent yellow
+            if self.gtMask is not None:
+                gtMask = self.gtMask
+                base = image.astype(np.float32)
+                yellow = np.array(GROUND_LABEL, dtype=np.float32)
+                base[gtMask] = base[gtMask] * (1.0 - OPACITY_ALPHA) + yellow * OPACITY_ALPHA
+                image = base.astype(np.uint8)
+
+            # 2) FP/FN overlays (opaque)
+            if self.fpMask is not None:
+                fpMask = self.fpMask
+                image[fpMask] = FP_LABEL  # False Positives in Red
+            if self.fnMask is not None:
+                fnMask = self.fnMask
+                image[fnMask] = FN_LABEL  # False Negatives in Blue
+
+        return image
+
+    def getFpFnMask(self, imageIndex, bestThr):
+        """
+            @description : Generate boolean masks for False Positive (FP) and False Negative (FN) pixel locations based on the current prediction threshold, 
+                            which can be used for overlaying error regions on the original image. 
+            @author : Hyunsu Kim (2026.03.10)
+            @parameter :
+                - imageIndex: int, index of the image for which to compute FP/FN masks
+                - bestThr: float, threshold for classifying pixels as abnormal or normal based on abnormal scores, used to determine FP/FN conditions
+        """
+        # -------------------------------
+        #   - FP(과검출): pred=abnormal(DATA_ABNORMAL) & gt=normal(DATA_NORMAL)
+        #   - FN(미검출): pred=normal(DATA_NORMAL) & gt=abnormal(DATA_ABNORMAL)
+        # -------------------------------
+        preds = np.where(self.abnormal_scores < bestThr, DATA_NORMAL, DATA_ABNORMAL)
+        fpPixels = (preds == DATA_ABNORMAL) & (self.labels == DATA_NORMAL)
+        fnPixels = (preds == DATA_NORMAL) & (self.labels == DATA_ABNORMAL)
+        gtPixels = (self.labels != DATA_IGNORED)
+
+        try:
+            # Sample-level arrays (length N): which image each sample belongs to, and its (x,y) pixel coordinate.
+            imageIndice = self.position_indices[:, 0]
+            xCoordinateAll = self.position_indices[:, 1]
+            yCoordinateAll = self.position_indices[:, 2]
+            
+            # Initialize empty masks for the current image
+            img = self.origin_images[imageIndex]
+            height, width, _ = np.shape(img)
+            fpImage = np.zeros((height, width), dtype=bool)
+            fnImage = np.zeros((height, width), dtype=bool)
+            gtImage = np.zeros((height, width), dtype=bool)
+
+            # Find the samples that belong to the current image and update the FP/FN/GT masks accordingly
+            selectedImage = (imageIndice == imageIndex)
+            if selectedImage is not None:
+                xCoordinate = xCoordinateAll[selectedImage]
+                yCoordinate = yCoordinateAll[selectedImage]
+
+                fpPixel = fpPixels[selectedImage]
+                fnPixel = fnPixels[selectedImage]
+                gtPixel = gtPixels[selectedImage]
+
+                if np.any(fpPixel):
+                    fpImage[xCoordinate[fpPixel], yCoordinate[fpPixel]] = True
+                if np.any(fnPixel):
+                    fnImage[xCoordinate[fnPixel], yCoordinate[fnPixel]] = True
+                if np.any(gtPixel):
+                    gtImage[xCoordinate[gtPixel], yCoordinate[gtPixel]] = True
+
+                self.fpMask = fpImage
+                self.fnMask = fnImage
+                self.gtMask = gtImage
+
+        except Exception as e:
+            print("get Error in getFpFnMask:", e)
+
+
+    def show_updated_pred_image(self, image_index:int, threshold:float, show_pred_map:bool, showErrorMap:bool):
         self.update_pred_image(image_index, threshold)
-        self.show_selected_image(image_index, show_pred_map, True)
+        self.show_selected_image(image_index, show_pred_map, showErrorMap, True)
 
     def update_pred_image(self, image_index, threshold):
         self.pred_images[image_index] = self.get_pred_image(image_index, threshold)
@@ -441,198 +755,6 @@ class Result_Form(QtWidgets.QWidget):
         
         return f"Prec: {precision:.3f}, Rec: {recall:.3f}, F1: {F1score:.3f}"
 
-    def report_result(self):
-        if (len(self.origin_images) != 0):
-            # report resource directory
-            temp_path = os.path.join(self.save_path, "temp")
-            if not os.path.exists(temp_path):
-                os.mkdir(temp_path)
-            
-            # Plot Export
-            plot_exporter = exporters.ImageExporter(self.OutputPlotWidget.scene())
-            plot_exporter.export(os.path.join(temp_path, "OutputPlot.png"))
-
-            pdf = PyFPDF()
-            pdf.add_page()
-
-            head = """
-                <table border="0" align="center">
-                        <thead>
-                            <tr>
-                                <th width="12%">Label</th><th width="12%">Num Data</th><th width="12%">Precision</th><th width="12%">Recall</th><th width="12%">F1-Score</th>
-                            </tr>
-                        </thead>
-                    <tbody>
-            """
-            body = []
-            tail = """
-                    </tbody>
-                </table>
-            """
-
-            for result in self.results[3:-3]:
-                result = result.split()
-                body.append(f"<tr align='center'><td>{result[0]}</td><td>{result[1]}</td><td>{result[2]}</td><td>{result[3]}</td><td>{result[4]}</td></tr>")
-            results = head + "".join(body) + tail
-
-            html1 = f"""
-            <h1 align="center">Spectral AI Report</h1>
-            <h1>{self.current_model_type}</h1>
-            <h2>Date: {datetime.now().strftime('%Y/%m/%d %H:%M')}</h2>
-            <h2>Score</h2>
-            {results}
-            <p>Abnormal OA: {self.results[-3].split()[-1]}</p>
-            <br><p>Abnormal AA: {self.results[-2].split()[-1]}</p>
-            <br><p>Abnormal Average F1-Score: {self.results[-1].split()[-1]}</p>
-            <br>
-            """
-            
-            pdf.write_html(html1)
-            pdf.add_page()
-
-            html3 = u"<h2>Visualization</h2>"
-            
-            # # Image Export
-            for i in range(len(self.ImageSelectorComboBox)):
-                if self.current_threshold != None:
-                    Image.fromarray(self.get_pred_image(i, self.current_threshold)).save(f"{os.path.join(temp_path, 'pred_' + str({i}) + '.png')}")
-                else:
-                    Image.fromarray(self.pred_images[i]).save(f"{os.path.join(temp_path, 'pred_' + str({i}) + '.png')}")
-                Image.fromarray(self.label_images[i]).save(f"{os.path.join(temp_path, 'label_' + str({i}) + '.png')}")
-                html3 += f"""
-                    <br><h3>                                           Label                                             Prediction</h3>
-                    <img width="200" src="{os.path.join(temp_path, 'label_' + str({i}) + '.png')}"/>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <img width="200" src="{os.path.join(temp_path, 'pred_' + str({i}) + '.png')}"/>
-                    <br><br><br><br><br><br><br><br><br><br><br><br>
-                """
-                if i % 2 == 0 and i != 0:
-                    pdf.write_html(html3)
-                    pdf.add_page()
-                    html3 = u"<h2>Visualization</h2>"
-            
-            if len(self.ImageSelectorComboBox) % 3 != 0:
-                pdf.write_html(html3)
-
-            pdf.output(os.path.join(self.save_path, "report.pdf"), "F")
-
-            shutil.rmtree(temp_path)
-            message = f'{self.lang.get("training", "result_main", "ReportMessageBoxText")}{self.save_path}'
-            print(message)
-            messageBox(mode=MESSAGE_BOX_INFORMATION,
-                       title=self.lang.get("training", "result_main", "ReportMessageBoxTitle"),
-                       text=message,
-                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"}
-                       )
-        else:
-            message = self.lang.get("training", "result_main", "ReportNoResultText")
-            messageBox(mode=MESSAGE_BOX_INFORMATION,
-                       title=self.lang.get("training", "result_main", "ReportMessageBoxTitle"),
-                       text=message,
-                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"}
-                       )
-
-    def save_result(self, save_path):
-        with open(os.path.join(save_path, "result.re"), "wb") as f:
-            pickle.dump(
-                {
-                    "current_model_type": self.current_model_type,
-                    "is_anomaly_detection": self.is_anomaly_detection,
-                    "save_path": save_path,
-                    "image_names": self.image_names,
-                    "current_index": self.ImageSelectorComboBox.currentIndex(),
-                    "position_indices": self.position_indices,
-                    "abnormal_scores": self.abnormal_scores,
-                    "labels": self.labels,
-                    "best_threshold": self.best_threshold,
-                    "origin_images": self.origin_images,
-                    "pred_images": self.pred_images, # for classification
-                    "pred_thresholds": self.pred_thresholds,
-                    "label_images": self.label_images, # for report
-                    "train_loss": self.train_loss,
-                    "val_loss": self.val_loss,
-                    "abnormal_avg_f1score": self.abnormal_avg_f1score,
-                    "show_pred_map": self.PredictionMapToggle.isChecked(),
-                    "results": self.results
-                },
-                file=f,
-                protocol=pickle.HIGHEST_PROTOCOL
-            )
-
-    def load_result(self):
-        file_dialog = QFileDialog()
-        file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
-        file_dialog.setNameFilters(["re (*.re)"])
-        if file_dialog.exec_():
-            load_path = file_dialog.selectedFiles()[0]
-            # PyQt file dialog return the posix path style
-            if os.name == "nt":
-                load_path = load_path.replace("/", "\\")
-
-            with open(load_path, "rb") as f:
-                loaded_results = pickle.load(f)
-
-            self.init_combobox()
-
-            if "current_model_type" in loaded_results:
-                self.current_model_type = loaded_results["current_model_type"]
-
-            if "is_anomaly_detection" in loaded_results:
-                self.is_anomaly_detection = loaded_results["is_anomaly_detection"]
-
-            if "save_path" in loaded_results:
-                self.save_path = loaded_results["save_path"]
-            if "train_loss" in loaded_results:
-                self.train_loss = loaded_results["train_loss"]
-                self.TrainLossPlot.setData(self.train_loss)
-            if "val_loss" in loaded_results:
-                self.val_loss = loaded_results["val_loss"]
-                self.ValLossPlot.setData(self.val_loss)
-            if "abnormal_avg_f1score" in loaded_results:
-                self.abnormal_avg_f1score = loaded_results["abnormal_avg_f1score"]
-                self.ValAvgF1Plot.setData(self.abnormal_avg_f1score)
-            
-            # for classification
-            if "pred_images" in loaded_results:
-                self.pred_images = loaded_results["pred_images"]
-            if "label_images" in loaded_results:
-                self.label_images = loaded_results["label_images"]
-            
-            # for anomaly detection
-            if "origin_images" in loaded_results:
-                self.origin_images = loaded_results["origin_images"]
-            if "abnormal_scores" in loaded_results:
-                self.abnormal_scores = loaded_results["abnormal_scores"]
-            if "labels" in loaded_results:
-                self.labels = loaded_results["labels"]
-            if "pred_thresholds" in loaded_results:
-                self.pred_thresholds = loaded_results["pred_thresholds"]
-            if "position_indices" in loaded_results:
-                self.position_indices = loaded_results["position_indices"]
-
-            if "show_pred_map" in loaded_results:
-                self.PredictionMapToggle.setChecked(loaded_results["show_pred_map"])
-            
-            image_index = 0
-            if "current_index" in loaded_results:
-                image_index = loaded_results["current_index"]
-            
-            if "image_names" in loaded_results:
-                self.image_names = loaded_results["image_names"]
-
-
-            if "results" in loaded_results:
-                self.results = loaded_results["results"]
-            
-            self.change_control_ui(self.is_anomaly_detection) # set to specific type of task
-            self.ImageSelectorComboBox.addItems(self.image_names)
-            self.ImageSelectorComboBox.setCurrentIndex(image_index)
-            self.ImageSelectorComboBox.setCurrentText(self.image_names[image_index])
-            self.show_selected_image(image_index, loaded_results["show_pred_map"], True)
-            self.init_combobox_item_list(True)
-            self.adjust_combo_box_width()
-
     def result_signal_receiver(self, _dict):        
         if "current_model_type" in _dict:
             self.current_model_type = _dict["current_model_type"]
@@ -656,8 +778,12 @@ class Result_Form(QtWidgets.QWidget):
             self.abnormal_scores = copy.deepcopy(_dict["abnormal_scores"])
         if "labels" in _dict:
             self.labels = copy.deepcopy(_dict["labels"])
-        if "best_threshold" in _dict:
-            self.best_threshold = _dict["best_threshold"]
+        if "bestThreshold" in _dict:
+            self.best_threshold = _dict["bestThreshold"]
+        if "trainFeatureDistHist" in _dict:
+            self.trainFeatureDistHist = copy.deepcopy(_dict["trainFeatureDistHist"])
+        if "testFeatureDistHist" in _dict:
+            self.testFeatureDistHist = copy.deepcopy(_dict["testFeatureDistHist"])
         if "position_indices" in _dict:
             self.position_indices = np.copy(_dict["position_indices"])
         if "save_path" in _dict:
@@ -669,14 +795,15 @@ class Result_Form(QtWidgets.QWidget):
         if "is_classification" in _dict:
             self.is_anomaly_detection = False
             self.change_control_ui(self.is_anomaly_detection) # set to specific type of task
-            self.show_selected_image(0, self.PredictionMapToggle.isChecked(), True)
+            self.show_selected_image(0, self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True)
             self.init_combobox_item_list(False)
         if "is_anomaly_detection" in _dict:
             self.is_anomaly_detection = True
             self.change_control_ui(self.is_anomaly_detection) # set to specific type of task
             self.pred_thresholds = self.best_threshold
             self.init_images_anomaly_detection(self.origin_images)
-            self.show_selected_image(0, self.PredictionMapToggle.isChecked(), True)
+            self.updateDistPlots()
+            self.show_selected_image(0, self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True)
             self.init_combobox_item_list(False)
         if ("is_classification" in _dict or "is_anomaly_detection" in _dict) and self.plot_updator.isActive():
             self.plot_updator.stop()

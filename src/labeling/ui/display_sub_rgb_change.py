@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from labeling.stylesheet.stylesheet_display_sub_rgb_change import stylesheet
 from constants.constants import *
 
-class Display_rgb_change_Form(QtWidgets.QMainWindow):
+class Display_rgb_change_Form(QtWidgets.QWidget):
     """Image detail form과 관련된 모든 기능을 처리하기 위한 클래스
     """
     def __init__(self, Sync=None, lang=None):
@@ -52,16 +52,13 @@ class Display_rgb_change_Form(QtWidgets.QMainWindow):
 
         self.pen_obj_dict = self.Sync.pen_obj_dict
 
-    def init_Ui_display_rgb_change(self, Mainwindow):
-        Mainwindow.setObjectName("Mainwindow")
-        Mainwindow.setFixedSize(550,250)
-        Mainwindow.setStyleSheet(stylesheet)
-        Mainwindow.setWindowFlag(Qt.WindowMinimizeButtonHint, False)
+    def init_Ui_display_rgb_change(self, Form):
+        Form.setObjectName("display_rgb_change_form")
+        Form.setFixedSize(550,250)
+        Form.setStyleSheet(stylesheet)
+        Form.setWindowFlag(Qt.WindowMinimizeButtonHint, False)
 
-        self.centralwidget = QtWidgets.QWidget(Mainwindow)
-        self.centralwidget.setObjectName("centralwidget")
-
-        self.display_rgb_change_main_grid = QtWidgets.QGridLayout(self.centralwidget)
+        self.display_rgb_change_main_grid = QtWidgets.QGridLayout(Form)
         self.display_rgb_change_main_grid.setObjectName("display_rgb_change_main_grid")
 
         self.display_rgb_change_visualization_group = QtWidgets.QGroupBox()
@@ -155,12 +152,11 @@ class Display_rgb_change_Form(QtWidgets.QMainWindow):
         self.display_rgb_change_reset_horizon = QtWidgets.QHBoxLayout()
         self.display_rgb_change_reset_horizon.setObjectName("display_rgb_change_reset_horizon")
 
-        QtCore.QMetaObject.connectSlotsByName(Mainwindow)
-        Mainwindow.setCentralWidget(self.centralwidget)
+        QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def setup_Ui_display_rgb_change(self, Mainwindow):
+    def setup_Ui_display_rgb_change(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Mainwindow.setWindowTitle(_translate("Mainwindow", "Adjust Hyperspectral Visualization"))
+        Form.setWindowTitle(_translate("display_rgb_change_form", "Adjust Hyperspectral Visualization"))
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_color_label", self.display_rgb_change_title_color_label)
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_band_range_label", self.display_rgb_change_title_band_range_label)
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_band_label", self.display_rgb_change_title_band_label)
@@ -454,8 +450,8 @@ class Display_rgb_change_Form(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    Mainwindow = QtWidgets.QWidget()
+    Form = QtWidgets.QWidget()
     ui = Display_rgb_change_Form()
-    # ui.setupUi(Mainwindow)
-    # Mainwindow.show()
+    # ui.setupUi(Form)
+    # Form.show()
     sys.exit(app.exec_())

@@ -2,7 +2,6 @@ import io
 import os
 import torch
 import json
-import types
 import numpy as np
 import distinctipy
 from dataclasses import dataclass, asdict
@@ -18,7 +17,6 @@ from datetime import datetime
 from utils.encrypt import AesEncryption
 
 from spectral import spy_colors
-from PIL import Image
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -449,7 +447,7 @@ class modelMetadata:
         inputType = "torch." + str(metaData["config"]["dataType"])
         outputShape = [metaData["config"]["dataInputHeight"]]
         if metaData["classifier"]:
-            outputShape = [metaData["config"]["dataInputHeight"], metaData["num_classes"]]
+            outputShape = [[metaData["config"]["dataInputHeight"], metaData["num_classes"]], [metaData["config"]["dataInputHeight"]]]
         outputType = "torch." + str(metaData["config"]["dataType"])
         lineShape = metaData["config"]["dataInputHeight"]
 
@@ -513,3 +511,90 @@ class modelMetadata:
             @author : Hyunsu Kim (2026.03.03)
         """
         return asdict(self)
+
+@torch.inference_mode()
+def makeFeatureDistanceHist(model, dataLoader, bestThreshold, device, bins = 80):
+    """
+        @description : Compute feature distance histograms for normal and abnormal samples based on the model's output distances to the center C
+        @author : Hyunsu Kim (2026.03.10)
+        @parameter:
+                model: The trained model used for inference
+                dataLoader: DataLoader for the train, test dataset
+                bestThreshold: The threshold value is used to determine how the model divides the boundaries between normal and abnormal.
+                device: The device to perform inference on (e.g., "cuda:0" or "cpu")
+                bins: The number of bins to use for the histogram (default is 80)
+    """
+    model.eval()
+
+    allDist = []
+    allAbnormality = []
+
+    # Iterate through the dataLoader and compute distances to center C for each sample, along with their corresponding abnormality labels
+    for dataInput, _, abnormality, _ in dataLoader:
+        dataInput = dataInput.to(device)
+        abnormality = abnormality.to(device)
+
+        # distance to center C
+        dist = model(dataInput)
+        if type(dist) == tuple: # PE model case
+            dist = torch.sum((dist[0] - model.c) ** 2, dim=1)
+
+        allDist.append(dist.detach().cpu().numpy())
+        allAbnormality.append(abnormality.detach().cpu().numpy())
+
+    allScores = np.concatenate(allDist)
+    allAbn = np.concatenate(allAbnormality)
+
+    allEvalMask = (allAbn != DATA_IGNORED)
+
+    allLabelBinary = np.where(allAbn == -1, DATA_NORMAL, np.where(allAbn == 1, DATA_ABNORMAL, DATA_IGNORED))
+    allLabelsWithoutIgnored = allLabelBinary[allEvalMask]
+
+    def _make_hist(normalVals, abnormalVals, bins):
+        """
+            @description : Make Histograms using normal and abnormal data
+            @author : Hyunsu Kim
+            @parameter:
+                - normalVals: The distance values for normal samples
+                - abnormalVals: The distance values for abnormal samples
+            @history:
+                - Modified by Hyunsu Kim (2026.03.19) : 
+                    - Modified to generate histograms and set bin sizes based on normalVals only when values ​​exist in normalVals and abnormalVals.
+        """
+        normalVals = np.asarray(normalVals, dtype=np.float32)
+        abnormalVals = np.asarray(abnormalVals, dtype=np.float32)
+
+        if normalVals.size:
+            normalVals = normalVals[np.isfinite(normalVals)]
+        if abnormalVals.size:
+            abnormalVals = abnormalVals[np.isfinite(abnormalVals)]
+
+        vMin = float(np.min(normalVals)) if normalVals.size else float(np.min(abnormalVals))
+        vMax = float(np.max(abnormalVals)) if abnormalVals.size else float(np.max(normalVals))
+
+        edges = np.linspace(vMin, vMax, bins + 1, dtype=np.float32)
+
+        normalHist = None
+        abnormalHist = None
+        if normalVals.size:
+            normalHist, _ = np.histogram(normalVals, bins=edges, density=False)
+        if abnormalVals.size:
+            abnormalHist, _ = np.histogram(abnormalVals, bins=edges, density=False)
+        
+        return {"edges": edges, "normal": normalHist, "abnormal": abnormalHist, "normalCount": normalVals.size, "abnormalCount": abnormalVals.size}
+
+    # Filter out ignored samples and compute Scores for making histogram and getting fp/fn pixels based on the best threshold
+    allScoresWithoutIgnored = allScores[allEvalMask]
+
+    allNormalScores = allScoresWithoutIgnored[allLabelsWithoutIgnored == DATA_NORMAL]
+    allAbnormalScores = allScoresWithoutIgnored[allLabelsWithoutIgnored == DATA_ABNORMAL]
+
+    featureHist = _make_hist(allNormalScores, allAbnormalScores, bins)
+    if isinstance(featureHist, dict):
+        featureHist["best_thr"] = float(bestThreshold)
+        featureHist["normalMean"] = np.mean(allNormalScores)
+        featureHist["normalStd"] = np.std(allNormalScores)
+        featureHist["abnormalMean"] = np.mean(allAbnormalScores)
+        featureHist["abnormalStd"] = np.std(allAbnormalScores)
+
+    return featureHist

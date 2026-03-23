@@ -4,6 +4,9 @@ QWidget#scrollAreaWidgetContents{
     background-color: rgb(65, 65, 65);
     border: 0px;
 }
+QDockWidget{
+    background-color: rgb(39, 38, 39);
+}
 
 QMessageBox{
     background-color: rgb(83, 83, 83);
@@ -26,6 +29,9 @@ QPushButton:pressed {
     background-color: rgb(16, 97, 150);
 }
 
+QHeaderView{
+    font: 14px;
+}
 
 QTabBar{
     font: 15px;

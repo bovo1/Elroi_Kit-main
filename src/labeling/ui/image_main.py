@@ -46,6 +46,7 @@ class Image_Form(QWidget):
         self.image_to_label_signal = self.Sync.image_to_label_signal
         self.image_to_label_sub_signal = self.Sync.image_to_label_sub_signal
         self.image_to_display_signal = self.Sync.image_to_display_signal
+        self.imageToPenSignal = self.Sync.imageToPenSignal
         self.image_to_display_sub_rgb_change_signal = self.Sync.image_to_display_sub_rgb_change_signal
         self.image_to_labeling_mode_main_signal = self.Sync.image_to_labeling_mode_main_signal
         self.imageToGraphGroupSignal = self.Sync.imageToGraphGroupSignal
@@ -438,6 +439,9 @@ class Image_Form(QWidget):
                     tmp_dict['from'] = 'image'
                     self.imageToSemiAutoLabeling(tmp_dict)
 
+                    tmp_dict = {}
+                    tmp_dict['mode'] = 'unchecked'
+                    self.image_to_pen(tmp_dict)
 
                 elif self.image_control_dict['select_image_number'] == cnt:
                     """
@@ -476,6 +480,10 @@ class Image_Form(QWidget):
                     tmp_dict = {}
                     tmp_dict['mode'] = 'unchecked'
                     self.image_to_display(tmp_dict)
+
+                    tmp_dict = {}
+                    tmp_dict['mode'] = 'unchecked'
+                    self.image_to_pen(tmp_dict)
 
                     #graph_sub 에 시그널 전달
                     tmp_dict = {}
@@ -529,6 +537,10 @@ class Image_Form(QWidget):
             self.image_to_display(tmp_dict)
 
             tmp_dict = {}
+            tmp_dict['mode'] = 'unchecked'
+            self.image_to_pen(tmp_dict)
+
+            tmp_dict = {}
             tmp_dict['mode'] = 'delete'
             tmp_dict['type'] = 'image'
             tmp_dict['select_type'] = 'all'
@@ -567,6 +579,10 @@ class Image_Form(QWidget):
                 tmp_dict = {}
                 tmp_dict['mode'] = 'unchecked'
                 self.image_to_display(tmp_dict)
+
+                tmp_dict = {}
+                tmp_dict['mode'] = 'unchecked'
+                self.image_to_pen(tmp_dict)
 
             tmp_dict = {}
             tmp_dict['mode'] = 'delete'
@@ -634,6 +650,14 @@ class Image_Form(QWidget):
 
         """
         self.image_to_display_signal.emit(input)
+
+    def image_to_pen(self, input):
+        """image에서 pen으로 시그널을 보내기 위한 함수 선언문이다. Core에게 먼저 시그널을 보내어 pen에 최종적으로 전달된다. 펜의 상태를 업데이트 하기위해 사용
+                Parameters
+                1.	input(dict): Pen 업데이트를 위한 dictionary
+
+        """
+        self.imageToPenSignal.emit(input)
 
     def image_to_display_sub_rgb_change(self, input):
         self.image_to_display_sub_rgb_change_signal.emit(input)

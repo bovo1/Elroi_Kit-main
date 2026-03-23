@@ -719,7 +719,8 @@ class advanced_sal_Form(QtWidgets.QWidget):
                     elif saveLabelMethod == 1:  # Overwrite
                         np.save(file_path + label_dir, label)
                         yield [True, f"save complete Simple Auto Labeling ({label_dir}) result"]
-                elif result[1] == 0:
+                
+                elif result[0] == 0:
                     _, error_msg = result
                     yield [True, f"Error occured...{error_msg}, Sub"]
 

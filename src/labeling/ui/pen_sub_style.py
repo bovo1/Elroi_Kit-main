@@ -4,7 +4,7 @@ from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from labeling.stylesheet.stylesheet_pen_sub_style import stylesheet
 from constants.constants import QT_MAX_SIZE
 
-class Pen_style_Form(QtWidgets.QMainWindow):
+class Pen_style_Form(QtWidgets.QWidget):
     """Pen sub style ui, 펜 설정에 대한 모든 기능을 처리하기 위한 클래스
     """
     def __init__(self, Pen_Sync, lang):
@@ -48,20 +48,17 @@ class Pen_style_Form(QtWidgets.QMainWindow):
 
         self.pen_control_dict = self.Sync.pen_control_dict
 
-    def init_Ui_label_main_pen_style(self, Mainwindow):
+    def init_Ui_label_main_pen_style(self, Form):
         """Pen sub 리스트 UI 생성을 위한 초기 선언문이다.
                 Parmeters
                 1.	Form(object): PyQt widget object
 
         """
-        Mainwindow.setObjectName("pen_style_form")
-        Mainwindow.resize(150, 200)
-        Mainwindow.setStyleSheet(stylesheet)
+        Form.setObjectName("pen_sub_style_form")
+        Form.resize(150, 200)
+        Form.setStyleSheet(stylesheet)
 
-        self.centralwidget = QtWidgets.QWidget(Mainwindow)
-        self.centralwidget.setObjectName("centralwidget")
-
-        self.pen_main_grid = QtWidgets.QGridLayout(self.centralwidget)
+        self.pen_main_grid = QtWidgets.QGridLayout(Form)
         self.pen_main_grid.setObjectName("pen_main_grid")
 
         self.pen_style_main_title_widget = QtWidgets.QWidget()
@@ -231,8 +228,7 @@ class Pen_style_Form(QtWidgets.QMainWindow):
         self.pen_style_sub_drawing_combobox = QtWidgets.QComboBox()
         self.pen_style_sub_drawing_combobox.setObjectName("pen_style_sub_drawing_combobox")
 
-        QtCore.QMetaObject.connectSlotsByName(Mainwindow)
-        Mainwindow.setCentralWidget(self.centralwidget)
+        QtCore.QMetaObject.connectSlotsByName(Form)
 
 
     def setup_Ui_label_main_pen_style(self):
@@ -510,8 +506,8 @@ class Pen_style_Form(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    Mainwindow = QtWidgets.QWidget()
-    ui = Pen_style_Form()
-    # ui.setupUi(Mainwindow)
-    # Mainwindow.show()
+    Form = QtWidgets.QWidget()
+    ui =  Pen_style_Form()
+    # ui.setupUi(Form)
+    # Form.show()
     sys.exit(app.exec_())

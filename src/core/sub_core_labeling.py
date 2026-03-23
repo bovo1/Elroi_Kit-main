@@ -68,6 +68,8 @@ class Sub_Core_Labeling(QObject):
         # image
         self.image_to_core_signal = self.Sub_Core_Sync_Labeling.image_to_core_signal
         self.image_to_core_signal.connect(self.recv_image_to_core)
+        self.imageToPensignal = self.Sub_Core_Sync_Labeling.imageToPenSignal
+        self.imageToPensignal.connect(self.sendImageToPen)
         self.image_to_label_signal = self.Sub_Core_Sync_Labeling.image_to_label_signal
         self.image_to_label_signal.connect(self.send_image_to_label)
         self.image_to_label_sub_signal = self.Sub_Core_Sync_Labeling.image_to_label_sub_signal
@@ -382,6 +384,14 @@ class Sub_Core_Labeling(QObject):
                 input['type_detail'] = 0
         
         self.send_core_to_labeling_mode_main(input)
+
+    @pyqtSlot(dict)
+    def sendImageToPen(self, output):
+        """
+            description: Function to send signal from "image" to "pen"
+        """
+        output['from'] = 'image'
+        self.sendCoreToPen(output)
 
     @pyqtSlot(dict)
     def sendImageToGraphGroup(self, output):

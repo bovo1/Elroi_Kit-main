@@ -124,4 +124,8 @@ QScrollBar:left-arrow:horizontal, QScrollBar::right-arrow:horizontal {
 QScrollBar:add-page:horizontal, QScrollBar::sub-page:horizontal {
     background: none;
 }
+
+QComboBox{
+	font: 13px;
+}
 """

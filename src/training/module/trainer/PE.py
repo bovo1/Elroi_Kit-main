@@ -16,7 +16,7 @@ from constants.constants import *
 from utils.optimize_nn import Optimize
 
 from ..models.PE import PA2Ev2, PA2E_model, PA_Encoder
-from ..utils import ProgressManager, load_model, get_scores, get_images, get_threshold_from_log, cat_tensor, save_model, makeMetadata, modelMetadata
+from ..utils import ProgressManager, load_model, get_scores, get_images, get_threshold_from_log, cat_tensor, save_model, makeFeatureDistanceHist, makeMetadata, modelMetadata
 
 """
 description: training module for anomaly detection task
@@ -126,6 +126,7 @@ class T_PA2E_DSAD():
             @author : Hyunsu Kim(2026.03.03)
         """
         self.metadatas = {}
+        self.metadatas["classScore"] = {}
         if self.is_train:
             self.metadatas = makeMetadata(config, self.num_bands, False, self.batch_size, self.patch_size,\
                                         self.num_classes, self.current_model_type, self.hyperparameter_shared_dict, self.current_model_param_dict, self.pae_model.modelType)
@@ -276,10 +277,12 @@ class T_PA2E_DSAD():
                 self.pae_scheduler.step()
                 
             if epoch%self.val_interval == 0:
+                test_res = self.test(val=True, data_loader=self.val_loader, epoch=epoch)
                 if self.model_selection == MODEL_SELECTION_AUPR:
-                    model_score = self.test(val=True, data_loader=self.val_loader, epoch=epoch)["aupr"]
+                    model_score = test_res["aupr"]
                 elif self.model_selection == MODEL_SELECTION_LOSS:
-                    model_score = -self.test(val=True, data_loader=self.val_loader, epoch=epoch)["loss"]
+                    model_score = -test_res["loss"]
+                best_thr = float(test_res.get("best_thr", 1.0))
 
                 if model_score > model_score_max:
                     model_score_max = model_score
@@ -288,6 +291,14 @@ class T_PA2E_DSAD():
                     early_stop_counter = 0
                 else:
                     early_stop_counter += 1
+
+                if is_best_model:
+                    """
+                        @description : After training completion, if not classification model, compute and store feature distance histograms for the training set
+                        @author : Hyunsu Kim (2026.03.10)
+                    """
+                    trainFeatureHist = makeFeatureDistanceHist(self.pae_model, self.train_loader, best_thr, self.device)
+                    self.shared_data.put({"trainFeatureDistHist": trainFeatureHist})
 
                 if self.early_stop and early_stop_counter >= self.early_stopping_patience:
                     self._printer.print(f"Training early stop, Epoch: {epoch}/{self.pae_epochs}, Loss: {mean_loss:.5f}")
@@ -364,7 +375,7 @@ class T_PA2E_DSAD():
 
                 scores.append(dist)
                 scores_without_ignored.append(dist[eval_mask])
-                labels = torch.where(abnormality == -1, 2, torch.where(abnormality != 0, 3, 0)).to('cpu')
+                labels = torch.where(abnormality == -1, 2, torch.where(abnormality == 1, 3, 0)).to('cpu')
                 labels_binary.append(labels)
                 labels_without_ignored.append(labels[eval_mask])
                 pos = torch.stack(pos) # (batch_size, 3)
@@ -427,6 +438,20 @@ class T_PA2E_DSAD():
             if not val:
                 for result in results:
                     self._printer.print(result)
+
+                """
+                    @description : After training completion, if not classification model, compute and store feature distance histograms for the test set
+                    @author : Hyunsu Kim (2026.03.10)
+                """
+                try:
+                    if labels_binary is not None and len(labels_binary) > 0:
+                        testFeatureDistHist = makeFeatureDistanceHist(self.pae_model, data_loader, self.bestThr, self.device)
+                    else:
+                        testFeatureDistHist = None
+                    self.shared_data.put({"testFeatureDistHist": testFeatureDistHist})
+                except Exception as e:
+                    self._printer.print(f"[AD] Failed to build feature distance histograms: {e}")
+
                 origin_images, label_images = self.visualization(indices, labels, preds)
                 self.shared_data.put({"origin_images": origin_images})
                 self.shared_data.put({"label_images": label_images})

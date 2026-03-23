@@ -306,9 +306,9 @@ class Labellist_Form(QtWidgets.QWidget):
             tmp_dict['file_path'] = fname[0]
             self.label_to_core(tmp_dict)
 
-        tmp_dict = {}
-        tmp_dict['mode'] = 'show'
-        self.label_image_to_display(tmp_dict)
+            tmp_dict = {}
+            tmp_dict['mode'] = 'show'
+            self.label_image_to_display(tmp_dict)
     
     def save_label_class(self):
         tmp_dict = {}
