@@ -178,7 +178,7 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
                     tmp_qlabel = QtWidgets.QLabel()
                     tmp_qlabel.setObjectName(f"{idx}_tmp_qlabel")
                     tmp_qlabel.setText(value_)
-                    tmp_qlabel.setFixedWidth(tmp_qlabel.sizeHint().width() + 50)
+                    tmp_qlabel.setFixedWidth(tmp_qlabel.sizeHint().width() + 60)
                     tmp_obj_dict_["label"] = tmp_qlabel
                     tmp_qlayout.addWidget(tmp_qlabel)
                 

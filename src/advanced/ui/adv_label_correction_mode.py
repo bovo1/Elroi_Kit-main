@@ -153,12 +153,12 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.data = {}
         self.similarity = {}
         self.refLabel = {}
+        self.workingDone = {}
         self.updateImage = {}            # Dictionary to store updated RGB images for live updates in image results tab
         self.normalLabelColor = {} 
         # Diagnostics plot data for live PyQtGraph rendering
         self.similarityHistData = {}            # {data_name: {centers, counts, vmin, vmax, thr, method}}
         self.spectrumBeforeAfterData = {}      # {data_name: {bands, mb, sb, ma, sa, method}}
-
         self.similarity_tooltips = [
             "Area 기반 유사도 (마스크/영역 크기 비교, 스케일 차이 민감)",
             "SAM 스펙트럼 각도 기반 유사도 (조도 변화에 강건, 패턴 형태 중심)", 
@@ -539,7 +539,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             lambda: self.button_event(mode=LABEL_CORRECTION_START))
         self.advanced_label_correction_setting_stop_btn.clicked.connect(
             lambda: self.button_event(mode=LABEL_CORRECTION_STOP))
-        self.imageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(self.imageSelectorComboBox.currentText()))
+        self.imageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(rgb_image=self.rgb_image[self.imageSelectorComboBox.currentText()], data_name=self.imageSelectorComboBox.currentText()))
         self.thresholdButton.clicked.connect(lambda: self.button_event(mode=LABEL_CORRECTION_THRESHOLD))
         self.outputSplitter.splitterMoved.connect(lambda pos, index: self.outputImageWidget.fitInView())
 
@@ -738,6 +738,9 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             self.advanced_label_correction_status_textedit.clear()
             self.histPlotViewer.clear()
             self.beforeAfterPlotViewer.clear()
+            self.thresholdLineEdit.setText("0")
+            for _, data in self.adv_data_list_info.items():
+                data["wrongProcess"] = False
 
             # Print current parameter settings in the output window
             header = f"{self.mode}\n{self.dash * 30}"
@@ -770,6 +773,8 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             # Show progress bar and launch background work
             self.progress_bar.setValue(0)
             self.progress_bar.show()
+            for dataPath, data in self.adv_data_list_info.items():
+                self.workingDone[dataPath] = False
 
             self.worker_1.staging(self.correct_label_mode)
             self.worker_id = self.worker_1.cur_id
@@ -789,9 +794,10 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 self.advanced_label_correction_setting_stop_btn.setEnabled(False)
                 self.advanced_label_correction_setting_groupbox.setEnabled(True)
                 self.advanced_label_correction_datalist_groupbox.setEnabled(True)
-                if len(self.rgb_image):
-                    data_name = next(iter(self.rgb_image.keys()))
-                    self.update_rgb_image(data_name)
+                firstDonePath = next((data_path for data_path, done in self.workingDone.items() if done), None)
+                if firstDonePath is not None:
+                    data_name = firstDonePath.split("/")[-1]
+                    self.update_rgb_image(rgb_image=self.rgb_image[data_name], data_name=data_name)
                 self.string_signal.emit(f"\n{'-' * 50}\nProcess stopped by user.\n{'-' * 50}")
         # Image results function works when button is clicked
         elif mode == LABEL_CORRECTION_THRESHOLD:
@@ -934,7 +940,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 self.string_signal.emit(f"\n{'-' * 50}\nProcessing Complete!\n{'-' * 50}")
                 # Displaying the first result via update_signal
                 for data_path, info in self.adv_data_list_info.items():
-                    if info["wrongProcess"] == False:
+                    if info["wrongProcess"] == False and self.imageSelectorComboBox.findText(data_path.split("/")[-1]) != -1:
                         data_name = data_path.split("/")[-1]
                         self.update_signal.emit(self.updateImage[data_name], data_name)
                         self.thresholdLineEdit.setText("0")  # Reset threshold input
@@ -985,6 +991,10 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             if np.isin(self.label[data_name], NORMAL_LABELS).any() == False:
                 self.wrongProcess[pathIndex] = True
                 self.string_signal.emit(f"  - No reference pixels found in {data_name}. Skip.\n")
+                return
+            if np.where(self.label[data_name] >= DATA_ABNORMAL)[0].size > 0:
+                self.wrongProcess[pathIndex] = True
+                self.string_signal.emit(f"  - abnormal pixels found in {data_name}. Skip.\n")
                 return
             self.total_nonzero_pixel[data_name] = np.count_nonzero(self.label[data_name])
             self.rgb_image[data_name], self.normalLabelColor[data_name] = self.load_rgb_data(data_path)  # create an RGB image based on the label for visualization
@@ -1085,6 +1095,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                     else:
                         np.save(data_path + "/label.npy", labelAfterRemoval)
 
+                self.workingDone[data_path] = True
                 self.string_signal.emit("  - Folder processing completed.\n")
             else:
                 # Prevent outputting status messages when updating in the image results tab
@@ -1359,7 +1370,8 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 specPlot.addLegend(labelTextColor=pg.mkColor("w"))
             else:
                 specPlot.plotItem.legend.clear()
-            bands = np.asarray(spec.get("bands", []), dtype=np.float32)
+            if spec is not None:
+                bands = np.asarray(spec.get("bands", []), dtype=np.float32)
 
             beforePen = pg.mkPen(pg.mkColor(DISTRIBUTION_BEFORE_PEN_COLOR))
             afterPen = pg.mkPen(pg.mkColor(DISTRIBUTION_AFTER_PEN_COLOR))
@@ -1424,8 +1436,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             self.thresholdLineEdit.setText(str(threshold))
             for key, value in self.adv_data_list_info.items():
                 data_name = key.split("/")[-1]
-                data_path = key
-                if value["idx"] == self.imageSelectorComboBox.currentIndex() and value["wrongProcess"] == False:
+                if data_name == self.imageSelectorComboBox.currentText() and value["wrongProcess"] == False:
                     labelAfterRemoval = self.label[data_name].copy()
                     updateImage = self.rgb_image[data_name].copy()
                     labelAfterRemoval[np.where(self.similarity[data_name].reshape(labelAfterRemoval.shape[0], labelAfterRemoval.shape[1]) >= threshold)] = 0

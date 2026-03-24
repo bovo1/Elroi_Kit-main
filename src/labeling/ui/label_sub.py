@@ -141,7 +141,7 @@ class label_sub_Form(QtWidgets.QDialog):
                 2. Added by Hyunsu Kim (2025.11.21) : Add the UI for the Common Abnormal Auto Labeling
         """
         Form.setObjectName("label_sub_form")
-        Form.setFixedSize(320, 145)
+        Form.setFixedSize(320, 160)
         self.lang.set("labeling", "labelSub", "labelSubTitle", Form)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)

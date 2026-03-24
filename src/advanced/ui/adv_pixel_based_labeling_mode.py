@@ -382,9 +382,10 @@ class advanced_pixel_based_labeling_Form(QtWidgets.QWidget):
         # Connect “Calibration” toggle signal
         cal_toggle = self.header_dict_[4]["obj_set"]["toggle"]
         cal_toggle.setChecked(self.adv_model_info[4]["value"][0])
+        cal_toggle.toggled.connect(lambda ch: self._on_toggle_event(idx=4, ch=ch))
 
         # Connect “Calibration Ratio” double spinbox change signal
-        cal_ratio_spin = self.header_dict_[5]["obj_set"]["spinbox"]
+        cal_ratio_spin = self.header_dict_[5]["obj_set"]["spinbox"][0]
         if isinstance(cal_ratio_spin, QtWidgets.QDoubleSpinBox):
             cal_ratio_spin.setDecimals(2)
             cal_ratio_spin.setSingleStep(0.01)

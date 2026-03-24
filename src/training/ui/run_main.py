@@ -170,6 +170,7 @@ class Run_Form(QtWidgets.QWidget):
         self.OutputWidget.setReadOnly(True)
         # self.OutputWidget.setDisabled(True)
         # self.OutputWidget.setOverwriteMode(False)
+        self.OutputWidget.document().setDefaultStyleSheet(f"""pre {{font-family: '{QtWidgets.QApplication.font().family()}';}}""")
 
         # =============== Progress Settings ===============
         self.RemainTimeLabel.setFixedWidth(200)
@@ -362,28 +363,28 @@ class Run_Form(QtWidgets.QWidget):
 
         train_dict = self.dataset_shared_dict["train"]
         if self.is_train and sum([train_dict[data_path][0] for data_path in train_dict.keys()]) == 0:
-            message_list.append("There is no useable training datas")
+            message_list.append(self.lang.get("training", "run_main", "NoTrainingData"))
         
         val_dict = self.dataset_shared_dict["val"]
         if self.is_train and sum([val_dict[data_path][0] for data_path in val_dict.keys()]) == 0:
             if self.hyperparameter_shared_dict["current_model_type"] != "PD":
-                message_list.append("There is no useable validation datas")
+                message_list.append(self.lang.get("training", "run_main", "NoValidationData"))
 
         test_dict = self.dataset_shared_dict["test"]
         if not self.is_train and sum([test_dict[data_path][0] for data_path in test_dict.keys()]) == 0:
-            message_list.append("There is no useable test datas")
+            message_list.append(self.lang.get("training", "run_main", "NoTestData"))
 
         save_path = self.hyperparameter_shared_dict[self.hyperparameter_shared_dict["current_model_type"]]["save_path"]
         if not os.path.exists(save_path):
-            message_list.append("Save path is invalid")
+            message_list.append(self.lang.get("training", "run_main", "InvalidSavePath"))
         
         load_path = self.hyperparameter_shared_dict[self.hyperparameter_shared_dict["current_model_type"]]["load_path"]
         if not self.is_train and not os.path.exists(load_path):
-            message_list.append("Load path is invalid")
+            message_list.append(self.lang.get("training", "run_main", "InvalidLoadPath"))
 
         if message_list != []:
             messageBox(mode=MESSAGE_BOX_WARNING,
-                       title= self.lang.get("main", "run_main", "PathInvalidErrorMsg"),
+                       title= self.lang.get("training", "run_main", "PathInvalidErrorMsg"),
                        text="\n".join(message_list),
                        buttons={self.lang.get("main", "messageBox", "msgOk"):"accept"})
             return False

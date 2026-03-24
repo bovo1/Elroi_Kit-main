@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QFileDialog
 import numpy as np
 
-from constants.constants import QT_MAX_SIZE, PEN_SUB_MODE_SEMI_AUTO_LABELING, MESSAGE_BOX_WARNING, MESSAGE_BOX_INFORMATION
+from constants.constants import DATA_DIMENSION, QT_MAX_SIZE, PEN_SUB_MODE_SEMI_AUTO_LABELING, MESSAGE_BOX_WARNING, MESSAGE_BOX_INFORMATION
 from labeling.stylesheet.stylesheet_pen_sub_semi_auto_labeling import stylesheet
 from utils.worker import Threading_Worker
 from utils.custom_ui import messageBox
@@ -299,6 +299,8 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         """
             Description: Enable or disable UI buttons
             Author: Yugyeong Hong (2026.02.04)
+            History:
+                - Hyunsu Kim (2026.03.23) : Modify logic and message when an invalid endmember file is loaded
         """
         title = self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberFileLoadBtn")
         self.filePath, _ = QFileDialog.getOpenFileName(self, title[1], "", "NumPy file (*.npy)")
@@ -306,10 +308,10 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
             try:
                 npyFile = np.load(self.filePath, allow_pickle=False).astype(np.float32)
 
-                if npyFile.ndim != 2:
+                if npyFile.ndim != 2 or npyFile.shape[1] != DATA_DIMENSION:
                     messageBox(mode=MESSAGE_BOX_WARNING, 
                                title=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberTitleLabel"),
-                               text=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberLoadWarning"),
+                               text=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberDimensionWarning"),
                                buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
                 else:
                     self.penEndmemberImageLineEdit.setText(self.filePath)

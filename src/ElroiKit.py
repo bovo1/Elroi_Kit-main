@@ -94,6 +94,7 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
         self.timer.timeout.connect(self.lic_chk)
         # Added by MyoungHwan(2025.03.14): Added function to detect focus widget changed
         QApplication.instance().focusChanged.connect(self.focus_changed)
+        QApplication.instance().applicationStateChanged.connect(self.applicationFocusOut)
 
     def focus_changed(self, _, new_widget):
         """
@@ -108,6 +109,15 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             # 프로그램 외부로 진입 또는 widget에서 벗어날 경우 None 처리
             new_widget_name = "None"
         self.core_obj_dict["cur_focus_widget"] = new_widget_name
+
+    def applicationFocusOut(self):
+        """
+            @Description: application focus out 상태 저장함수
+            @Author: Hyunsu Kim (2026.03.23)
+        """
+        for _, obj in self.sub_widget_dict.items():
+            if obj.isVisible():
+                obj.close()
 
 
     def init_Ui_main(self, merge_MainWindow):
@@ -376,9 +386,9 @@ if __name__ == "__main__":
 
     # add fonts to application
     fontDict = dict()
-    for fontName, fontFile in FONT_DICTIONARY.items():
+    for fontName, fontInfo in FONT_DICTIONARY.items():
         # add font to application not require font installation on OS
-        fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, fontFile))
+        fontID = QtGui.QFontDatabase.addApplicationFont(os.path.join(font_path, fontInfo["fileName"]))
         # it returns the fontID if the font is successfully added, otherwise it returns -1
         if fontID != -1:
             # applicationFontFamilies() returns a list of font families for the given font ID
@@ -386,7 +396,7 @@ if __name__ == "__main__":
             fontDict[fontName] = {
                 "font": QtGui.QFont(QtGui.QFontDatabase.applicationFontFamilies(fontID)[0])
             }
-            fontDict[fontName]["font"].setPointSizeF(fontDict[fontName]["font"].pointSizeF() * factor)
+            fontDict[fontName]["font"].setPointSizeF(fontInfo["defaultSize"] * factor)
             fontDict[fontName]["font"].setHintingPreference(QtGui.QFont.HintingPreference.PreferFullHinting)
             fontDict[fontName]["font"].setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias)
         else:

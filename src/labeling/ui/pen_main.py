@@ -605,6 +605,8 @@ class Pen_Form(QtWidgets.QWidget):
         """
         peb_sub_mode = mode
         if peb_sub_mode == PEN_SUB_MODE_PEN:
+            if not self.sub_widget_dict['pen_style_form'].isVisible():
+                self.pen_obj_dict['pen_draw_type']['opened'] = False
             if self.pen_obj_dict['pen_draw_type']['opened'] == False:
                 self.pen_style_form.show()
                 x, y = self.pen_draw_type.mapToGlobal(QPoint()).x(), self.pen_draw_type.mapToGlobal(QPoint()).y()
@@ -620,6 +622,8 @@ class Pen_Form(QtWidgets.QWidget):
                 self.pen_obj_dict['pen_draw_type']['opened'] = False
 
         elif peb_sub_mode == PEN_SUB_MODE_ERASER:
+            if not self.sub_widget_dict['pen_eraser_form'].isVisible():
+                self.pen_obj_dict['pen_eraser']['opened'] = False
             if self.pen_obj_dict['pen_eraser']['opened'] == False:
                 self.pen_eraser_form.show()
                 x, y = self.pen_eraser.mapToGlobal(QPoint()).x(), self.pen_eraser.mapToGlobal(QPoint()).y()
@@ -658,6 +662,8 @@ class Pen_Form(QtWidgets.QWidget):
                 self.pen_obj_dict['pen_opacity']['opened'] = True
                 self.pen_opacity_form.exec_()
         elif peb_sub_mode == PEN_SUB_MODE_SEMI_AUTO_LABELING:
+            if not self.sub_widget_dict['penSemiAutoLabelingForm'].isVisible():
+                self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
             if self.pen_obj_dict['penSemiAutoLabeling']['opened'] == False:
                 self.pen_semi_auto_labeling_form.show()
                 x, y = self.penSemiAutoLabeling.mapToGlobal(QPoint()).x(), self.penSemiAutoLabeling.mapToGlobal(QPoint()).y()

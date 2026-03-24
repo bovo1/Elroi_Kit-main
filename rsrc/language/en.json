@@ -40,16 +40,16 @@
             "quit_title" : "ELROILAB",
             "quit_title_msg" : "Do you want to quit 'ELOILAB KIT'?",
             "quit_title_msg_yes" : "Yes",
-            "quit_title_msg_no" : "No"
-        },
-        "mainCoreSync": {
-            "statusImage": "Image : ",
-            "statusLabel": "Label : ",
-            "statusCoordinate": "Pixel Coordinates : ",
+            "quit_title_msg_no" : "No",
             "licenseErrorTitle": "License Authentication Error",
             "licenseErrorMsg": "License is not authenticated. Please check your license and try again.",
             "WarningTitle": "Program Execution Warning",
             "alreadyRunningMsg": "ElroiKit is already running.\nThe newly launched program will be closed."
+        },
+        "mainCoreSync": {
+            "statusImage": "Image : ",
+            "statusLabel": "Label : ",
+            "statusCoordinate": "Pixel Coordinates : "
         }
     },
     "labeling": {
@@ -210,6 +210,7 @@
             "penEndmemberParamDLabel": "Dimension(D)",
             "penEndmemberParamKLabel": "Clusters(K)",
             "penEndmemberSavePath": "Saved to",
+            "penEndmemberDimensionWarning": "Endmember dimension is incorrect. Please check the file.",
             "penEndmemberLoadCheck" : "Please check the endmember file.",
             "penEndmemberNormalDataLoadErrorMsg": "Please check the selected folder exists and is accessible.",
             "penEndmemberNormalDataRequiredError": "Required files do not exist in the selected folder. \n Please check that the following files exist:",
@@ -362,7 +363,12 @@
             "RuntimeErrorMsg": "Runtime Error Occurred",
             "PathInvalidErrorMsg": "Path invalid error",
             "Stop_info_title": "Stop Training",
-            "Stop_info_msg": "Are you sure to stop the process?"
+            "Stop_info_msg": "Are you sure to stop the process?",
+            "NoTrainingData": "There is no useable training datas",
+            "NoValidationData": "There is no useable validation datas",
+            "NoTestData": "There is no useable test datas",
+            "InvalidSavePath": "Save path is invalid",
+            "InvalidLoadPath": "Load path is invalid"
         },
         "result_main": {
             "update_result_text": null,

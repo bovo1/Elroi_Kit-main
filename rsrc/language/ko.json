@@ -44,16 +44,16 @@
             "quit_title" : "엘로이랩",
             "quit_title_msg" : "프로그램을 종료하시겠습니까?",
             "quit_title_msg_yes" : "네",
-            "quit_title_msg_no" : "아니오"
-        },
-        "mainCoreSync": {
-            "statusImage": "이미지 : ",
-            "statusLabel": "라벨 : ",
-            "statusCoordinate": "픽셀 좌표 : ",
+            "quit_title_msg_no" : "아니오",
             "licenseErrorTitle": "라이선스 인증 오류",
             "licenseErrorMsg": "라이선스가 인증되지 않았습니다. 라이선스를 확인하고 다시 시도해주세요.",
             "WarningTitle": "프로그램 실행 경고",
             "alreadyRunningMsg": "이미 실행 중인 ElroiKit 프로그램이 있습니다.\n새로 실행된 프로그램을 종료합니다."
+        },
+        "mainCoreSync": {
+            "statusImage": "이미지 : ",
+            "statusLabel": "라벨 : ",
+            "statusCoordinate": "픽셀 좌표 : "
         }
     },
     "labeling": {
@@ -215,6 +215,7 @@
             "penEndmemberParamKLabel": "클러스터 수(K)",
             "penEndmemberSavePath": "저장 경로:",
             "penEndmemberLoadCheck": "대표 스펙트럼 파일을 확인해주세요.",
+            "penEndmemberDimensionWarning": "대표 스펙트럼 차원이 올바르지 않습니다. 파일을 확인 후 다시 시도해주세요.",
             "penEndmemberNormalDataLoadErrorMsg": "정상 데이터 디렉토리가 올바르지 않습니다. \n 디렉토리를 확인 후 다시 시도해주세요.",
             "penEndmemberNormalDataRequiredError": "선택한 폴더에 필요한 파일이 존재하지 않습니다.\n 다음 파일이 존재하는지 확인해 주세요:",
             "penEndmemberFileErrorMsg": "파일을 불러오는 중 에러가 발생했습니다:\n",
@@ -367,7 +368,12 @@
             "RuntimeErrorMsg": "런타임 에러가 발생했습니다.",
             "PathInvalidErrorMsg": "경로가 존재하지 않습니다.",
             "Stop_info_title": "작업 중지",
-            "Stop_info_msg": "현재 진행 중인 작업을 중단 하시겠습니까?"
+            "Stop_info_msg": "현재 진행 중인 작업을 중단 하시겠습니까?",
+            "NoTrainingData": "사용 가능한 학습 데이터가 없습니다",
+            "NoValidationData": "사용 가능한 검증 데이터가 없습니다",
+            "NoTestData": "사용 가능한 테스트 데이터가 없습니다",
+            "InvalidSavePath": "저장 경로가 유효하지 않습니다",
+            "InvalidLoadPath": "로드 경로가 유효하지 않습니다"
         },
         "result_main": {
             "update_result_text": null,

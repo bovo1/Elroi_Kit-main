@@ -197,6 +197,8 @@ DATA_BACKGROUND = 1
 DATA_NORMAL = 2
 DATA_ABNORMAL = 3
 
+DATA_DIMENSION = 224
+
 # Common Abnormal Auto Labeling
 PATCH_SIZE = 3
 # remain time update size
@@ -290,9 +292,18 @@ FONT_NANUM_SQUARE_NEO = "NanumSquareNeo"
 FONT_NANUM_GOTHIC = "NanumGothic"
 
 FONT_DICTIONARY = {
-    FONT_PRETENDARD: "Pretendard.ttf",
-    FONT_NANUM_SQUARE_NEO: "NanumSquareNeo.ttf",
-    FONT_NANUM_GOTHIC: "NanumGothic.ttf"
+    FONT_PRETENDARD: {
+        "fileName": "Pretendard.ttf",
+        "defaultSize": 11
+    },
+    FONT_NANUM_SQUARE_NEO: {
+        "fileName": "NanumSquareNeo.ttf",
+        "defaultSize": 10.5
+    },
+    FONT_NANUM_GOTHIC: {
+        "fileName": "NanumGothic.ttf",
+        "defaultSize": 11
+    }
 }
 
 def switch_pen_to_draw(value):

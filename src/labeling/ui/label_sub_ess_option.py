@@ -28,7 +28,7 @@ class label_sub_ess_option_Form(QtWidgets.QDialog):
 
     def init_ui(self, Form):
         Form.setObjectName("ESS_Setting_Form")
-        Form.setFixedSize(318, 199)
+        Form.setFixedSize(318, 230)
         self.lang.set("labeling","labelSubESSOption", "labelESSTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)

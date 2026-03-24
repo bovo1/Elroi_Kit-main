@@ -46,7 +46,7 @@ class pen_sub_adv_opacity_option_Form(QtWidgets.QDialog):
             @author : MyoungHwan (2024.09.06)
         """
         Form.setObjectName("adv_opacity_setting_form")
-        Form.setFixedSize(318, 240)
+        Form.setFixedSize(318, 270)
         self.lang.set("labeling","penSubOpacity", "penOpacityTitle", Form) 
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)

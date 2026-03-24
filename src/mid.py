@@ -376,10 +376,10 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.action_info_license.triggered.connect(lambda : self.info_function(mode=1))
 
         # Setting Menu list trigger
-        self.actionSettingFont_Default.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_DEFAULT))
-        self.actionSettingFont_Pretendard.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_PRETENDARD))
-        self.actionSettingFont_NanumSquareNeo.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_SQUARE_NEO))
-        self.actionSettingFont_NanumGothic.triggered.connect(lambda : self.settingFontFunction(fontName=FONT_NANUM_GOTHIC))
+        self.actionSettingFont_Default.toggled.connect(lambda checked=self.actionSettingFont_Default.isChecked(): self.settingFontFunction(fontName=FONT_DEFAULT, checked=checked))
+        self.actionSettingFont_Pretendard.toggled.connect(lambda checked=self.actionSettingFont_Pretendard.isChecked(): self.settingFontFunction(fontName=FONT_PRETENDARD, checked=checked))
+        self.actionSettingFont_NanumSquareNeo.toggled.connect(lambda checked=self.actionSettingFont_NanumSquareNeo.isChecked(): self.settingFontFunction(fontName=FONT_NANUM_SQUARE_NEO, checked=checked))
+        self.actionSettingFont_NanumGothic.toggled.connect(lambda checked=self.actionSettingFont_NanumGothic.isChecked(): self.settingFontFunction(fontName=FONT_NANUM_GOTHIC, checked=checked))
 
     def setup_Ui_Main(self, Mid_MainWindow):
         """초기화된 ui의 디자인을 정의한다. Widget의 크기, layout 마진정의 및 정렬을 해당함수에서 정의한다.
@@ -492,11 +492,13 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         elif mode == 2:
             pass 
     
-    def settingFontFunction(self, fontName):
+    def settingFontFunction(self, fontName, checked):
         """
             @description: send signal with selected font
             @author: GaEun Hwang (2026.03.10)
         """
+        if not checked:
+            return
         changeFontMessageTitle = self.lang.get("main", "mid", "changeFontMessageTitle")
         changeFontMessage = self.lang.get("main", "mid", "changeFontMessage")
         self.settingFontFunction_signal.emit(fontName, changeFontMessageTitle, changeFontMessage)
