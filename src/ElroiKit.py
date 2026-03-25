@@ -110,11 +110,22 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             new_widget_name = "None"
         self.core_obj_dict["cur_focus_widget"] = new_widget_name
 
-    def applicationFocusOut(self):
+    def applicationFocusOut(self, state):
         """
             @Description: application focus out 상태 저장함수
             @Author: Hyunsu Kim (2026.03.23)
         """
+        if state != QtCore.Qt.ApplicationInactive:
+            return
+
+        app = QApplication.instance()
+        if app.activeModalWidget() is not None or app.activePopupWidget() is not None:
+            return
+
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, QtWidgets.QFileDialog) and widget.isVisible():
+                return
+
         for _, obj in self.sub_widget_dict.items():
             if obj.isVisible():
                 obj.close()
@@ -272,6 +283,9 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
                                              text=self.lang.get("main", "top", "quit_title_msg"),
                                              buttons={self.lang.get("main", "messageBox", "msgYes"): "accept", self.lang.get("main", "messageBox", "msgNo"): "reject"})
         if self.messageBoxResponse == "accept":
+            for _, obj in self.sub_widget_dict.items():
+                if obj.isVisible():
+                    obj.close()
             e.accept()
         else:
             e.ignore()
