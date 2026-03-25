@@ -539,7 +539,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
             lambda: self.button_event(mode=LABEL_CORRECTION_START))
         self.advanced_label_correction_setting_stop_btn.clicked.connect(
             lambda: self.button_event(mode=LABEL_CORRECTION_STOP))
-        self.imageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(rgb_image=self.rgb_image[self.imageSelectorComboBox.currentText()], data_name=self.imageSelectorComboBox.currentText()))
+        self.imageSelectorComboBox.activated.connect(lambda: self.update_rgb_image(rgb_image=self.updateImage[self.imageSelectorComboBox.currentText()], data_name=self.imageSelectorComboBox.currentText()))
         self.thresholdButton.clicked.connect(lambda: self.button_event(mode=LABEL_CORRECTION_THRESHOLD))
         self.outputSplitter.splitterMoved.connect(lambda pos, index: self.outputImageWidget.fitInView())
 
