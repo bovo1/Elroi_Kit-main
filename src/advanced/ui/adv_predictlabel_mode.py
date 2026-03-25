@@ -800,7 +800,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
         """
         self.advanced_predictlabel_datalist_tableview.clear()
         self.advanced_predictlabel_datalist_tableview.setRowCount(4)
-        self.advanced_predictlabel_datalist_tableview.setHorizontalHeaderLabels(["Index", "Data", "Use"])
+        self.advanced_predictlabel_datalist_tableview.setHorizontalHeaderLabels(self.lang.get("advanced", "advanced_predictlabel_main", "advanced_predictlabel_datalist_tableview")[1])
         self.adv_data_list_info = {}
 
     def update_status(self, string_):

@@ -130,7 +130,8 @@ class Label_Main(QtWidgets.QMainWindow):
         self.graphDockingWindow = QtWidgets.QMainWindow()
         self.graphDockingWindow.setObjectName("graphDockingWindow")
         self.graphDock = ReDockOnCloseDockWidget("Graph", self.graphDockingWindow, hideTitleBarWhenDocked=True, hideTitleBarWhenFloating=False)
-        self.graphDockingWindow.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.graphDock)
+        self.graphDockingWindow.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.graphDock)
+        self.graphDock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.graphDockingWindow.setDockOptions(QtWidgets.QMainWindow.DockOption.AnimatedDocks)
         self.graphDock.setWidget(self.Graph_tab_widget)
 
@@ -152,6 +153,7 @@ class Label_Main(QtWidgets.QMainWindow):
 
         self.vsplitter = QSplitter(QtCore.Qt.Vertical)
         self.vsplitter.setObjectName("vsplitter")
+        self.vsplitter.splitterMoved.connect(self.setDockingArea)
         
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -229,7 +231,6 @@ class Label_Main(QtWidgets.QMainWindow):
         self.graphDock.show()
         self.graphDock.raise_() 
 
-
     def moveFloatingGraphDock(self, globalPos, startPos):
         """
             @description: move floating graphDock when received move signal from graphTabBar
@@ -238,6 +239,19 @@ class Label_Main(QtWidgets.QMainWindow):
         # calculate the position to move the floating dock to the cursor position
         movedPos = self.graphDock.pos() + (globalPos - self.graphTabBar.mapToGlobal(startPos))
         self.graphDock.move(movedPos)
+
+    def setDockingArea(self):
+        """
+            @description: set docking area of graphDock according to the height of docking area when splitter is moved
+            @author: GaEun Hwang(2026.03.24)
+        """
+        dockingWidgetIndex = self.vsplitter.indexOf(self.graphDockingWindow)
+        vsplitterHeight = self.vsplitter.widget(dockingWidgetIndex).height()
+        
+        if vsplitterHeight <= self.graphDock.minimumSizeHint().height():
+            self.graphDock.setAllowedAreas(Qt.DockWidgetArea.NoDockWidgetArea)
+        else:
+            self.graphDock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
 
     @pyqtSlot(dict)
     def recv_from_core(self, output):

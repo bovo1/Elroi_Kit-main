@@ -737,7 +737,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
         """
         self.advanced_label_aggregation_datalist_tableview.clear()
         self.advanced_label_aggregation_datalist_tableview.setRowCount(4)
-        self.advanced_label_aggregation_datalist_tableview.setHorizontalHeaderLabels(["Index", "Data", "Use"])
+        self.advanced_label_aggregation_datalist_tableview.setHorizontalHeaderLabels(self.lang.get("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_datalist_tableview")[1])
         self.adv_data_list_info = {}
 
     def updateTextStatus(self, string):

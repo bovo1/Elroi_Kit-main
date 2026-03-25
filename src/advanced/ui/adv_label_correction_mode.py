@@ -867,7 +867,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         elif mode == LABEL_CORRECTION_CLEAR:
             # Clear: reset table and internal info
             self.advanced_label_correction_datalist_tableview.clear()
-            self.advanced_label_correction_datalist_tableview.setting_headerlabels(["Index", "Data", "Use"])
+            self.advanced_label_correction_datalist_tableview.setting_headerlabels(self.lang.get("advanced", "advanced_label_correction_main", "advanced_label_correction_datalist_tableview")[1])
             self.adv_data_list_info.clear()
             """
             clear the image results tab data

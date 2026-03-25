@@ -657,7 +657,7 @@ class advanced_pixel_based_labeling_Form(QtWidgets.QWidget):
         self.advanced_pixel_based_labeling_datalist_tableview.clear()
         self.advanced_pixel_based_labeling_datalist_tableview.setRowCount(4)
         self.advanced_pixel_based_labeling_datalist_tableview.setHorizontalHeaderLabels(
-            ["Index", "Data", "Use"]
+            self.lang.get("advanced", "advanced_pixel_based_labeling_main", "advanced_pixel_based_labeling_datalist_tableview")[1]
         )
         self.adv_data_list_info.clear()
 
