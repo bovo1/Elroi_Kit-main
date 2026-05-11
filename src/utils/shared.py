@@ -10,8 +10,8 @@ else:
     icon_path = os.path.join(os.path.abspath("."), 'ico')
     font_path = os.path.join(os.path.abspath("."), 'font')
 main_key = "elroilab" # main key for encryption
-shared_root_path = "C:\\ProgramData\\ElroiKit" # shared path (workspace)
-license_path = "C:\\ProgramData\\ElroiKit\\license" # license path
+shared_root_path = "C:\\ProgramData\\Elroilab\\ElroiKit" # shared path (workspace)
+license_path = "C:\\ProgramData\\Elroilab\\ElroiKit\\license" # license path
 license_txt_path = os.path.join(resource_path, "license.txt")
 temp_path = f"C:\\Users\\{os.getlogin()}\\Documents\\ElroiKit" # temp path (labeling, training)
 config_path = f"{os.path.join(shared_root_path)}\\config.json" # config path

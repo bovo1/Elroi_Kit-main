@@ -9,7 +9,7 @@ import numpy as np
 from shutil import copyfile
 from torch.utils.data import DataLoader
 from .utils import PrinterManager, AesEncryption
-from utils.shared import config_path
+from utils.shared import shared_root_path, config_path
 from .Dataset import HSIDataset, get_data, load_metaData, load_labelData
 from .trainer.PD import T_PLSDA
 from .trainer.CLS import T_CLS
@@ -238,7 +238,7 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
 
     except Exception as e:
         _printer.print(f"{type(e).__name__}: {e}\n{''.join(traceback.TracebackException.from_exception(e).format())}", color="#ff0000")
-        AesEncryption().make_fire(f"{type(e).__name__}: {e}\n{''.join(traceback.TracebackException.from_exception(e).format())}", f"C:\\ProgramData\\ElroiKit\\{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')}.log", "Elroilab")
+        AesEncryption().make_fire(f"{type(e).__name__}: {e}\n{''.join(traceback.TracebackException.from_exception(e).format())}", f"{shared_root_path}\\{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')}.log", "Elroilab")
         # shared_data.put({"runtime_error": True})
         shared_data.put({"runtime_error": str(e)})
         _printer.print(f"{type(e).__name__}: at line {e.__traceback__.tb_frame} of {__file__}: {e}", color="#ff0000")
