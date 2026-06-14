@@ -11,8 +11,7 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QFileDialog
 import numpy as np
 
-from constants.constants import DATA_DIMENSION, QT_MAX_SIZE, PEN_SUB_MODE_SEMI_AUTO_LABELING, MESSAGE_BOX_WARNING, MESSAGE_BOX_INFORMATION
-from labeling.stylesheet.stylesheet_pen_sub_semi_auto_labeling import stylesheet
+from constants.constants import DATA_DIMENSION, QT_MAX_SIZE, PEN_MODE_ADVANCED_LABELING, MESSAGE_BOX_WARNING, MESSAGE_BOX_INFORMATION
 from utils.worker import Threading_Worker
 from utils.custom_ui import messageBox
 from labeling.module.semi_auto_labeling import semiAutoLabeling
@@ -24,7 +23,7 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
     """
     def __init__(self, Pen_Sync, lang, parent):
         super().__init__()
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.Window | QtCore.Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.init(Sync=Pen_Sync, lang=lang, parent=parent)
         self.initUiLabelMainPenSemiAutoLabeling(self)
         self.setupUiLabelMainPenSemiAutoLabeling()
@@ -50,8 +49,6 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         self.penControlDict = self.Sync.pen_control_dict
         self.semiAutoLabelingDict = self.Sync.semiAutoLabelingDict
         self.semiAutoLabelingDict['builder'] = semiAutoLabeling()
-
-        self.penSemiAutoLabelingBtn = self.parent.penSemiAutoLabeling
 
         # Connect buttons availability method while threading process
         self.worker.started.connect(lambda: self.manageButtons(False))
@@ -131,8 +128,6 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         """
         Form.setObjectName("PenSemiAutoLabelingForm")
         Form.resize(200, 200)
-        Form.setStyleSheet(stylesheet)
-
 
         self.penMainGrid = QtWidgets.QVBoxLayout(Form)
         self.penMainGrid.setObjectName("penMainGrid")
@@ -140,8 +135,10 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         # ================================= Build Endmember =============================
         self.penEndmmberTitleWidget = QtWidgets.QWidget()
         self.penEndmmberTitleWidget.setObjectName("penEndmemberTitleWidget")
+        self.penEndmmberTitleWidget.setFixedHeight(24)
 
         self.penEndmemberTitleHorizon = QtWidgets.QHBoxLayout(self.penEndmmberTitleWidget)
+        self.penEndmemberTitleHorizon.setContentsMargins(4, 2, 4, 2)
         self.penEndmemberTitleHorizon.setObjectName("penEndmemberTitleHorizon")
         self.penEndmemberTitleLabel = QtWidgets.QLabel()
         self.penEndmemberTitleLabel.setObjectName("penEndmemberTitleLabel")
@@ -211,14 +208,17 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         # Build button
         self.penEndmemberBuildBtn = QtWidgets.QPushButton()
         self.penEndmemberBuildBtn.setObjectName("penEndmemberBuildBtn")
+        self.penEndmemberBuildBtn.setMinimumHeight(30)
         self.lang.set("labeling", "penSubSemiAutoLabeling", "penEndmemberBuildBtn", self.penEndmemberBuildBtn)
 
 
         # ================================= Labeling Parameters  =============================
         self.penSemiAutoLabelingTitleWidget = QtWidgets.QWidget()
         self.penSemiAutoLabelingTitleWidget.setObjectName("penSemiAutoLabelingTitleWidget")
+        self.penSemiAutoLabelingTitleWidget.setFixedHeight(24)
 
         self.penSemiAutoLabelingTitleHorizon = QtWidgets.QHBoxLayout(self.penSemiAutoLabelingTitleWidget)
+        self.penSemiAutoLabelingTitleHorizon.setContentsMargins(4, 2, 4, 2)
         self.penSemiAutoLabelingTitleHorizon.setObjectName("penSemiAutoLabelingTitleHorizon")
 
         self.penSemiAutoLabelingTitleLabel = QtWidgets.QLabel()
@@ -231,6 +231,12 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         self.pWidget, self.pSlider, self.pEdit = self.initUiSlider(titleKey="penSemiAutoLabelingStrictness", guideKey="penSemiAutoLabelingStrictnessGuide")
         self.qWidget, self.qSlider, self.qEdit = self.initUiSlider(titleKey="penSemiAutoLabelingTolerance", guideKey="penSemiAutoLabelingToleranceGuide")
 
+        # Apply button
+        self.penSemiAutoApplyBtn = QtWidgets.QPushButton()
+        self.penSemiAutoApplyBtn.setObjectName("penSemiAutoApplyBtn")
+        self.penSemiAutoApplyBtn.setMinimumHeight(30)
+        self.lang.set("labeling", "penSubSemiAutoLabeling", "penSemiAutoApplyBtn", self.penSemiAutoApplyBtn)
+
 
     def setupUiLabelMainPenSemiAutoLabeling(self):
         """
@@ -240,6 +246,7 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
 
         self.penEndmemberParameterHLayout.addWidget(self.penEndmemberParamDLabel)
         self.penEndmemberParameterHLayout.addWidget(self.penEndmemberParamDSpinBox)
+        self.penEndmemberParameterHLayout.addStretch(1)
         self.penEndmemberParameterHLayout.addWidget(self.penEndmemberParamKLabel)
         self.penEndmemberParameterHLayout.addWidget(self.penEndmemberParamKSpinBox)
 
@@ -248,19 +255,17 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         self.penSemiAutoLabelingVertical.addWidget(self.pWidget)
         self.penSemiAutoLabelingVertical.addWidget(self.qWidget)
 
-        self.penEndmemberParameterVLayout.addWidget(self.penEndmmberTitleWidget)
-        self.penEndmemberParameterVLayout.addLayout(self.penEndmemberImageHorizon)
-        self.penEndmemberParameterVLayout.addLayout(self.penEndmemberParameterHLayout)
-        self.penEndmemberParameterVLayout.addWidget(self.penEndmemberBuildingLabel)
-        self.penEndmemberParameterVLayout.addWidget(self.penEndmemberBuildBtn)
-        self.penEndmemberParameterVLayout.addStretch(1)
-
-
         self.penMainGrid.setContentsMargins(6,6,6,6)
-        self.penMainGrid.addLayout(self.penEndmemberParameterVLayout)
-        self.penMainGrid.addStretch(1)
+        self.penMainGrid.setSpacing(6)
+        self.penMainGrid.addWidget(self.penEndmmberTitleWidget)
+        self.penMainGrid.addLayout(self.penEndmemberImageHorizon)
+        self.penMainGrid.addLayout(self.penEndmemberParameterHLayout)
+        self.penMainGrid.addWidget(self.penEndmemberBuildingLabel)
+        self.penMainGrid.addWidget(self.penEndmemberBuildBtn)
+        self.penMainGrid.addSpacing(10)
         self.penMainGrid.addWidget(self.penSemiAutoLabelingTitleWidget)
         self.penMainGrid.addLayout(self.penSemiAutoLabelingVertical)
+        self.penMainGrid.addWidget(self.penSemiAutoApplyBtn)
 
     def initFunction(self):
         """
@@ -271,18 +276,70 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         self.normalDirectoryLoadBtn.clicked.connect(self.loadNormalDirectory)
         self.fileAddBtn.clicked.connect(self.loadEndmember)
         self.penEndmemberBuildBtn.clicked.connect(self.buildEndmember)
+        self.penSemiAutoApplyBtn.clicked.connect(self.onApplyClicked)
         self.pSlider.sliderReleased.connect(lambda: self.penControlDict.update(penSemiStrictness=self.pSlider.value()))
         self.qSlider.sliderReleased.connect(lambda: self.penControlDict.update(penSemiTolerance=self.qSlider.value()))
+
+    def onApplyClicked(self):
+        """
+            description : Apply Semi Auto Labeling with current parameters and loaded endmember
+            author : Hyunsu Kim (2026.05.19)
+            hisotry:
+                1. Hyunsu Kim(2026.06.04): Modified to show menu checkbox status and activate main window after closing the form when apply button is clicked, for better user experience
+        """
+        if 'kEndmember' not in self.semiAutoLabelingDict:
+            messageBox(mode=MESSAGE_BOX_WARNING,
+                       title=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberTitleLabel"),
+                       text=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberDisabledLabel"),
+                       buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
+            return
+        # Build aMap if not yet built for current image data
+        if self.semiAutoLabelingDict.get('aMap') is None:
+            if 'data' in self.semiAutoLabelingDict:
+                self.buildAmap()
+            if self.semiAutoLabelingDict.get('aMap') is None:
+                return
+        self.parent.pen_obj_dict['penAdvancedLabeling']['semiAuto'] = True
+        self.parent.pen_obj_dict['penAdvancedLabeling']['pixelBased'] = False
+        self.parent.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(True)
+        self.parent.pen_obj_dict['penAdvancedLabeling']['opened'] = False
+        self.parent.pen_obj_dict['penAdvancedLabeling']['onMode'] = 'semiAuto'
+        if self.parent.actionPixelBased.isChecked():
+            self.parent.actionPixelBased.setChecked(False)
+        self.parent.actionSemiAuto.setChecked(True)
+        self.parent.pen_mode(ch=True, mode=PEN_MODE_ADVANCED_LABELING)
+        self.close()
+        QtCore.QTimer.singleShot(0, self.parent.activateWindow)
+
+    def closeEvent(self, event):
+        if self.parent.pen_obj_dict['penAdvancedLabeling']['pixelBased']:
+            self.parent.pen_obj_dict['penAdvancedLabeling']['opened'] = False
+        elif not (self.parent.pen_obj_dict['penAdvancedLabeling']['semiAuto'] or self.parent.pen_obj_dict['penAdvancedLabeling']['pixelBased']):
+            onMode = self.parent.pen_obj_dict['penAdvancedLabeling']['onMode']
+            self.parent.pen_obj_dict['penAdvancedLabeling']['opened'] = False
+            self.parent.pen_obj_dict['penAdvancedLabeling']['semiAuto'] = False
+            if onMode == 'pixelBased':
+                self.parent.pen_obj_dict['penAdvancedLabeling']['pixelBased'] = True
+                self.parent.actionPixelBased.setChecked(True)
+            elif onMode == 'semiAuto':
+                self.parent.pen_obj_dict['penAdvancedLabeling']['semiAuto'] = True
+                self.parent.actionSemiAuto.setChecked(True)
+            else:
+                self.parent.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
+        self.close()
 
     def manageButtons(self, enable):
         """
             Description: Control button availability
             Author: Yugyeong Hong(2026.02.26)
+            History:
+                1. Hyunsu Kim (2026.05.19) : Add enabling/disabling of apply button in Semi Auto Labeling mode
         """
-        self.penSemiAutoLabelingBtn.setEnabled(enable)
+        self.parent.pen_obj_dict['penAdvancedLabeling']['obj'].setEnabled(enable)
         self.normalDirectoryLoadBtn.setEnabled(enable)
         self.fileAddBtn.setEnabled(enable)
         self.penEndmemberBuildBtn.setEnabled(enable)
+        self.penSemiAutoApplyBtn.setEnabled(enable)
 
     def loadNormalDirectory(self):
         """
@@ -290,7 +347,7 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
             Author: Yugyeong Hong
         """
         title = self.lang.get("labeling", "penSubSemiAutoLabeling", "penNormalDirectoryLoadBtn")
-        dirPath = QFileDialog.getExistingDirectory(self, title[1], "")
+        dirPath = QFileDialog.getExistingDirectory(parent=self, caption=title[1], directory="")
         if dirPath:
             self.penEndmemberImageLineEdit.setText(dirPath)
             self.semiAutoLabelingDict['dirPath'] = dirPath
@@ -301,9 +358,10 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
             Author: Yugyeong Hong (2026.02.04)
             History:
                 - Hyunsu Kim (2026.03.23) : Modify logic and message when an invalid endmember file is loaded
+                - Hyunsu Kim (2026.04.24) : Change endmember file load button name to "penEndmemberFileLoadBtn" for translation in language file
         """
         title = self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberFileLoadBtn")
-        self.filePath, _ = QFileDialog.getOpenFileName(self, title[1], "", "NumPy file (*.npy)")
+        self.filePath, _ = QFileDialog.getOpenFileName(parent=self, caption=title[1], directory="", filter="NumPy file (*.npy)")
         if self.filePath:
             try:
                 npyFile = np.load(self.filePath, allow_pickle=False).astype(np.float32)
@@ -377,7 +435,7 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
         self.semiAutoLabelingDict["aMap"] = self.semiAutoLabelingDict['builder'].aMap(self.semiAutoLabelingDict['kEndmember'], self.semiAutoLabelingDict['data'])
         if self.semiAutoLabelingDict["aMap"] is None:
             # Deactivate semi auto labeling pen
-            self.parent.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
+            self.parent.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
             messageBox(mode=MESSAGE_BOX_WARNING,
                        title=self.lang.get("labeling", "penSubSemiAutoLabeling", "penSemiAutoLabelingWarning"),
                        text=self.lang.get("labeling", "penSubSemiAutoLabeling", "penAmapBuildingError"),
@@ -420,10 +478,9 @@ class PenSemiAutoLabelingForm(QtWidgets.QWidget):
                            title=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberTitleLabel"),
                            text=self.lang.get("labeling", "penSubSemiAutoLabeling", "penEndmemberDisabledLabel"),
                            buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
-                # Deactivate semi auto labeling pen and keep sub window open
-                self.parent.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
-                self.parent.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
-                self.parent.pen_sub_open(PEN_SUB_MODE_SEMI_AUTO_LABELING)
+                # Deactivate semi auto labeling pen; form stays open for endmember build
+                self.parent.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
+                self.parent.pen_obj_dict['penAdvancedLabeling']['semiAuto'] = False
 
         elif from_ == 'image':
             self.semiAutoLabelingDict['data'] = receivedDict['data']

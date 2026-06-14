@@ -11,7 +11,6 @@ from PyQt5.QtCore import Qt, pyqtSlot
     description
     Modified by MyoungHwan(20240603) : stylesheet명 수정
 """
-from labeling.stylesheet.stylesheet_display_sub_rgb_change import stylesheet
 from constants.constants import *
 
 class Display_rgb_change_Form(QtWidgets.QWidget):
@@ -44,18 +43,19 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
         self.display_sub_rgb_change_to_core_signal = self.Sync.display_sub_rgb_change_to_core_signal
         self.display_sub_rgb_change_to_display_signal = self.Sync.display_sub_rgb_change_to_display_signal
         self.display_sub_rgb_change_to_graph_sub_signal = self.Sync.display_sub_rgb_change_to_graph_sub_signal
+        self.displaySubRgbChangeToGraphSignal = self.Sync.displaySubRgbChangeToGraphSignal
 
         self.tmp_db = {}
         self.init_status = False # RGB Bands의 설정창 활성화 여부
         self.slicombo_sw = False # Slider 발동 및 combo 박스 스위치, 슬라이더 혹은 콤보박스 설정변경 시 두개다 이벤트 발생하는거 막기위해 사용, 1개만 발동하도록
         self.cur_btn = -1 # 현재 버튼의 위치, 똑같은 버튼 두번 누르는거 방지하기 위함, default -1
+        self.LinkForRgbLine = False # RGB 라인과 Slider/Combobox 연동 여부
 
         self.pen_obj_dict = self.Sync.pen_obj_dict
 
     def init_Ui_display_rgb_change(self, Form):
         Form.setObjectName("display_rgb_change_form")
         Form.setFixedSize(550,250)
-        Form.setStyleSheet(stylesheet)
         Form.setWindowFlag(Qt.WindowMinimizeButtonHint, False)
 
         self.display_rgb_change_main_grid = QtWidgets.QGridLayout(Form)
@@ -155,8 +155,8 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def setup_Ui_display_rgb_change(self, Form):
-        _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("display_rgb_change_form", "Adjust Hyperspectral Visualization"))
+        Form.setWindowTitle(self.lang.get("labeling", "display_sub_rgb_change", "displayRgbChangeTitle"))
+        self.lang.set("labeling", "display_sub_rgb_change", "displayRgbChangeTitle", Form)
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_color_label", self.display_rgb_change_title_color_label)
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_band_range_label", self.display_rgb_change_title_band_range_label)
         self.lang.set("labeling", "display_sub_rgb_change", "display_rgb_change_title_band_label", self.display_rgb_change_title_band_label)
@@ -241,19 +241,18 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
 
 
     def init_Function(self):
-        self.display_rgb_change_red_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_red_range_slider : self.slider_value_change(color_type='red', value=value, mode=0))
-        self.display_rgb_change_green_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_green_range_slider : self.slider_value_change(color_type='green', value=value, mode=0))
-        self.display_rgb_change_blue_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_blue_range_slider : self.slider_value_change(color_type='blue', value=value, mode=0))
+        self.display_rgb_change_red_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_red_range_slider : self.slider_value_change(color_type=SUBRGB_RED, value=value, mode=RGB_SLIDER_CHANGE))
+        self.display_rgb_change_green_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_green_range_slider : self.slider_value_change(color_type=SUBRGB_GREEN, value=value, mode=RGB_SLIDER_CHANGE))
+        self.display_rgb_change_blue_range_slider.valueChanged.connect(lambda value=self.display_rgb_change_blue_range_slider : self.slider_value_change(color_type=SUBRGB_BLUE, value=value, mode=RGB_SLIDER_CHANGE))
 
-        self.display_rgb_change_red_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_red_comboBox : self.slider_value_change(color_type='red', value=value, mode=1))
-        self.display_rgb_change_green_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_green_comboBox : self.slider_value_change(color_type='green', value=value, mode=1))
-        self.display_rgb_change_blue_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_blue_comboBox : self.slider_value_change(color_type='blue', value=value, mode=1))
+        self.display_rgb_change_red_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_red_comboBox : self.slider_value_change(color_type=SUBRGB_RED, value=value, mode=RGB_COMBOBOX_CHANGE))
+        self.display_rgb_change_green_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_green_comboBox : self.slider_value_change(color_type=SUBRGB_GREEN, value=value, mode=RGB_COMBOBOX_CHANGE))
+        self.display_rgb_change_blue_comboBox.currentIndexChanged.connect(lambda value=self.display_rgb_change_blue_comboBox : self.slider_value_change(color_type=SUBRGB_BLUE, value=value, mode=RGB_COMBOBOX_CHANGE))
         
-        self.display_rgb_change_setting_rgb_button.clicked.connect(lambda ch=self.display_rgb_change_setting_rgb_button : self.button_event(ch=ch, mode=0))
-        self.display_rgb_change_setting_cmf_button.clicked.connect(lambda ch=self.display_rgb_change_setting_cmf_button : self.button_event(ch=ch, mode=1))
-        self.display_rgb_change_setting_dlcmf_button.clicked.connect(lambda ch=self.display_rgb_change_setting_dlcmf_button : self.button_event(ch=ch, mode=2))
+        self.display_rgb_change_setting_rgb_button.clicked.connect(lambda ch=self.display_rgb_change_setting_rgb_button : self.button_event(ch=ch, mode=VISUALIZATION_MODE_RGB))
+        self.display_rgb_change_setting_cmf_button.clicked.connect(lambda ch=self.display_rgb_change_setting_cmf_button : self.button_event(ch=ch, mode=VISUALIZATION_MODE_CMF))
+        self.display_rgb_change_setting_dlcmf_button.clicked.connect(lambda ch=self.display_rgb_change_setting_dlcmf_button : self.button_event(ch=ch, mode=VISUALIZATION_MODE_DLCMF))
         self.display_rgb_change_setting_default_button.clicked.connect(lambda ch=self.display_rgb_change_setting_default_button : self.button_event(ch=ch, mode=3))
-        
 
     def slider_value_change(self, color_type=None, value=None, mode=0):
         # mode 0일때 콤보박스 값 변경
@@ -262,25 +261,32 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
         if self.init_status and not self.slicombo_sw:
             self.slicombo_sw = True
             if changed_by == RGB_SLIDER_CHANGE: # slider 동작시 발동 -> 콤보도 같이 변하게 설정
-                if color_type == 'red':
+                if color_type == SUBRGB_RED:
                     self.display_rgb_change_red_comboBox.setCurrentIndex(value)
-                elif color_type == 'green':
+                elif color_type == SUBRGB_GREEN:
                     self.display_rgb_change_green_comboBox.setCurrentIndex(value)
-                elif color_type == 'blue':
+                elif color_type == SUBRGB_BLUE:
                     self.display_rgb_change_blue_comboBox.setCurrentIndex(value)
             elif changed_by == RGB_COMBOBOX_CHANGE:# 콤보 동작시 발동 -> 슬라이더도 같이 변하게 설정
-                if color_type == 'red':
+                if color_type == SUBRGB_RED:
                     self.display_rgb_change_red_range_slider.setValue(value)
-                elif color_type == 'green':
+                elif color_type == SUBRGB_GREEN:
                     self.display_rgb_change_green_range_slider.setValue(value)
-                elif color_type == 'blue':
+                elif color_type == SUBRGB_BLUE:
                     self.display_rgb_change_blue_range_slider.setValue(value)
-            if color_type == 'red':
-                self.tmp_db['hsi_cur_bands'][0] = value
-            elif color_type == 'green':
-                self.tmp_db['hsi_cur_bands'][1] = value
-            elif color_type == 'blue':
-                self.tmp_db['hsi_cur_bands'][2] = value
+
+            self.tmp_db['hsi_cur_bands'][color_type] = value
+
+            """
+                description: Update graph RGB line position in response to slider/combobox change when LinkForRgbLine is True
+                author : Hyunsu Kim (2026.04.27)
+                History:
+                    1. Hyunsu Kim (2026.05.06): Change the tmp_db key from color name string to SUBRGB constants for better consistency and management. Update corresponding code to reflect this change.
+            """
+
+            if self.LinkForRgbLine:
+                self.displaySubRgbChangeToGraph({"color": color_type, "band": self.tmp_db['hsi_cur_bands'][color_type]})
+
             tmp_dict={}
             tmp_dict['mode'] = 0
             tmp_dict['hsi_cur_bands'] = self.tmp_db['hsi_cur_bands']
@@ -304,18 +310,29 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
             self.tmp_db['hsi_cur_bands'] = [red, green, blue]
             self.display_sub_rgb_change_to_display(tmp_dict)
             self.init_status = True
+            """
+                description: Update graph RGB line position to default when RGB reset button is clicked
+                author : Hyunsu Kim (2026.04.27)
+                History:
+                    1. Hyunsu Kim (2026.05.06): Change the signal key from color name string to SUBRGB constants for better consistency and management. Update corresponding code to reflect this change.
+            """
+            self.displaySubRgbChangeToGraph({"color": SUBRGB_RED, "band": red})
+            self.displaySubRgbChangeToGraph({"color": SUBRGB_GREEN, "band": green})
+            self.displaySubRgbChangeToGraph({"color": SUBRGB_BLUE, "band": blue})
         else:
             if self.cur_btn == mode:
-                if mode == 0:
+                if mode == VISUALIZATION_MODE_RGB:
                     self.display_rgb_change_setting_rgb_button.setChecked(True)
-                elif mode == 1:
+                elif mode == VISUALIZATION_MODE_CMF:
                     self.display_rgb_change_setting_cmf_button.setChecked(True)
-                elif mode == 2:
+                elif mode == VISUALIZATION_MODE_DLCMF:
                     self.display_rgb_change_setting_dlcmf_button.setChecked(True)
             else:
                 self.cur_btn = mode
-                if mode == 0: # RGB mode
+                self.displaySubRgbChangeToGraph({"currentViewMode":mode})
+                if mode == VISUALIZATION_MODE_RGB: # RGB mode
                     self.display_rgb_change_rgb_group.setEnabled(True)
+                    self.LinkForRgbLine = True
                     if self.display_rgb_change_setting_cmf_button.isChecked():
                         self.display_rgb_change_setting_cmf_button.toggle()
                     if self.display_rgb_change_setting_dlcmf_button.isChecked():
@@ -329,8 +346,9 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
                     tmp_dict['mode'] = 1
                     self.display_sub_rgb_change_to_graph_sub(tmp_dict)
 
-                elif mode == 1: # CMF mode
+                elif mode == VISUALIZATION_MODE_CMF: # CMF mode
                     self.display_rgb_change_rgb_group.setEnabled(False)
+                    self.LinkForRgbLine = False
                     if self.display_rgb_change_setting_rgb_button.isChecked():
                         self.display_rgb_change_setting_rgb_button.toggle()
                     if self.display_rgb_change_setting_dlcmf_button.isChecked():
@@ -343,8 +361,9 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
                     tmp_dict['mode'] = 0
                     self.display_sub_rgb_change_to_graph_sub(tmp_dict)
 
-                elif mode == 2: # DLCMF mode
+                elif mode == VISUALIZATION_MODE_DLCMF: # DLCMF mode
                     self.display_rgb_change_rgb_group.setEnabled(False)
+                    self.LinkForRgbLine = False
                     if self.display_rgb_change_setting_rgb_button.isChecked():
                         self.display_rgb_change_setting_rgb_button.toggle()
                     if self.display_rgb_change_setting_cmf_button.isChecked():
@@ -375,9 +394,10 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
     def recv_core_to_display_sub_rgb_change(self, output):
         # 받는곳, hsi data 업데이트 되면 활성화
         self.init_status = False
-        self.combobox_clear()
         mode = output['mode']
         if mode == "load":
+            self.combobox_clear()
+            self.displaySubRgbChangeToGraph({"currentViewMode":VISUALIZATION_MODE_RGB})
             self.display_rgb_change_visualization_group.setEnabled(True)
             self.display_rgb_change_rgb_group.setEnabled(True)
             self.display_rgb_change_setting_rgb_button.setChecked(True)
@@ -424,6 +444,29 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
             self.display_rgb_change_visualization_group.setEnabled(False)
             self.display_rgb_change_rgb_group.setEnabled(False)
             self.init_status = False
+
+        elif mode == "graph":
+            """
+                description: Change the slider value based on the signal received from the graph, or set the synchronization status based on whether the RGB Graph Support function is enabled.
+                author : Hyunsu Kim (2026.04.27)
+            """
+            self.init_status = True
+            if output['type'] == "rgbLines":
+                band = output["band"]
+                color = output["color"]
+
+                if color == "red":
+                    self.display_rgb_change_red_range_slider.setValue(band)
+                elif color == "green":
+                    self.display_rgb_change_green_range_slider.setValue(band)
+                else:
+                    self.display_rgb_change_blue_range_slider.setValue(band)
+            
+            elif output['type'] == "hideRgbLines":
+                self.LinkForRgbLine = False
+
+            elif output['type'] == "showRgbLines":
+                self.LinkForRgbLine = True
         
     def display_sub_rgb_change_to_display(self, input):
         """display sub rgb에서 display로 시그널을 보내기 위한 함수 선언문이다. Core에게 먼저 시그널을 보내어 display에 최종적으로 전달된다.
@@ -440,6 +483,14 @@ class Display_rgb_change_Form(QtWidgets.QWidget):
 
         """
         self.display_sub_rgb_change_to_graph_sub_signal.emit(input)
+
+    def displaySubRgbChangeToGraph(self, input):
+        """
+            description: Function declaration for sending signals from display sub rgb change to graph. The signal is first sent to the core and then finally delivered to the graph.
+            parameters
+            1. input(dict): dictionary for graph update
+        """
+        self.displaySubRgbChangeToGraphSignal.emit(input)
 
     def closeEvent(self, _):
         if self.pen_obj_dict['pen_bright']['opened']:

@@ -1,7 +1,6 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import *
 from PyQt5.QtCore import QSize, Qt, pyqtSlot
-from labeling.stylesheet.stylesheet_pen_sub_style import stylesheet
 from constants.constants import QT_MAX_SIZE
 
 class Pen_style_Form(QtWidgets.QWidget):
@@ -56,7 +55,6 @@ class Pen_style_Form(QtWidgets.QWidget):
         """
         Form.setObjectName("pen_sub_style_form")
         Form.resize(150, 200)
-        Form.setStyleSheet(stylesheet)
 
         self.pen_main_grid = QtWidgets.QGridLayout(Form)
         self.pen_main_grid.setObjectName("pen_main_grid")

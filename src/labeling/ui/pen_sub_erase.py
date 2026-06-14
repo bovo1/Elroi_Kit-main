@@ -2,7 +2,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import *
 from PyQt5.QtGui import QBrush, QPen
 from PyQt5.QtCore import QSize, Qt
-from labeling.stylesheet.stylesheet_pen_sub_erase import stylesheet
 from constants.constants import QT_MAX_SIZE
 
 class Pen_eraser_Form(QtWidgets.QWidget):
@@ -47,7 +46,6 @@ class Pen_eraser_Form(QtWidgets.QWidget):
         """
         Form.setObjectName("pen_sub_erase_form")
         Form.resize(150, 150)
-        Form.setStyleSheet(stylesheet)
 
 
         self.pen_main_grid = QtWidgets.QGridLayout(Form)

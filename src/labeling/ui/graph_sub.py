@@ -4,7 +4,6 @@ from PyQt5.QtCore import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 from qtwidgets import AnimatedToggle
-from labeling.stylesheet.stylesheet_graph_sub import stylesheet
 
 
 class graph_sub_Form(QtWidgets.QDialog):
@@ -81,7 +80,6 @@ class graph_sub_Form(QtWidgets.QDialog):
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
-        Form.setStyleSheet(stylesheet)
         
         self.graph_sub_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.graph_sub_main_vertical.setObjectName("graph_sub_main_vertical")
@@ -262,8 +260,8 @@ class graph_sub_Form(QtWidgets.QDialog):
         self.graph_sub_to_display_signal.emit(input)
 
     def closeEvent(self, e):
-        if self.parent.graph_setting_temp.isChecked():
-            self.parent.graph_setting_temp.toggle()
+        if self.parent.graph_setting.isChecked():
+            self.parent.graph_setting.toggle()
         
  
 

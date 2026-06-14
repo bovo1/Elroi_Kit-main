@@ -143,7 +143,6 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
                 1.   Mid_MainWindow(object): PyQt widget object
         """
         Mid_MainWindow.setObjectName("Mid_MainWindow")
-        Mid_MainWindow.setStyleSheet(stylesheet)
 
         self.centralwidget = QtWidgets.QWidget(Mid_MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -459,6 +458,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
                 1. Modified by MyoungHwan (2024.02.15): Add Excteption when input the empty path for "getSaveFileName" Function
                 2. Modified by MyoungHwan (2024.12.13): 기능사용(Labeling, Training, Utility)에 따른 분기 코드 추가
                 3. Modified by MyoungHwan (2025.03.14): 기능사용(Labeling, Training, Utility)에 따른 분기 코드 수정
+                4. Modified by Hyunsu Kim (2026.04.21): Modify QFileDialog title to enable Korean translation
         """
         # Modified by MyoungHwan (2024.12.13): 기능사용(Labeling, Training, Utility)에 따른 분기 코드 추가
         cur_page = self.stackedWidget.currentIndex()
@@ -470,7 +470,7 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
                 if mode == 1:
                     pass
                 elif mode == 2:
-                    fname, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save labeled file(*.npy)", "", "npy(*.npy)")
+                    fname, _ = QtWidgets.QFileDialog.getSaveFileName(parent=self, caption=self.lang.get("main", "mid", "actionSaveAsTitle"), filter="npy(*.npy)")
                     temp_dict['save_as_path'] = fname
                 self.mainwindow_to_core(temp_dict)
 

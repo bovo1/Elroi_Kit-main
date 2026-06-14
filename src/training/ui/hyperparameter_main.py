@@ -20,7 +20,6 @@ from training.module.hyperparameters import DA, DN, PD, PE, SC
 from utils.shared import temp_path, config_path
 from utils.custom_ui import messageBox
 from constants.constants import MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
-from training.stylesheet.stylesheet_hyperparameter_main import stylesheet
 
 """
 description: hyperparameter UI Widget
@@ -144,7 +143,7 @@ class Hyperparameter_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("Hyperparameter_Form")
         Form.setWindowTitle("Hyperparameter_Form")
-        Form.setStyleSheet(stylesheet)
+
         self.FormLayout = QtWidgets.QVBoxLayout(Form)
         self.FormLayout.setObjectName("FormLayout")
         
@@ -741,7 +740,8 @@ class Hyperparameter_Form(QtWidgets.QWidget):
         # filedialog
         if path_type == "save" or path_type == "load_ref":
             key = "save_path" if path_type == "save" else "load_ref_path"
-            file_dialog = QFileDialog(directory=self.hyperparameter_shared_dict[model_type][key])
+            title = self.lang.get("training", "hyperparameter_main", "CommonSettingSavePathTitle") if path_type == "save" else self.lang.get("training", "hyperparameter_main", "CommonSettingsLoadRefPathTitle")
+            file_dialog = QFileDialog(caption=title, directory=self.hyperparameter_shared_dict[model_type][key])
             file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
             file_dialog.setFileMode(QFileDialog.DirectoryOnly)
             # get save path
@@ -775,7 +775,7 @@ class Hyperparameter_Form(QtWidgets.QWidget):
                     self.CommonSettingsLoadRefPathLineEdit.setToolTip(path)
 
         elif path_type == "load":
-            file_dialog = QFileDialog(directory=self.hyperparameter_shared_dict[model_type]["load_path"])
+            file_dialog = QFileDialog(caption=self.lang.get("training", "hyperparameter_main", "CommonSettingsLoadPathTitle"), directory=self.hyperparameter_shared_dict[model_type]["load_path"])
             file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
             file_dialog.setNameFilters(self.hyperparameter_shared_dict[model_type]["load_type"])
             # get load path
@@ -956,7 +956,7 @@ class Hyperparameter_Form(QtWidgets.QWidget):
     
     def load_config(self, load_from_user:bool=False):
         if load_from_user:
-            file_dialog = QFileDialog()
+            file_dialog = QFileDialog(caption=self.lang.get("training", "hyperparameter_main", "ParameterLoadTitle"))
             file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
             file_dialog.setNameFilters(["json (*.json)"])
             if file_dialog.exec_():

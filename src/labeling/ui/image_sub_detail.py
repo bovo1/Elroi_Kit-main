@@ -8,7 +8,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtCore import pyqtSlot, Qt
 
-from labeling.stylesheet.stylesheet_image_sub_detail import stylesheet
 from constants.constants import QT_MAX_SIZE
 from utils.custom_ui import custom_qtablewidget
 
@@ -74,7 +73,6 @@ class Image_detail_Form(QtWidgets.QWidget):
         """
         Mainwindow.setObjectName("MainWindow")
         Mainwindow.setFixedSize(600, 400)
-        Mainwindow.setStyleSheet(stylesheet)
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Mainwindow.setWindowModality(QtCore.Qt.ApplicationModal)
         Mainwindow.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
@@ -119,10 +117,12 @@ class Image_detail_Form(QtWidgets.QWidget):
         self.data_list_detail_label_search.setMaximumSize(QtCore.QSize(30, QT_MAX_SIZE))
         self.data_list_detail_label_search.setObjectName("data_list_detail_label_search")
         self.data_list_detail_label_search.setIcon(icon)
+        self.data_list_detail_label_search.setEnabled(False)
 
         # Improvemented by MyoungHwan (2024.12.13): Image 데이터 리스트화를 위한 UI 변경
-        self.data_list_main_custom_tablewidget = custom_qtablewidget(obj_name="data_list_main_custom_tablewidget", col=2, row=3)
-        self.data_list_main_custom_tablewidget_setting_header_labels = ["Num","Name"]
+        self.data_list_main_custom_tablewidget = custom_qtablewidget(obj_name="imageSubTable", col=2, row=3)
+        self.lang.set("labeling", "image_sub_detail", "imageSubTable", self.data_list_main_custom_tablewidget)
+        self.data_list_main_custom_tablewidget_setting_header_labels = self.lang.get("labeling", "image_sub_detail", "imageSubTable")[1]
         self.data_list_main_custom_tablewidget.setting_headerlabels(labels=self.data_list_main_custom_tablewidget_setting_header_labels)
         self.data_list_main_custom_tablewidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.data_list_main_custom_tablewidget.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
@@ -140,8 +140,8 @@ class Image_detail_Form(QtWidgets.QWidget):
                 1. Modified by MyoungHwan(20240507) : UI 구조 개선
                 2. Improvemented by MyoungHwan (2024.12.13) : UI 구조 및 언어팩 수정
         """
-        _translate = QtCore.QCoreApplication.translate
-        Mainwindow.setWindowTitle(_translate("Mainwindow", "Data detail setting Menu"))
+        Mainwindow.setWindowTitle(self.lang.get("labeling", "image_sub_detail", "imageSubWindowTitle"))
+        self.lang.set("labeling", "image_sub_detail", "imageSubWindowTitle", Mainwindow)
         self.lang.set("labeling", "image_sub_detail", "data_list", self.data_list_group)
         self.lang.set("labeling", "image_sub_detail", "data_list_detail", self.data_list_detail_group)
         self.lang.set("labeling", "image_sub_detail", "data_list_detail_label_label", self.data_list_detail_label_label)
@@ -211,10 +211,12 @@ class Image_detail_Form(QtWidgets.QWidget):
             @Parameters
                 1.	value(int)
                     - 정수값: 행 번호
+            @History
+                1. Modified by Hyunsu Kim (2026.05.12): Modify to enable data_list_detail_label_search when a cell is selected
         """
         self.select_row_number = value
         self.update_label_path(idx=self.select_row_number)
-    
+        self.data_list_detail_label_search.setEnabled(True)
 
     def update_ui_status(self, mode=None):
         """
@@ -226,14 +228,13 @@ class Image_detail_Form(QtWidgets.QWidget):
                     - 1 : UI 활성화
             @History
                 1. Improvemented by MyoungHwan (2024.12.13): UI 활성화 코드 수정
+                2. Modified by Hyunsu Kim (2026.05.12): delete label search button control to control by cell selection
         """
         if mode == 1:
             self.data_list_detail_label_line.setEnabled(True)
-            self.data_list_detail_label_search.setEnabled(True)
             self.data_list_main_custom_tablewidget.setEnabled(True)
         else:
             self.data_list_detail_label_line.setEnabled(False)
-            self.data_list_detail_label_search.setEnabled(False)
             self.data_list_main_custom_tablewidget.setEnabled(False)
 
 
@@ -244,10 +245,11 @@ class Image_detail_Form(QtWidgets.QWidget):
             @History
                 1. Modified by MyoungHwan(20240529) : QFileDialog 통해 경로 불러올 경우에 대한 예외처리 수정, length 기준으로 크기가 0보다 큰 경우에만 처리
                 2. Improvemented by MyoungHwan (2024.12.13): 파일경로 DB에 전달하기위한 코드 수정    
+                3. Modified by Hyunsu Kim (2026.04.24): change label search button name to "labelSearch" for translation in language file
         """
         image_number = int(self.data_list_main_custom_tablewidget.item(self.select_row_number, 0).text())
         path = self.image_obj_dict[image_number]['label_path']
-        fname = QFileDialog.getOpenFileName(self, 'Load Label File', path, filter='*.npy')
+        fname = QFileDialog.getOpenFileName(parent=self, caption=self.lang.get("labeling", "image_sub_detail", "data_list_detail_label_label"), directory=path, filter='*.npy')
 
         # Modified by MyoungHwan(20240529) : QFileDialog 통해 경로 불러올 경우에 대한 예외처리 수정, length 기준으로 크기가 0보다 큰 경우에만 처리
         # Improvemented by MyoungHwan (2024.12.13): 파일경로 DB에 전달하기위한 코드 수정
@@ -268,11 +270,15 @@ class Image_detail_Form(QtWidgets.QWidget):
             @Author : MyoungHwan
             @History
                 1. Improvemented by MyoungHwan (2024.12.13): image 데이터 리스트 업데이트 코드 수정
+                2. Modified by Hyunsu Kim (2026.05.12): Modify to disable data_list_detail_label_search if image_obj_dict is empty
         """
         self.clear_data_list()
         self.data_list_main_custom_tablewidget.setRowCount(len(self.image_obj_dict.keys()))
 
         tmp_data_list_info = {}
+        if len(self.image_obj_dict) == 0:
+            self.data_list_detail_label_search.setEnabled(False)
+
         for _, (tmp_key, tmp_value) in enumerate(self.image_obj_dict.items()):
             number = tmp_value['number']
             name = tmp_value['name']
@@ -307,11 +313,14 @@ class Image_detail_Form(QtWidgets.QWidget):
             @Author : MyoungHwan
             @History
                 1. Improvemented by MyoungHwan (2024.12.13): UI 초기화 코드 수정
+                2. Modified by Hyunsu Kim (2026.05.14): Modify to disable data_list_detail_label_search when clearing data list
         """
         self.data_list_detail_label_line.setText("")
         self.data_list_main_custom_tablewidget.clear()
+        self.data_list_main_custom_tablewidget_setting_header_labels = self.lang.get("labeling", "image_sub_detail", "imageSubTable")[1]
         self.data_list_main_custom_tablewidget.setting_headerlabels(labels=self.data_list_main_custom_tablewidget_setting_header_labels)
         self.update_ui_status(mode=0)
+        self.data_list_detail_label_search.setEnabled(False)
 
 
     def closeEvent(self, _):

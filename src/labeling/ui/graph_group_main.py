@@ -16,7 +16,6 @@ from utils.custom_ui import custom_qtablewidget, custom_qheaderview, messageBox
 gen_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
 iconSize = 30
 
-from labeling.stylesheet.stylesheet_label_main import stylesheet
 
 class graphGroupForm(QtWidgets.QWidget):
     """
@@ -71,7 +70,6 @@ class graphGroupForm(QtWidgets.QWidget):
             Description: Graph Group UI Init Function
             Author: GaEun Hwang (2025.12.05)
         """
-        form.setStyleSheet(stylesheet)
 
         self.gridLayout = QtWidgets.QGridLayout(form)
         self.gridLayout.setObjectName("gridLayout")
@@ -110,10 +108,11 @@ class graphGroupForm(QtWidgets.QWidget):
 
         # =================================Selective View Table=============================
         self.graphGroupTable = custom_qtablewidget(obj_name="graphGroupTable", col=5,row=0)
+        self.lang.set("labeling", "graphGroupMain", "graphGroupTable", self.graphGroupTable)
         self.graphGroupTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.graphGroupTable.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.graphGroupTable_headerlabels = ["", "Show", "Color", "Name", ""]
-        self.graphGroupTable.setting_headerlabels(labels=self.graphGroupTable_headerlabels)
+        self.graphGroupTable_headerlabels = self.lang.get("labeling", "graphGroupMain", "graphGroupTable")
+        self.graphGroupTable.setting_headerlabels(labels=self.graphGroupTable_headerlabels[1])
 
         customHeader = custom_qheaderview(obj_name="graphGroupTable_custom_headerview")
         customHeader.set_clickable_sections([1])
@@ -129,8 +128,9 @@ class graphGroupForm(QtWidgets.QWidget):
         self.labelViewGraphGroupTable = custom_qtablewidget(obj_name="labelViewGraphGroupTable", col=3,row=0)
         self.labelViewGraphGroupTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.labelViewGraphGroupTable.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.labelViewGraphGroupTable_headerlabels = ["Show", "Color", "Name"]
-        self.labelViewGraphGroupTable.setting_headerlabels(labels=self.labelViewGraphGroupTable_headerlabels)
+        self.labelViewGraphGroupTable_headerlabels = self.lang.get("labeling", "graphGroupMain", "labelViewGraphGroupTable")
+        self.labelViewGraphGroupTable.setting_headerlabels(labels=self.labelViewGraphGroupTable_headerlabels[1])
+        self.lang.set("labeling", "graphGroupMain", "labelViewGraphGroupTable", self.labelViewGraphGroupTable)
 
         labelViewCustomHeader = custom_qheaderview(obj_name="labelViewGraphGroupTable_custom_headerview")
         labelViewCustomHeader.set_clickable_sections([0])
@@ -250,7 +250,7 @@ class graphGroupForm(QtWidgets.QWidget):
         graphGroupRemoveWidgetButton.setProperty("index", self.graphIndex)
         graphGroupRemoveWidgetButton.setMinimumSize(QtCore.QSize(iconSize, iconSize))
         graphGroupRemoveWidgetButton.setMaximumSize(QtCore.QSize(iconSize, iconSize))
-        graphGroupRemoveWidgetButton.clicked.connect(lambda : self.removeGraphGroup(item=graphGroupRemoveWidgetButton, cnt=graphGroupRemoveWidgetButton.property("index")))
+        graphGroupRemoveWidgetButton.clicked.connect(lambda : self.removeGraphGroup(cnt=graphGroupRemoveWidgetButton.property("index")))
 
         self.graphGroupTable.setCellWidget(graphGroupIdx, 0, graphGroupSelectWidget['widget'])
         self.graphGroupTable.setCellWidget(graphGroupIdx, 1, graphGroupHideWidget['widget'])
@@ -475,7 +475,7 @@ class graphGroupForm(QtWidgets.QWidget):
             self.labelViewGraphGroupDict[cnt]["objects"]["nameLineEdit"].setText(txt)
             self.labelViewGraphGroupDict[cnt]["name"] = txt
 
-    def removeGraphGroup(self, item, cnt):
+    def removeGraphGroup(self, cnt):
         """
             Description: remove a graph group
             Author: GaEun Hwang (2025.12.05)
@@ -488,12 +488,13 @@ class graphGroupForm(QtWidgets.QWidget):
                        text=self.lang.get("labeling", "graphGroupMain", "graphGroupWarningMsg"),
                        buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             return
-        # calculate the row index of the item to be removed
-        indexRow = self.graphGroupTable.indexAt(item.parent().pos()).row()
-        self.graphGroupTable.removeRow(indexRow)
         # if the removed graph group is selected, deselect it
         if cnt == self.graphControlDict['selectedGraphGroup']:
             self.graphControlDict['selectedGraphGroup'] = GRAPH_GROUP_NONE
+        
+        indexRow = self.findTableRow(self.graphGroupTable, cnt)
+        if indexRow != -1:
+            self.graphGroupTable.removeRow(indexRow)
         
         # remove graph coordinates from label view graph groups
         # reason: when checked graph in selective view, the graph coordinates are added to label view too.
@@ -522,6 +523,26 @@ class graphGroupForm(QtWidgets.QWidget):
         self.graphGroupToGraph.emit(emitDict)
         self.graphGroupToDisplay.emit(emitDict)
         self.clear()
+    
+    def findTableRow(self, table, index):
+        """
+            @Description: find the row index of the graph group table by index
+            @Author: GaEun Hwang (2026.05.07)
+        """
+        if table == self.graphGroupTable:
+            propertyName = "index"
+        elif table == self.labelViewGraphGroupTable:
+            propertyName = "labelClass"
+        else:
+            return -1
+        
+        for row in range(table.rowCount()):
+            rowWidget = table.cellWidget(row, 0)
+            if rowWidget is not None:
+                buttonWidget = rowWidget.findChild(QtWidgets.QPushButton)
+                if buttonWidget is not None and buttonWidget.property(propertyName) == index:
+                    return row
+        return -1
 
     def convertGraphView(self):
         """
@@ -560,8 +581,7 @@ class graphGroupForm(QtWidgets.QWidget):
             self.graphGroupClearBtn.setEnabled(True)
             # remove temporary graph group if temporary graph group has no coordinates
             if len(self.graphGroupDict[self.graphIndex-1]["coordinates"].keys()) == 0:
-                item = self.graphGroupDict[self.graphIndex-1]["objects"]["removeBtn"]
-                self.removeGraphGroup(item=item, cnt=self.graphIndex-1)
+                self.removeGraphGroup(cnt=self.graphIndex-1)
             for graphGroup in self.labelViewGraphGroupDict.values():
                 if graphGroup["hide"] == False:
                     graphGroup["objects"]["hideBtn"].click()
@@ -660,15 +680,16 @@ class graphGroupForm(QtWidgets.QWidget):
             elif mode == REMOVE_LABEL_CLASS:
                 # when remove a label class in label class list, remove the corresponding label view graph group
                 labelClass = receivedDict["labelNumber"]
-                indexRow = self.labelViewGraphGroupTable.indexAt(self.labelViewGraphGroupDict[labelClass]["objects"]["hideBtn"].parent().pos()).row()
-                self.labelViewGraphGroupTable.removeRow(indexRow)
-                removedLabelItem = self.labelViewGraphGroupDict.pop(labelClass)
-                self.labelViewGraphGroupDict[0]["coordinates"].update(removedLabelItem["coordinates"])
-                emitDict = {"mode": GRAPH_GROUP_REMOVE,
-                            "index": labelClass,
-                            "label": True,
-                            "removedLabelItem": removedLabelItem}
-                self.graphGroupToGraph.emit(emitDict)
+                indexRow = self.findTableRow(self.labelViewGraphGroupTable, labelClass)
+                if indexRow != -1:
+                    self.labelViewGraphGroupTable.removeRow(indexRow)
+                    removedLabelItem = self.labelViewGraphGroupDict.pop(labelClass)
+                    self.labelViewGraphGroupDict[0]["coordinates"].update(removedLabelItem["coordinates"])
+                    emitDict = {"mode": GRAPH_GROUP_REMOVE,
+                                "index": labelClass,
+                                "label": True,
+                                "removedLabelItem": removedLabelItem}
+                    self.graphGroupToGraph.emit(emitDict)
             
             elif mode == MERGE_LABEL:
                 # when labels are merged in label class list
@@ -676,18 +697,19 @@ class graphGroupForm(QtWidgets.QWidget):
                 targetLabelClass = receivedDict["afterLabelNumber"]
                 
                 # update label graph table
-                indexRow = self.labelViewGraphGroupTable.indexAt(self.labelViewGraphGroupDict[sourceLabelClass]["objects"]["hideBtn"].parent().pos()).row()
-                self.labelViewGraphGroupTable.removeRow(indexRow)
-                # update label view graph group dict
-                removedLabelItem = self.labelViewGraphGroupDict.pop(sourceLabelClass)
-                self.labelViewGraphGroupDict[targetLabelClass]["coordinates"].update(removedLabelItem["coordinates"])
+                indexRow = self.findTableRow(self.labelViewGraphGroupTable, sourceLabelClass)
+                if indexRow != -1:
+                    self.labelViewGraphGroupTable.removeRow(indexRow)
+                    # update label view graph group dict
+                    removedLabelItem = self.labelViewGraphGroupDict.pop(sourceLabelClass)
+                    self.labelViewGraphGroupDict[targetLabelClass]["coordinates"].update(removedLabelItem["coordinates"])
                 
-                # send signal to graph
-                emitDict = {}
-                emitDict["mode"] = MERGE_LABEL
-                emitDict["labelClass"] = targetLabelClass
-                emitDict["color"] = self.labelViewGraphGroupDict[targetLabelClass]["color"]
-                self.graphGroupToGraph.emit(emitDict)
+                    # send signal to graph
+                    emitDict = {}
+                    emitDict["mode"] = MERGE_LABEL
+                    emitDict["labelClass"] = targetLabelClass
+                    emitDict["color"] = self.labelViewGraphGroupDict[targetLabelClass]["color"]
+                    self.graphGroupToGraph.emit(emitDict)
 
         # DISPLAY
         elif from_ == "display":

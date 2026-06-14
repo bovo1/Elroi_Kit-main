@@ -19,8 +19,6 @@ from utils.custom_ui import custom_qtablewidget, custom_qheaderview, messageBox
 ## generate random color
 gen_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
 
-from labeling.stylesheet.stylesheet_label_main import stylesheet
-
 class Labellist_Form(QtWidgets.QWidget):
     """Label과 관련된 모든 기능을 처리하기 위한 클래스이다.
     """
@@ -130,7 +128,6 @@ class Labellist_Form(QtWidgets.QWidget):
         Form.setObjectName("label_Form")
         Form.setWindowTitle("label list Form")
         # Form.resize(1030, 717)
-        Form.setStyleSheet(stylesheet)
 
         self.grid_main_window = QtWidgets.QGridLayout(Form)
         self.grid_main_window.setObjectName("grid_main_window")
@@ -191,13 +188,14 @@ class Labellist_Form(QtWidgets.QWidget):
         self.label_list_setting.setIcon(icon_label_setting_icon)
         self.label_list_setting.setObjectName("label_list_setting")
         self.label_list_setting.setCheckable(True)
-        # self.lang.set("labeling", "label_main", "label_list_resorting", self.label_list_resorting)
+        self.lang.set("labeling", "label_main", "labelListSetting", self.label_list_setting)
 
         # Improvemented by MyoungHwan (2024.12.13): Label main Ui 구조 수정
-        self.label_list_table = custom_qtablewidget(obj_name="label_list_table", col=6,row=0)
+        self.label_list_table = custom_qtablewidget(obj_name="labelTable", col=6,row=0)
+        self.lang.set("labeling", "label_main", "labelTable", self.label_list_table)
         self.label_list_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.label_list_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        self.label_list_table_headerlabels = ["", "Show", "Class", "Color", "Name",""]
+        self.label_list_table_headerlabels = self.lang.get("labeling", "label_main", "labelTable")[1]
         self.label_list_table.setting_headerlabels(labels=self.label_list_table_headerlabels)
 
         custom_header = custom_qheaderview(obj_name="label_list_table_custom_headerview")
@@ -290,10 +288,12 @@ class Labellist_Form(QtWidgets.QWidget):
         """
             Description: function to load saved label file(.npy)
             Author: Hyunsu Kim
+            History:
+                1. Modified by Hyunsu Kim (2026.04.24): change label load button name to "loadLabel" for translation in language file
         """
         image_number = self.image_number
         path = self.image_info['image_label_path'] if 'image_label_path' in self.image_info else self.image_info['label_path']
-        fname = QFileDialog.getOpenFileName(self, 'Load_sal Label File', path, filter='*.npy')
+        fname = QFileDialog.getOpenFileName(parent=self, caption=self.lang.get("labeling", "label_main", "loadLabelTitle"), directory=path, filter='*.npy')
 
         if len(fname[0]) > 0:
             tmp_dict = {}
@@ -821,7 +821,7 @@ class Labellist_Form(QtWidgets.QWidget):
         """
         color = None
         if selected_color == None:
-            col = QColorDialog.getColor()
+            col = QColorDialog.getColor(title = self.lang.get("labeling", "label_main", "labelColorSelectTitle"))
             if col.isValid():
                 r, g, b, _ = col.getRgb()
                 color = [r,g,b]
@@ -984,7 +984,7 @@ class Labellist_Form(QtWidgets.QWidget):
         self.clear_data_list()
         self.label_list_table.clear()
         self.label_list_table.setRowCount(0)
-        self.label_list_table.setting_headerlabels(labels=self.label_list_table_headerlabels)
+        self.label_list_table.setting_headerlabels(labels=self.lang.get("labeling", "label_main", "labelTable")[1])
 
         self.label_show_status = set()
  

@@ -13,7 +13,6 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QHBoxLayout, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget, QStackedWidget
 from pyqtgraph import PlotWidget
 from constants.constants import *
-from labeling.stylesheet.stylesheet_graph_main import stylesheet
 from labeling.module.graph_adv_option import setSavitzkyGolay, setGaussian
 from utils.custom_item import customScatterItem
 from labeling.module.advanced_analysis import visualizerLDA
@@ -21,8 +20,10 @@ from utils.custom_ui import messageBox
 
 if __name__ == "__main__" :
     from graph_sub import graph_sub_Form
+    from .graph_option import graphOptionForm
 else:
     from .graph_sub import graph_sub_Form
+    from .graph_option import graphOptionForm
 
 class Graph_Form(QtWidgets.QWidget):
     """Graph와 관련된 모든 기능을 처리하기 위한 클래스
@@ -41,7 +42,7 @@ class Graph_Form(QtWidgets.QWidget):
 
 
     @pyqtSlot(dict)
-    def recv_from_display(self, output):
+    def recv_from_core(self, output):
         """그래프 리스트 업데이트를 위해 signal을 통해 실시간으로 정보를 업데이트하기 위한 함수이다.
             그래프를 표시하기 위해 HSI 데이터와 좌표를 받는다.
                 Parameters
@@ -55,23 +56,51 @@ class Graph_Form(QtWidgets.QWidget):
                     - output['shape']: 이미지의 shape
                     - output['point_data']: 좌표에 대한 hsi 데이터
                     - output['graph_number']: 그래프 저장할 번호
+                History
+                    1. Hyunsu Kim (2026.04.27): Add graph RGB Lines show/hide and position update function in response to signal from display_sub_rgb_change.py
+                    2. Hyunsu Kim (2026.05.06): Change the rgbLinesWidget key from color name string to SUBRGB constants for better consistency and management. Update corresponding code to reflect this change.
                     
         """
         from_ = output['from']
         if from_ == 'image':
-            self.clear_graph_list()
-            # when currentgraphmode is LDA, clear_graph_list function only clear the graph points that user added in LDA graph widget.
-            # create a clearLDAGraph function to reset the entire LDA graph when the image is changed or released.
-            self.clearLDAGraph()
-            self.select_image_number = output['image_number']
-            self.select_image_name = output['data_name']
-            self.save_path = output['save_path']
-            self.hsi_metadata = output['hsi_metadata']
-            if 'wavelength' in self.hsi_metadata:
-                self.hsi_metadata['wavelength'] = list(map(float, self.hsi_metadata['wavelength']))
-                self.graph_plot_widget.setXRange(self.hsi_metadata['wavelength'][0], self.hsi_metadata['wavelength'][-1], padding=0.05)
+            if output['mode'] == 'unchecked':
+                for obj_name in list(self.graph_obj_dict.keys()):
+                    if obj_name not in ["graph_color"]:
+                        self.graph_obj_dict[obj_name]['obj'].setChecked(False)
+                self.clear_graph_list()
+                self.clearLDAGraph()
             else:
-                self.hsi_metadata['wavelength'] = list(range(224))
+                self.clear_graph_list()
+                # when currentgraphmode is LDA, clear_graph_list function only clear the graph points that user added in LDA graph widget.
+                # create a clearLDAGraph function to reset the entire LDA graph when the image is changed or released.
+                self.clearLDAGraph()
+                self.select_image_number = output['image_number']
+                self.select_image_name = output['data_name']
+                self.save_path = output['save_path']
+                self.hsi_metadata = output['hsi_metadata']
+                if 'wavelength' in self.hsi_metadata:
+                    self.hsi_metadata['wavelength'] = list(map(float, self.hsi_metadata['wavelength']))
+                    # Store minWavelength/maxWavelength values for making RGB line bounds and setting x-axis range of graph plot widget
+                    minWavelength = self.hsi_metadata['wavelength'][0]
+                    maxWavelength = self.hsi_metadata['wavelength'][-1]
+                    self.graph_plot_widget.setXRange(minWavelength, maxWavelength, padding=0.05)
+
+                    # Set bounds for RGB lines on the x-axis
+                    for idx, color in enumerate(RGB):
+                        self.rgbLinesWidget[color].setBounds((minWavelength - 0.05, maxWavelength + 0.05))
+                        if 'default band' in self.hsi_metadata:
+                            self.rgbLinesWidget[color].setValue(self.hsi_metadata['wavelength'][int(self.hsi_metadata['default band'][idx])])
+
+                    # Connect move events for RGB lines
+                    self.rgbLinesWidget[SUBRGB_RED].sigDragged.connect(lambda:self.rgbLineMove(self.rgbLinesWidget[SUBRGB_RED], "red"))
+                    self.rgbLinesWidget[SUBRGB_GREEN].sigDragged.connect(lambda:self.rgbLineMove(self.rgbLinesWidget[SUBRGB_GREEN], "green"))
+                    self.rgbLinesWidget[SUBRGB_BLUE].sigDragged.connect(lambda:self.rgbLineMove(self.rgbLinesWidget[SUBRGB_BLUE], "blue"))
+                    
+                else:
+                    self.hsi_metadata['wavelength'] = list(range(224))
+                    for color in RGB:
+                        self.rgbLinesWidget[color].setBounds((0, 223))
+
         elif from_ == 'display':
             mode = output['mode']
             if mode == GRAPH_DISPLAY_PREVIEW:
@@ -93,7 +122,7 @@ class Graph_Form(QtWidgets.QWidget):
                                 modelOutTmpHsiSpectral = self.visualizerLDA.transformSpectralData(tmp_hsi_spectral)
                                 self.scatterGraphPreview.setData(x=[modelOutTmpHsiSpectral[0,0]], y=[modelOutTmpHsiSpectral[0,1]])
 
-        if from_ == "graphGroup":
+        elif from_ == "graphGroup":
             # Draw
             if output["mode"] == GRAPH_GROUP_DRAW_GRAPH:
                 point = output["point"]
@@ -160,6 +189,49 @@ class Graph_Form(QtWidgets.QWidget):
                 if self.graph_control_dict['graph_view_mode'] == GRAPH_VIEW_MODE_LABEL_COLOR:
                     self.changeGraphGroupColor(color, output["labelClass"], True)
 
+        elif from_ == "display_sub_rgb_change":
+            """
+                Description : Disable graphRgb and remove RGB lines in view-1 and view-2 modes and update RGB line position when RGB line is visible.
+                Author: Hyunsu Kim (2026.04.23)
+            """
+            # Enable the RGB icon only in RGB view mode
+            if "currentViewMode" in output and self.select_image_number != IMAGE_UNSELECTED:
+                if output['currentViewMode'] == VISUALIZATION_MODE_RGB:
+                    self.graphRgb.setEnabled(True)
+                else:
+                    if self.graphRgb.isChecked():
+                        self.graphRgb.setChecked(False)
+                    self.graphRgb.setEnabled(False)
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_RED])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_GREEN])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_BLUE])
+                pass
+            else:
+                # Update RGB line value to match the slider/combobox value
+                band = output["band"]
+                color = output["color"]
+                self.rgbLinesWidget[color].setValue(self.hsi_metadata['wavelength'][band])
+
+    @pyqtSlot(dict)
+    def recieveFromGraphOptionMenu(self, output):
+        """
+            @description : receive signals from graph option menu and perform corresponding actions on graph based on the received signal
+            @author : GaEun Hwang (2026.04.10)
+        """
+        if "DefaultView" in output:
+            if self.graphStackWidget.currentWidget() == self.graph_plot_widget:
+                self.graph_plot_widget.setYRange(*self.graphYRange, padding=0.05)
+            elif self.graphStackWidget.currentWidget() == self.ldaGraphPlotWidget:
+                self.ldaGraphPlotWidget.plotItem.getViewBox().autoRange()
+        
+        elif "Grid" in output:
+            if "axis" in output["Grid"] and "state" in output["Grid"]:
+                axis = output["Grid"]["axis"]
+                state = output["Grid"]["state"]
+                self.graphStackWidget.currentWidget().getPlotItem().showGrid(x=state if axis=="x" else None, y=state if axis=="y" else None)
+            elif "opacity" in output["Grid"]:
+                opacity = output["Grid"]["opacity"]
+                self.graphStackWidget.currentWidget().getPlotItem().showGrid(alpha=opacity/100)
 
     def init(self, Sync=None, lang=None):
         """graph 리스트 초기 선언 시 변수 선언문이다. 각종 변수들이 이곳에서 선언된다.
@@ -170,10 +242,13 @@ class Graph_Form(QtWidgets.QWidget):
         self.lang = lang
         self.Sync = Sync
         self.core_to_graph_signal = self.Sync.core_to_graph_signal
-        self.core_to_graph_signal.connect(self.recv_from_display)
+        self.core_to_graph_signal.connect(self.recv_from_core)
         self.graph_to_core_signal = self.Sync.graph_to_core_signal
+        self.graphOptionToGraphSignal = self.Sync.graphOptionToGraphSignal
+        self.graphOptionToGraphSignal.connect(self.recieveFromGraphOptionMenu)
         self.graph_to_display_signal = self.Sync.graph_to_display_signal
         self.graphToGraphGroupSignal = self.Sync.graphToGraphGroupSignal
+        self.graphToDisplaySubRgbChangeSignal = self.Sync.graphToDisplaySubRgbChangeSignal
         self.graph_control_dict = self.Sync.graph_control_dict
         self.display_control_dict = self.Sync.display_control_dict
         self.sub_widget_dict = self.Sync.sub_widget_dict
@@ -181,17 +256,22 @@ class Graph_Form(QtWidgets.QWidget):
         self.select_image_number = IMAGE_UNSELECTED
         self.select_image_name = ""
         self.save_path =""
+        self.graphNoneMode = self.lang.get("labeling", "graph_main", "graphNoneMode")
 
         """
             Description: Setting graph preview always top and remove transparency
             Modified by MyoungHwan (2024.09.06)
+            History:
+                1. Modified by Hyunsu Kim (2026.04.24): change graph preview name to "graphPreview" and "scatterPreview" for translation in language file
         """
         #legend option
-        self.line_graph_preview = pg.PlotCurveItem(name="Preview")
+        self.line_graph_preview = pg.PlotCurveItem(name=self.lang.get("labeling", "graph_main", "graphPreview"))
+        self.lang.set("labeling", "graph_main", "graphPreview", self.line_graph_preview)
         self.line_graph_preview_pen_color = pg.mkPen(QtGui.QColor(255,255,0),width=1.5)
         self.line_graph_preview.setPen(self.line_graph_preview_pen_color)
         self.line_graph_preview.setZValue(1)
-        self.scatterGraphPreview = customScatterItem(name="Preview")
+        self.scatterGraphPreview = customScatterItem(name=self.lang.get("labeling", "graph_main", "scatterPreview"))
+        self.lang.set("labeling", "graph_main", "scatterPreview", self.scatterGraphPreview)
         self.scatterGraphPreview.setSize(10)
         self.scatterGraphPreview.setPen(pg.mkPen(QtGui.QColor(0,0,0)))
         self.scatterGraphPreview.setBrush(pg.mkBrush(QtGui.QColor(255,255,0)))
@@ -211,11 +291,28 @@ class Graph_Form(QtWidgets.QWidget):
         self.label_obj_dict = self.Sync.label_obj_dict
         
         # graph info
-        self.currentFilterMode = GRAPH_FILTER_NONE
+        self.graphYRange = (0, 5000)
+        self.currentFilterMode = self.graphNoneMode
         self.originGraphData = {}
 
         # visualizer for data to lda data
         self.visualizerLDA = visualizerLDA()
+
+        """
+             Description: Initialize RGB line widgets and pens for normal and selected states.
+             Modified by Hyunsu Kim (2026.04.23)
+        """
+        self.rgbLinesWidget = {}
+        self.rgbLinePens = {
+            "red": pg.mkPen('r', width=RGB_LINE_DEFAULT_WIDTH),
+            "green": pg.mkPen('g', width=RGB_LINE_DEFAULT_WIDTH),
+            "blue": pg.mkPen('b', width=RGB_LINE_DEFAULT_WIDTH),
+        }
+        self.rgbLineSelectedPens = {
+            "red": pg.mkPen('r', width=RGB_LINE_SELECTED_WIDTH),
+            "green": pg.mkPen('g', width=RGB_LINE_SELECTED_WIDTH),
+            "blue": pg.mkPen('b', width=RGB_LINE_SELECTED_WIDTH),
+        }
 
     def init_Ui_label_graph_display(self, Form):
         """
@@ -224,10 +321,10 @@ class Graph_Form(QtWidgets.QWidget):
                 1.	Form(object): PyQt widget object
                 History:
                     2025.12.05 - remove graph hide widget, color combobox widget for better mangement by GaEun Hwang
+                    2026.04.23 - Add RGB line widget initialization for graph display by Hyunsu Kim
         """
         Form.setObjectName("graph_form")
         Form.setWindowTitle("graph_form")
-        Form.setStyleSheet(stylesheet)
 
         self.graph_main_vertical = QVBoxLayout(Form)
         self.graph_main_vertical.setObjectName("graph_main_vertical")
@@ -264,14 +361,16 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_clear.setObjectName("graph_clear")
         self.lang.set("labeling", "graph_main", "graph_clear", self.graph_clear)
 
-        self.graph_save = QtWidgets.QPushButton()
-        graph_save_icon = QtGui.QIcon()
-        graph_save_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_save_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        graph_save_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_save_disabled.png"), QtGui.QIcon.Disabled)
-        self.graph_save.setIcon(graph_save_icon)
-        self.graph_save.setObjectName("graph_save")
-        self.lang.set("labeling", "graph_main", "graph_save", self.graph_save)
-
+        self.graphRgb = QtWidgets.QPushButton()
+        graphRgbIcon = QtGui.QIcon()
+        graphRgbIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_rgb_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        graphRgbIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_rgb_yellow.png"), QtGui.QIcon.Active, QtGui.QIcon.On)
+        graphRgbIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_rgb_disabled.png"), QtGui.QIcon.Disabled)
+        self.graphRgb.setIcon(graphRgbIcon)
+        self.graphRgb.setObjectName("graphRgb")
+        self.graphRgb.setCheckable(True)
+        self.lang.set("labeling", "graph_main", "graphRgb", self.graphRgb)
+        
         self.graph_setting = QtWidgets.QPushButton()
         graph_setting_icon = QtGui.QIcon()
         graph_setting_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_setting_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
@@ -282,24 +381,17 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_setting.setCheckable(True)
         self.lang.set("labeling", "graph_main", "graph_setting", self.graph_setting)
 
-        self.graph_setting_temp = QtWidgets.QPushButton()
-        graph_setting_icon = QtGui.QIcon()
-        graph_setting_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_setting_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        graph_setting_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_setting_yellow.png"), QtGui.QIcon.Active, QtGui.QIcon.On)
-        graph_setting_icon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_setting_disabled.png"), QtGui.QIcon.Disabled)
-        self.graph_setting_temp.setIcon(graph_setting_icon)
-        self.graph_setting_temp.setObjectName("graph_setting_temp")
-        self.graph_setting_temp.setCheckable(True)
-
         self.graph_plot_widget = PlotWidget()
         self.graph_plot_widget.setObjectName("graph_plot_widget")
         self.graph_plot_widget.setBackground(QtGui.QColor(83, 83, 83))        
         self.graph_plot_widget.addLegend()
+        self.graph_plot_widget.getPlotItem().setMenuEnabled(False)
 
         self.ldaGraphPlotWidget = PlotWidget()
         self.ldaGraphPlotWidget.setObjectName("ldaGraphPlotWidget")
         self.ldaGraphPlotWidget.setBackground(QtGui.QColor(83, 83, 83))
         self.ldaGraphPlotWidget.addLegend()
+        self.ldaGraphPlotWidget.getPlotItem().setMenuEnabled(False)
 
         # create stacked widget for stack plotwidget
         """
@@ -318,10 +410,6 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_legend_vertical.setObjectName("graph_legend_vertical")
 
         self.graph_legend_list = QListWidget()
-        self.graph_legend_list.setStyleSheet("""
-            font: 15px;
-            color : white;
-        """)
         self.graph_legend_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         self.graph_legend_buttons_horizon = QHBoxLayout()
@@ -367,11 +455,20 @@ class Graph_Form(QtWidgets.QWidget):
 
         self.graphComboboxSelectAdvOption = QtWidgets.QComboBox()
         self.graphComboboxSelectAdvOption.setObjectName("graphComboboxSelectAdvOption")
-        self.graphComboboxSelectAdvOption.addItem(GRAPH_FILTER_NONE)
+        self.graphComboboxSelectAdvOption.addItem(self.graphNoneMode)
         self.graphComboboxSelectAdvOption.addItem(GRAPH_FILTER_SAVITZKY_GOLAY)
         self.graphComboboxSelectAdvOption.addItem(GRAPH_FILTER_GAUSSIAN)
         self.graphComboboxSelectAdvOption.addItem(GRAPH_FILTER_LDA)
         self.graphComboboxSelectAdvOption.setCurrentIndex(0)
+        self.lang.set("labeling", "graph_main", "graphNoneMode", self.graphComboboxSelectAdvOption.model().item(0))
+
+        self.graphMenu = graphOptionForm(Sync=self.Sync, lang=self.lang, parent=self)
+
+        self.rgbLinesWidget[SUBRGB_RED] = pg.InfiniteLine(angle=90, pen=self.rgbLinePens["red"], hoverPen=self.rgbLineSelectedPens["red"], movable=True)
+        self.rgbLinesWidget[SUBRGB_GREEN] = pg.InfiniteLine(angle=90, pen=self.rgbLinePens["green"], hoverPen=self.rgbLineSelectedPens["green"], movable=True)
+        self.rgbLinesWidget[SUBRGB_BLUE] = pg.InfiniteLine(angle=90, pen=self.rgbLinePens["blue"], hoverPen=self.rgbLineSelectedPens["blue"], movable=True)
+        for line in self.rgbLinesWidget.values():
+            line.setZValue(10)
 
         QtCore.QMetaObject.connectSlotsByName(Form)
 
@@ -391,10 +488,9 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_main_setting_list_top_horizon.addWidget(self.graph_check)
         self.graph_main_setting_list_top_horizon.addWidget(self.graph_eraser)
         self.graph_main_setting_list_top_horizon.addWidget(self.graph_clear)
+        self.graph_main_setting_list_top_horizon.addWidget(self.graphRgb)
         self.graph_main_setting_list_top_horizon.addStretch(1)
-        self.graph_main_setting_list_top_horizon.addWidget(self.graph_save)
-        # self.graph_main_setting_list_top_horizon.addWidget(self.graph_setting)
-        self.graph_main_setting_list_top_horizon.addWidget(self.graph_setting_temp)
+        self.graph_main_setting_list_top_horizon.addWidget(self.graph_setting)
 
         self.graph_main_setting_list_sub_horizon.addStretch(1)
         self.graph_main_setting_list_sub_horizon.addWidget(self.ldaGraphRefitBtn)
@@ -426,7 +522,7 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_plot_widget.setLabel('left', '', **self.styles)
         self.graph_plot_widget.setLabel('bottom', '', **self.styles)
         self.graph_plot_widget.setXRange(0, 224, padding=0.05)
-        self.graph_plot_widget.setYRange(0, 5000, padding=0.05)
+        self.graph_plot_widget.setYRange(*self.graphYRange, padding=0.05)
         self.lang.set("labeling", "graph_main", "graph_plot_widget", self.graph_plot_widget)
 
         # self.ldaGraphPlotWidget setting
@@ -441,6 +537,9 @@ class Graph_Form(QtWidgets.QWidget):
         self.graph_obj_dict['graph_eraser']={
             'obj':self.graph_eraser
         }
+        self.graph_obj_dict['graphRgb']={
+            'obj':self.graphRgb
+        }
         self.graph_obj_dict['graph_clear']={
             'obj':self.graph_clear
         }
@@ -448,7 +547,7 @@ class Graph_Form(QtWidgets.QWidget):
             'obj':self.graph_linedrawing
         }
         self.graph_obj_dict['graph_sub'] = {
-            'obj' : self.graph_setting_temp,
+            'obj' : self.graph_setting,
             'opened' : False,
             'sub_form' : self.graph_sub_form
         }
@@ -459,11 +558,10 @@ class Graph_Form(QtWidgets.QWidget):
         """
         self.graph_check.clicked.connect(lambda ch = self.graph_check: self.graph_mode(ch=ch, mode=GRAPH_DRAW))
         self.graph_eraser.clicked.connect(lambda ch = self.graph_eraser: self.graph_mode(ch=ch, mode=GRAPH_ERASE))
+        self.graphRgb.clicked.connect(lambda ch=self.graphRgb: self.graph_mode(ch=ch, mode=GRAPH_RGB))
         self.graph_clear.clicked.connect(lambda: self.graph_mode(mode=GRAPH_CLEAR))
-        self.graph_setting.clicked.connect(lambda ch = self.graph_setting: self.graph_mode(ch=ch, mode=GRAPH_SETTING))
-        self.graph_setting_temp.clicked.connect(lambda ch = self.graph_setting_temp: self.graph_mode(ch=ch, mode=GRAPH_DISPLAY_SUB_FORM))
+        self.graph_setting.clicked.connect(lambda ch = self.graph_setting: self.graph_mode(ch=ch, mode=GRAPH_DISPLAY_SUB_FORM))
         self.graph_linedrawing.clicked.connect(lambda ch = self.graph_linedrawing: self.graph_mode(ch=ch, mode=GRAPH_DISPLAY_PREVIEW))
-        self.graph_save.clicked.connect(lambda: self.graph_list_save())
         self.graph_legend_list.itemClicked.connect(lambda item = self.graph_legend_list : self.select_graph_line(item=item))
         self.graph_legend_buttons_all_check.clicked.connect(lambda ch=self.graph_legend_buttons_all_check: self.select_graph_all(ch=ch))
         self.graph_legend_buttons_select_delete.clicked.connect(self.select_graph_delete)
@@ -473,6 +571,28 @@ class Graph_Form(QtWidgets.QWidget):
     def init_sub_function(self):
         self.graph_sub_form = graph_sub_Form(Sync=self.Sync, lang=self.lang, parent=self)
         self.sub_widget_dict['graph_sub_form'] = self.graph_sub_form
+
+    def rgbLineMove(self, movedLine, mode="red"):
+        """
+            Description: Event handler connected to RGB Lines widgets to control comboboxes and sliders in display_sub_rgb_change
+            Author: Hyunsu Kim (2026.04.23)
+            Parameters:
+                movedLine: the RGB line widget selected and moved by the user
+                mode: color of the moved line, to identify which line is moved among the three RGB lines
+        """
+        rgbLineValue = movedLine.value() # Get wavelength of moved line
+
+        # Find the band index closest to the selected wavelength
+        wavelength = np.array(self.hsi_metadata['wavelength'], dtype=float)
+        band = np.abs(wavelength - rgbLineValue).argmin()
+
+        tmpDict = {}
+        tmpDict['color'] = mode
+        tmpDict['band'] = int(band)
+        tmpDict['mode'] = 'graph'
+        tmpDict['type'] = 'rgbLines'
+        # Send signal to display_sub_rgb_change
+        self.graphToDisplaySubRgbChangeSignal.emit(tmpDict)
 
     def checkLdaAvailability(self, labelMatrix):
         """
@@ -574,7 +694,7 @@ class Graph_Form(QtWidgets.QWidget):
         """
         # only proceed if the current filter mode is different value
         if self.currentFilterMode != value:
-            if self.currentFilterMode == GRAPH_FILTER_NONE and value != GRAPH_FILTER_NONE:
+            if self.currentFilterMode == self.graphNoneMode and value != self.graphNoneMode:
                 self.line_graph_preview.setData()
 
             # when currentfiltermode is changed LDA to another filtermode, initialize graph and make ldarefitbtn to invisible
@@ -583,7 +703,7 @@ class Graph_Form(QtWidgets.QWidget):
                 self.ldaGraphPlotWidget.clear()
                 self.graphStackWidget.setCurrentWidget(self.graph_plot_widget)
 
-            if value == GRAPH_FILTER_NONE:
+            if value == self.graphNoneMode:
                 # to restore filtered preview graph to original graph
                 for graphGroup in self.graphGroupDict.values():
                     for graphInfo in graphGroup["coordinates"].values():
@@ -802,9 +922,16 @@ class Graph_Form(QtWidgets.QWidget):
             History:
                 2025.09.04 - clear self.originGraphData and if current graph widget is LDA widget, clear added graph point item by user
                 2025.12.05 - modify logic to remove scatter item when current graph widget is LDA graph widget by GaEun Hwang
+                2026.04.23 - modify to consider RGB line widget when clear graph list by Hyunsu Kim
         """
         self.graph_plot_widget.clear()
         self.line_graph_preview.clear()
+
+        if self.graphRgb.isChecked():
+            self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_RED])
+            self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_GREEN])
+            self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_BLUE])
+
         # if currentgraphmode is LDA, don't clear original LDA graph
         # only remove graphs in graph_point_dict
         # Reason: users may want to reset their clicked points while keeping the background LDA scatter visible.
@@ -841,57 +968,8 @@ class Graph_Form(QtWidgets.QWidget):
         """
         self.ldaGraphPlotWidget.clear()
         self.graphStackWidget.setCurrentWidget(self.graph_plot_widget)
-        self.graphComboboxSelectAdvOption.setCurrentText(GRAPH_FILTER_NONE)
+        self.graphComboboxSelectAdvOption.setCurrentText(self.graphNoneMode)
         self.ldaGraphRefitBtn.setVisible(False)
-
-    def graph_list_save(self):
-        """그래프를 저장하기 위한 함수이다. "export_graph.png"로 저장이 된다.
-        """
-        tmp_filedialog = QtWidgets.QFileDialog()
-        tmp_filedialog.setOptions(QtWidgets.QFileDialog.ShowDirsOnly)
-        try:
-            fname = tmp_filedialog.getExistingDirectory(self, "Save Graph files", "")
-            """
-                description: export current graph scene with considering current graph widget
-                modified by GaEun Hwang (2025.09.30)
-            """
-            if self.graphStackWidget.currentWidget() == self.graph_plot_widget:
-                plotGraph = self.graph_plot_widget
-            elif self.graphStackWidget.currentWidget() == self.ldaGraphPlotWidget:
-                plotGraph = self.ldaGraphPlotWidget
-            tmp_export = pg.exporters.ImageExporter(plotGraph.scene())
-            tmp_export.parameters()['width'] = 640
-            tmp_export.parameters()['height'] = 1024
-            fname += "/graph_result"
-            os.makedirs(fname , exist_ok=True)
-            full_path = fname +  "/" + f"{self.select_image_name}_all_export_graph.png"
-            tmp_export.export(full_path)
-
-            # tmp_display_graph_point = self.Core_DB_Labeling['graph_info'][self.select_image_number]['rgb']
-            # self.graph_plot_dict = {}
-
-            # for label_number in self.label_obj_dict.keys():
-            #     self.graph_plot_dict[label_number] = graph_plot(metadata=self.hsi_metadata)
-            #     self.graph_plot_dict[label_number].setObjectName(f"graph_plot_widget_label_{label_number}")
-
-            # tmp_display_graph_point_indice = np.where((tmp_display_graph_point[:,:,0]!=-1) & (tmp_display_graph_point[:,:,1]!=-1) & (tmp_display_graph_point[:,:,2]!=-1))
-            # for indice in zip(*tmp_display_graph_point_indice):
-            #     label_number = self.Core_DB_Labeling['image_list'][self.select_image_number]['image_info']['image_label'][indice]
-            #     label_color = self.label_obj_dict[label_number]['color']
-            #     tmp_hsi_spectral = self.Core_DB_Labeling['image_list'][self.select_image_number]['image_info']['image_raw'][indice]
-            #     tmp_line = pg.PlotCurveItem()
-            #     tmp_line.setPen(pg.mkPen(QtGui.QColor(label_color[0],label_color[1],label_color[2]),width=1.5))
-            #     tmp_line.setData(self.hsi_metadata['wavelength'], tmp_hsi_spectral)
-            #     self.graph_plot_dict[label_number].addItem(tmp_line)
-
-            # for label_number in self.label_obj_dict.keys():
-            #     tmp_export = pg.exporters.ImageExporter(self.graph_plot_dict[label_number].scene())
-            #     tmp_export.parameters()['width'] = 640
-            #     tmp_export.parameters()['height'] = 1024
-            #     full_path = fname +  "/" + f"{self.select_image_name}_labe_{label_number}_export_graph.png"
-            #     tmp_export.export(full_path)
-        except Exception as e:
-            print("error",e)
     
     def drawGraph(self, point, spectralData, color, selectiveGraphIdx, labelClass):
         """
@@ -1099,6 +1177,7 @@ class Graph_Form(QtWidgets.QWidget):
                     - GRAPH_CLEAR(7) : graph clear mode, click to clear graph on plot widget
             History:
                 2025.12.05 - modify code for graph group and readability by GaEun Hwang
+                2026.04.23 - Add code for RGB line display mode by Hyunsu Kim
         """
         if self.graph_control_dict['graph_control_sw']:
             # print(f"graph mode {ch}, {mode}")
@@ -1129,6 +1208,27 @@ class Graph_Form(QtWidgets.QWidget):
                 self.graphToGraphGroupSignal.emit(emitDict)
                 self.update_graph_preview()
 
+            elif mode == GRAPH_RGB:
+                # Add RGB line widgets when activated else remove
+                if ch:
+                    type_detail = "showRgbLines"
+                    self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_RED])
+                    self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_GREEN])
+                    self.graph_plot_widget.addItem(self.rgbLinesWidget[SUBRGB_BLUE])
+                    tmp_dict = {}
+                    tmp_dict['mode'] = 'graph'
+                    tmp_dict['type'] = "showRgbLines"
+                    self.graphToDisplaySubRgbChangeSignal.emit(tmp_dict)
+                else:
+                    type_detail = "hideRgbLines"
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_RED])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_GREEN])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_BLUE])
+                    tmp_dict = {}
+                    tmp_dict['mode'] = 'graph'
+                    tmp_dict['type'] = "hideRgbLines"
+                    self.graphToDisplaySubRgbChangeSignal.emit(tmp_dict)
+
             elif mode == GRAPH_CLEAR:
                 #all clear mode
                 type_detail = "clear"
@@ -1142,17 +1242,6 @@ class Graph_Form(QtWidgets.QWidget):
                 else: # show mode
                     type_detail = "hide_preview_linedrawing"
                 self.update_graph_preview()
-
-            elif mode == GRAPH_SETTING:
-                #setting
-                type_detail = "setting"
-                if ch:
-                    # self.graph_main_horizon.addWidget(self.graph_legend_list)
-                    self.graph_main_horizon.addWidget(self.graph_legend_main)
-
-                else:
-                    # self.graph_legend_list.setParent(None)
-                    self.graph_legend_main.setParent(None)
 
             elif mode == GRAPH_DISPLAY_SUB_FORM:
                 type_detail = "graph_sub_form"
@@ -1178,6 +1267,8 @@ class Graph_Form(QtWidgets.QWidget):
                     self.update_old_line()
             except:
                 pass
+        elif e.button() == QtCore.Qt.MouseButton.RightButton:
+            self.graphMenu.exec_(e.globalPos())
 
 
     def graph_to_core(self, input):

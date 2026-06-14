@@ -9,7 +9,6 @@ from multiprocessing import Queue
 from training.module import training_main
 from .video_window import Video_Form
 
-from training.stylesheet.stylesheet_run_main import stylesheet
 from constants.constants import MESSAGE_BOX_WARNING, MESSAGE_BOX_CONFIRMATION
 from utils.custom_ui import messageBox
 
@@ -125,7 +124,7 @@ class Run_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("Run_Form")
         Form.setWindowTitle("Run_Form")
-        Form.setStyleSheet(stylesheet)
+
         self.FormLayout = QtWidgets.QVBoxLayout(Form)
         self.FormLayout.setObjectName("FormLayout")
 
@@ -234,28 +233,14 @@ class Run_Form(QtWidgets.QWidget):
         self.hyperparameter_signal.emit({"disabled": False}) # enable hyperparameter tab
 
         self.StartButton.setDisabled(False)
-        self.StartButton.setStyleSheet("""
-            QPushButton{
-                background-color: rgb(83, 83, 83);
-            }
-            QPushButton:hover{
-                background-color: rgb(16, 97, 150);
-            }
-            QPushButton:pressed{
-                background-color: rgb(16, 97, 150);
-            }
-        """)
         self.RunTypeComboBox.setDisabled(False)
-        self.RunTypeComboBox.setStyleSheet("background-color: rgb(83, 83, 83)")
 
     def disable_ui(self):
         self.dataset_signal.emit({"disabled": True}) # disable dataset tab
         self.hyperparameter_signal.emit({"disabled": True}) # disable hyperparameter tab
 
         self.StartButton.setDisabled(True)
-        self.StartButton.setStyleSheet("background-color: grey")
         self.RunTypeComboBox.setDisabled(True)
-        self.RunTypeComboBox.setStyleSheet("background-color: grey")
 
     def start(self):
         if self.path_validator():

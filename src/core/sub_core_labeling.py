@@ -15,7 +15,7 @@ import spectral
 import time
 
 from .db_labeling import DB_Control_Labeling
-from constants.constants import MESSAGE_BOX_WARNING, PEN_MODE_IMAGE, AGGREGATION_DATA, MESSAGE_BOX_INFORMATION
+from constants.constants import MESSAGE_BOX_WARNING, PEN_MODE_IMAGE, AGGREGATION_DATA, MESSAGE_BOX_INFORMATION, PEN_MODE_ROT90, PEN_MODE_ADVANCED_LABELING
 from utils.custom_ui import messageBox
 
 from utils.shared import temp_path
@@ -133,6 +133,9 @@ class Sub_Core_Labeling(QObject):
         self.display_sub_rgb_change_to_graph_sub_signal = self.Sub_Core_Sync_Labeling.display_sub_rgb_change_to_graph_sub_signal
         self.display_sub_rgb_change_to_graph_sub_signal.connect(self.send_display_sub_rgb_change_to_graph_sub)
 
+        self.displaySubRgbChangeToGraphSignal = self.Sub_Core_Sync_Labeling.displaySubRgbChangeToGraphSignal
+        self.displaySubRgbChangeToGraphSignal.connect(self.sendDisplaySubRgbChangeToGraph)
+
         self.display_to_labeling_mode_main_signal = self.Sub_Core_Sync_Labeling.display_to_labeling_mode_main_signal
         self.display_to_labeling_mode_main_signal.connect(self.send_display_to_labeling_mode_main)
 
@@ -144,12 +147,21 @@ class Sub_Core_Labeling(QObject):
 
         self.display_to_pen_style_signal = self.Sub_Core_Sync_Labeling.display_to_pen_style_signal
         self.display_to_pen_style_signal.connect(self.send_display_to_pen_style)
+
+        self.displayToDisplayMenuSignal = self.Sub_Core_Sync_Labeling.displayToDisplayMenuSignal
+        self.displayToDisplayMenuSignal.connect(self.sendDisplayToDisplayMenu)
         
+        # displayMenu
+        self.displayMenuToDisplaySignal = self.Sub_Core_Sync_Labeling.displayMenuToDisplaySignal
+        self.displayMenuToDisplaySignal.connect(self.sendDisplayMenuToDisplay)
+        self.displayMenuToPenSignal = self.Sub_Core_Sync_Labeling.displayMenuToPenSignal
+        self.displayMenuToPenSignal.connect(self.sendDisplayMenuToPen)
 
         #core
         self.core_to_label_signal = self.Sub_Core_Sync_Labeling.core_to_label_signal
         self.core_to_label_sub_signal = self.Sub_Core_Sync_Labeling.core_to_label_sub_signal
         self.core_to_display_signal = self.Sub_Core_Sync_Labeling.core_to_display_signal
+        self.coreToDisplayMenuSignal = self.Sub_Core_Sync_Labeling.coreToDisplayMenuSignal
         self.core_to_image_sub_signal = self.Sub_Core_Sync_Labeling.core_to_image_sub_signal
         self.core_to_display_sub_rgb_change_signal = self.Sub_Core_Sync_Labeling.core_to_display_sub_rgb_change_signal
         self.core_to_labeling_mode_main_signal = self.Sub_Core_Sync_Labeling.core_to_labeling_mode_main_signal
@@ -167,6 +179,8 @@ class Sub_Core_Labeling(QObject):
         self.graphGroupToCoreSignal.connect(self.recvGraphGroupToCore)
         self.graph_to_core_signal = self.Sub_Core_Sync_Labeling.graph_to_core_signal
         self.graph_to_core_signal.connect(self.recv_graph_to_core)
+        self.graphToDisplaySubRgbChangeSignal = self.Sub_Core_Sync_Labeling.graphToDisplaySubRgbChangeSignal
+        self.graphToDisplaySubRgbChangeSignal.connect(self.sendGraphToDisplaySubRgbChange)
         self.graphToGraphGroupSignal = self.Sub_Core_Sync_Labeling.graphToGraphGroupSignal
         self.graphToGraphGroupSignal.connect(self.sendGraphToGraphGroup)
         self.graphGroupToDisplaySignal = self.Sub_Core_Sync_Labeling.graphGroupToDisplaySignal
@@ -185,6 +199,12 @@ class Sub_Core_Labeling(QObject):
         self.pen_to_display_signal.connect(self.send_pen_to_display)
         self.penToSemiAutoLabelingSignal = self.Sub_Core_Sync_Labeling.penToSemiAutoLabelingSignal
         self.penToSemiAutoLabelingSignal.connect(self.sendPenToSemiAutoLabeling)
+        self.penToDisplayMenuSignal = self.Sub_Core_Sync_Labeling.penToDisplayMenuSignal
+        self.penToDisplayMenuSignal.connect(self.sendPenToDisplayMenu)
+
+        # similarity map
+        self.similarityToCoreSignal = self.Sub_Core_Sync_Labeling.similarityToCoreSignal
+        self.similarityToCoreSignal.connect(self.sendSimilarityMapToDisplay)
 
         #pen style
         self.pen_style_to_core_signal = self.Sub_Core_Sync_Labeling.pen_style_to_core_signal
@@ -206,7 +226,7 @@ class Sub_Core_Labeling(QObject):
         #pen opacity
         self.pen_opacity_to_display_signal = self.Sub_Core_Sync_Labeling.pen_opacity_to_display_signal
         self.pen_opacity_to_display_signal.connect(self.send_pen_opacity_to_display)
-        
+
     @pyqtSlot(dict)
     def recv_mainwindow_to_core(self, input):
         """mainwindow로부터 signal을 받기 위한 함수이다.
@@ -499,6 +519,15 @@ class Sub_Core_Labeling(QObject):
         input['from'] = 'display_sub_rgb_change'
         input['mode'] = output['mode']        
         self.send_core_to_graph_sub(input)
+
+    @pyqtSlot(dict)
+    def sendDisplaySubRgbChangeToGraph(self, output):
+        """
+            description: Function to send signal from "display sub rgb change" to "graph main"
+            author: Hyunsu Kim (2026.04.23)
+        """
+        output['from'] = 'display_sub_rgb_change'
+        self.send_core_to_graph(output)
         
     @pyqtSlot(dict)
     def send_display_to_labeling_mode_main(self, output):
@@ -517,6 +546,22 @@ class Sub_Core_Labeling(QObject):
     @pyqtSlot(dict)
     def send_display_to_pen_style(self, output):
         self.send_core_to_pen_style(output)
+
+    @pyqtSlot(dict)
+    def sendDisplayMenuToDisplay(self, output):
+        output['from'] = 'displayMenu'
+        self.send_core_to_display(output)
+    
+    @pyqtSlot(dict)
+    def sendDisplayMenuToPen(self, output):
+        output['from'] = 'displayMenu'
+        self.sendCoreToPen(output)
+    
+    @pyqtSlot(dict)
+    def sendDisplayToDisplayMenu(self, output):
+        output['from'] = 'display'
+        self.sendCoreToDisplayMenu(output)
+
 
     @pyqtSlot(dict)
     def sendDisplayToGraphGroup(self, output):
@@ -587,7 +632,11 @@ class Sub_Core_Labeling(QObject):
 
     @pyqtSlot(dict)
     def send_pen_to_display(self, output):
-        """pen에서 display로 signal에 대한 요청 결과를 보내기 위한 함수이다.
+        """
+            @description: Function to send signal from "pen" to "display"
+            @author: MyoungHwan (2022.01.28)
+            @history
+                1. Modified by Hyunsu Kim (2026.05.12): Added flip count information for PEN_MODE_ROT90 
         """
         print("recv pen to display core")
         input = {}
@@ -597,6 +646,12 @@ class Sub_Core_Labeling(QObject):
         if output['mode'] == PEN_MODE_IMAGE:
             image_number = self.image_control_dict['select_image_number']
             input['image_path'] = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_data_path']
+        elif output['mode'] == PEN_MODE_ROT90:
+            input['flipCount'] = output['flipCount']
+        elif output['mode'] == PEN_MODE_ADVANCED_LABELING and output['toggle'] == True:
+            input['type_detail'] = output['type_detail']
+            if input['type_detail'] == 'semiAuto':
+                input['applyClicked'] = output['applyClicked']
         self.send_core_to_display(input)
 
     @pyqtSlot(dict)
@@ -604,8 +659,18 @@ class Sub_Core_Labeling(QObject):
         self.sendCoreToSemiAutoLabeling(output)
 
     @pyqtSlot(dict)
+    def sendSimilarityMapToDisplay(self, output):
+        output['from'] = 'similarity_map'
+        self.send_core_to_display(output)
+
+    @pyqtSlot(dict)
     def sendPenSemiAutoLabelingToPen(self,output):
         self.sendCoreToPen(output)
+
+    @pyqtSlot(dict)
+    def sendPenToDisplayMenu(self, output):
+        output['from'] = 'pen'
+        self.sendCoreToDisplayMenu(output)
 
     @pyqtSlot(dict)
     def send_pen_style_to_display(self, output):
@@ -636,6 +701,14 @@ class Sub_Core_Labeling(QObject):
         """
         output['from'] = 'pen_opacity'
         self.send_core_to_display(output)  
+
+    @pyqtSlot(dict)
+    def sendGraphToDisplaySubRgbChange(self, output):
+        """
+            description: Function to send signal from "graph main" to "display sub rgb change"
+            author: Hyunsu Kim (2026.04.23)
+        """
+        self.send_core_to_display_sub_rgb_change(output)
     
     @pyqtSlot(dict)
     def sendGraphToGraphGroup(self, output):
@@ -734,6 +807,9 @@ class Sub_Core_Labeling(QObject):
         """core에서 display로 signal에 대한 요청 결과를 보내기 위한 함수이다.
         """
         self.core_to_display_signal.emit(input)
+    
+    def sendCoreToDisplayMenu(self, input):
+        self.coreToDisplayMenuSignal.emit(input)
 
     def send_core_to_pen_style(self, input):
         """core에서 pen style로 signal에 대한 요청 결과를 보내기 위한 함수이다.

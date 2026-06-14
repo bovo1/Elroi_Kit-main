@@ -8,14 +8,13 @@ import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QAbstractItemView, QFileDialog, QListView, QTreeView, QWidget
 from constants.constants import MESSAGE_BOX_WARNING
-from labeling.stylesheet.stylesheet_image_main import stylesheet
+
 if __name__ == "__main__" :
     from image_sub_detail import Image_detail_Form
 else:
     from .image_sub_detail import Image_detail_Form
 
 from utils.custom_ui import custom_qtablewidget, messageBox
-from labeling.stylesheet.stylesheet_image_main import stylesheet
 
 class Image_Form(QWidget):
     """Image와 관련된 모든 기능을 처리하기 위한 클래스
@@ -82,7 +81,6 @@ class Image_Form(QWidget):
         """
         Form.setObjectName("image_Form")
         Form.setWindowTitle("image list Form")
-        Form.setStyleSheet(stylesheet)
         
         self.image_list_main_grid = QtWidgets.QGridLayout(Form)
         self.image_list_main_grid.setObjectName("image_list_main_grid")
@@ -120,9 +118,10 @@ class Image_Form(QWidget):
         # Improvemented by MyoungHwan(2024.11.07): Image Main UI 코드 개선 (미사용 object 제거 및 수정)
         # custom qtablewidet을 이용하여 UI 생성
         self.image_list_table = custom_qtablewidget(obj_name="image_list_table", col=4,row=0)
+        self.lang.set("labeling", "image_main", "imageTable", self.image_list_table)
         self.image_list_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
         self.image_list_table.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
-        self.image_list_table_headerlabels = ["", "Num", "Name", " "]
+        self.image_list_table_headerlabels = self.lang.get("labeling", "image_main", "imageTable")[1]
         self.image_list_table.setting_headerlabels(labels=self.image_list_table_headerlabels)
         self.image_list_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch) # 2번 header 최대너비로 resize
         self.image_list_table_create_obj = self.image_list_table.create_obj
@@ -171,7 +170,7 @@ class Image_Form(QWidget):
                 3. Yugyeong Hong(2026.02.25): Refactor message box with util method and language support
         """
         fname = []
-        file_dialog = QFileDialog()
+        file_dialog = QFileDialog(caption=self.lang.get("labeling", "image_main", "imageFileAddTitle"))
         file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         file_dialog.setFileMode(QFileDialog.DirectoryOnly)
         file_dialog.findChild(QListView, 'listView').setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -484,6 +483,13 @@ class Image_Form(QWidget):
                     tmp_dict = {}
                     tmp_dict['mode'] = 'unchecked'
                     self.image_to_pen(tmp_dict)
+
+                    #graph 에 시그널 전달, 비활성
+                    tmpDict = {}
+                    tmpDict['from'] = 'image'
+                    tmpDict['mode'] = 'unchecked'
+                    tmpDict['image_number'] = cnt
+                    self.image_to_graph(tmpDict)
 
                     #graph_sub 에 시그널 전달
                     tmp_dict = {}

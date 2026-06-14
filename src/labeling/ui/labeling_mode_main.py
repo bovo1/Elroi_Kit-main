@@ -2,7 +2,6 @@ import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QHBoxLayout, QSplitter, QVBoxLayout
 from PyQt5.QtCore import Qt, pyqtSlot
-from labeling.stylesheet.stylesheet_labeling_mode_main import stylesheet
 from utils.custom_ui import ReDockOnCloseDockWidget, customTabBar
 
 from constants.constants import QT_MAX_SIZE
@@ -57,7 +56,6 @@ class Label_Main(QtWidgets.QMainWindow):
         """
         MainWindow.setObjectName("Label_MainWindow")
         MainWindow.setWindowTitle("Label Main Window")
-        MainWindow.setStyleSheet(stylesheet)
         
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -129,7 +127,8 @@ class Label_Main(QtWidgets.QMainWindow):
 
         self.graphDockingWindow = QtWidgets.QMainWindow()
         self.graphDockingWindow.setObjectName("graphDockingWindow")
-        self.graphDock = ReDockOnCloseDockWidget("Graph", self.graphDockingWindow, hideTitleBarWhenDocked=True, hideTitleBarWhenFloating=False)
+        self.graphDock = ReDockOnCloseDockWidget(self.lang.get("labeling", "labeling_mode_main", "graphTitle"), self.graphDockingWindow, hideTitleBarWhenDocked=True, hideTitleBarWhenFloating=False)
+        self.lang.set("labeling", "labeling_mode_main", "graphTitle", self.graphDock)
         self.graphDockingWindow.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.graphDock)
         self.graphDock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.graphDockingWindow.setDockOptions(QtWidgets.QMainWindow.DockOption.AnimatedDocks)

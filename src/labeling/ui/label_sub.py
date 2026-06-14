@@ -14,7 +14,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot
 from utils.advanced import Kmeans, autoCommonLabel
 from utils.worker import AutoLabel_Worker, Threading_Worker
-from labeling.stylesheet.stylesheet_label_sub import stylesheet
 
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
@@ -146,7 +145,6 @@ class label_sub_Form(QtWidgets.QDialog):
         # Ensure the settings window always stays on top for improved accessibility and user convenience.
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
         Form.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
-        Form.setStyleSheet(stylesheet)
         
         self.label_sub_main_vertical = QtWidgets.QVBoxLayout(Form)
         self.label_sub_main_vertical.setObjectName("label_sub_main_vertical")
@@ -270,7 +268,7 @@ class label_sub_Form(QtWidgets.QDialog):
         if mode == 0: # ESS Mode
             tmp_filedialog = QtWidgets.QFileDialog()
             tmp_filedialog.setOptions(QtWidgets.QFileDialog.ShowDirsOnly)
-            fname = tmp_filedialog.getExistingDirectory(self, "Save Folder", "")
+            fname = tmp_filedialog.getExistingDirectory(parent=self, caption=self.lang.get("labeling", "labelSubESSOption", "labelESSApplyTitle"), directory="")
             if fname:
                 self.tmp_fname = fname
                 self.worker_3.output_dict = {

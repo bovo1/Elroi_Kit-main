@@ -22,8 +22,6 @@ if __name__ == "__main__" :
 else:
     from .adv_gen_module import gen_module
 
-from advanced.stylesheet.stylesheet_adv_sal_mode import stylesheet
-
 class signal_(QtCore.QObject):
     string_signal = QtCore.pyqtSignal(str)
 
@@ -160,7 +158,6 @@ class advanced_sal_Form(QtWidgets.QWidget):
         MainWindow.setObjectName("adv_setting_form")
         MainWindow.resize(840, 640)
         MainWindow.setWindowTitle("Advanced Setting")
-        MainWindow.setStyleSheet(stylesheet)
 
         self.advanced_simpleautolabel_main_horizon = QtWidgets.QHBoxLayout(MainWindow)
         self.advanced_simpleautolabel_main_horizon.setObjectName("advanced_simpleautolabel_main_horizon")
@@ -485,7 +482,7 @@ class advanced_sal_Form(QtWidgets.QWidget):
             @author : MyoungHwan
         """
         if mode == 0: # select model
-            file_dialog = QtWidgets.QFileDialog()
+            file_dialog = QtWidgets.QFileDialog(caption=self.lang.get("advanced", "advanced_main", "advancedAddModelTitle"))
             fname = file_dialog.getOpenFileName(self,"파일 선택","","Files (*.el)")
             if fname[0]:
                 self.adv_model_info[mode]["value"][1] = fname[0]
@@ -499,7 +496,7 @@ class advanced_sal_Form(QtWidgets.QWidget):
             @author : MyoungHwan
         """
         if mode == 0: # Search
-            file_dialog = QtWidgets.QFileDialog()
+            file_dialog = QtWidgets.QFileDialog(caption=self.lang.get("advanced", "advanced_main", "advancedAddDataTitle"))
             file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
             file_dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
             file_dialog.findChild(QtWidgets.QListView, 'listView').setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)

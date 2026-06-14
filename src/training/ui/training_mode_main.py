@@ -5,8 +5,6 @@ from .hyperparameter_main import Hyperparameter_Form
 from .run_main import Run_Form
 from .result_main import Result_Form
 
-from training.stylesheet.stylesheet_training_mode_main import stylesheet
-
 class Train_Main(QtWidgets.QMainWindow):
     def __init__(self, Sync, lang) -> None:
         super().__init__()
@@ -22,7 +20,6 @@ class Train_Main(QtWidgets.QMainWindow):
     def init_ui(self, MainWindow):
         MainWindow.setObjectName("Train_MainWindow")
         MainWindow.setWindowTitle("Train Main Window")
-        MainWindow.setStyleSheet(stylesheet)
 
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")

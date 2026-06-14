@@ -15,7 +15,6 @@ import time
 import json
 from enum import Enum, auto
 
-from advanced.stylesheet.stylesheet_adv_label_aggregation_mode import stylesheet
 from utils.custom_ui import custom_qtablewidget, custom_qheaderview
 from utils.worker import Threading_Worker
 from constants.constants import ADV_LABEL_AGGREGATION_WINDOW_SIZE, ADV_LABEL_AGGREGATION_BUTTON_SIZE, ADV_LABEL_AGGREGATION_GROUPBOX_MINIMUM_WIDTH, ADV_LABEL_AGGREGATION_LINEEDIT_MINIMUM_WIDTH, MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_INFORMATION
@@ -103,7 +102,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
             "savePath": # Save Path
                 {
                     "tip":["label:3. Save Path"],
-                    "objList":["lineedit:path", "button:Search"],
+                    "objList":["lineedit:placeHolderText", "lineedit:path", "button:Search"],
                     "objTip": None,
                     "objSetting": None,
                     "layout": None
@@ -119,7 +118,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
             "commonReferencePath": # Reference Path
                 {
                     "tip":["label:5. Common Reference Path"],
-                    "objList":["lineedit:path", "button:Search"],
+                    "objList":["lineedit:placeHolderText", "lineedit:path", "button:Search"],
                     "objTip": None,
                     "objSetting": None,
                     "layout": None
@@ -156,7 +155,6 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
         MainWindow.setObjectName("adv_setting_form")
         MainWindow.resize(*ADV_LABEL_AGGREGATION_WINDOW_SIZE)
         MainWindow.setWindowTitle("Advanced Setting")
-        MainWindow.setStyleSheet(stylesheet)
 
         self.advanced_label_aggregation_main_horizon = QtWidgets.QHBoxLayout(MainWindow)
         self.advanced_label_aggregation_main_horizon.setObjectName("advanced_label_aggregation_main_horizon")
@@ -196,6 +194,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
         self.advanced_label_aggregation_datalist_global_horizon = QtWidgets.QHBoxLayout()
         self.advanced_label_aggregation_datalist_global_horizon.setObjectName("advanced_label_aggregation_datalist_global_horizon")
         self.advanced_label_aggregation_datalist_global_search_btn = QtWidgets.QPushButton()
+        self.advanced_label_aggregation_datalist_global_search_btn.setProperty("property", "outline")
         self.advanced_label_aggregation_datalist_global_search_btn.setObjectName("advanced_label_aggregation_datalist_global_search_btn")
         self.lang.set("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_datalist_global_search_btn", self.advanced_label_aggregation_datalist_global_search_btn)
         self.advanced_label_aggregation_datalist_global_clear_btn = QtWidgets.QPushButton()
@@ -304,8 +303,6 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
 
         self.adv_model_info["fileName"]["objSetting"]["lineedit"].setReadOnly(False)
         self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setEnabled(False)
-        # if common reference option is disabled, change lineedit text color to gray
-        self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setStyleSheet("color: gray;")
         self.adv_model_info["commonReferencePath"]["objSetting"]["button"].setEnabled(False)
 
         self.adv_model_info["savePath"]["objSetting"]["button"].clicked.connect(lambda: self.buttonEvent(eventMode.SELECT_SAVEPATH))
@@ -320,6 +317,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
 
         # 3. Save Path
         self.lang.set("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_savepath_label", self.adv_model_info["savePath"]["objTip"]["label"])
+        self.lang.set("advanced", "advanced_label_aggregation_main", "advancedLabelAggregationSavePath", self.adv_model_info["savePath"]["objSetting"]["lineedit"])
         self.lang.set("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_savepath_button", self.adv_model_info["savePath"]["objSetting"]["button"])
         
         # 4. Use Common Reference
@@ -327,6 +325,7 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
 
         # 5. Common Reference Path
         self.lang.set("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_commonReferencePath_label", self.adv_model_info["commonReferencePath"]["objTip"]["label"])
+        self.lang.set("advanced", "advanced_label_aggregation_main", "advancedLabelAggregationCommonReferencePathLine", self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"])
         self.lang.set("advanced", "advanced_label_aggregation_main", "advanced_label_aggregation_commonReferencePath_button", self.adv_model_info["commonReferencePath"]["objSetting"]["button"])
 
     def setIdleSettingUi(self):
@@ -363,12 +362,9 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
             if self.adv_model_info["useCommonReference"]["objSetting"]["toggle"].isChecked():
                 self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setEnabled(True)
                 self.adv_model_info["commonReferencePath"]["objSetting"]["button"].setEnabled(True)
-                # Change lineedit text color to white if enabled
-                self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setStyleSheet("color: white;")
             else:
                 self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setEnabled(False)
                 self.adv_model_info["commonReferencePath"]["objSetting"]["button"].setEnabled(False)
-                self.adv_model_info["commonReferencePath"]["objSetting"]["lineedit"].setStyleSheet("color: gray;")
         
         elif mode == eventMode.USE_DATA:
             if self.adv_data_list_info[idx]["objSetting"]["toggle"].isChecked():
@@ -389,7 +385,13 @@ class advanced_label_aggregation_Form(QtWidgets.QWidget):
         """
         if mode in {eventMode.SELECT_SAVEPATH, eventMode.SELECT_COMMON_REFERENCE_PATH, eventMode.SEARCH_DATA}:
             # define QFileDialog for folder selection
-            fileDialog = QtWidgets.QFileDialog()
+            if mode == eventMode.SELECT_SAVEPATH:
+                title = self.lang.get("advanced", "advanced_label_aggregation_main", "advancedLabelAggregationFindSavePath")
+            elif mode == eventMode.SELECT_COMMON_REFERENCE_PATH:
+                title = self.lang.get("advanced", "advanced_label_aggregation_main", "advancedLabelAggregationCommonReferenceLoadPath")
+            elif mode == eventMode.SEARCH_DATA:
+                title = self.lang.get("advanced", "advanced_main", "advancedAddDataTitle")
+            fileDialog = QtWidgets.QFileDialog(caption=title)
             fileDialog.setFileMode(QtWidgets.QFileDialog.FileMode.DirectoryOnly)
             fileDialog.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, True)
             fileDialog.setOption(QtWidgets.QFileDialog.Option.DontUseCustomDirectoryIcons, True)

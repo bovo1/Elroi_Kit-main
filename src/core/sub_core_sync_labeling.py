@@ -55,6 +55,7 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     core_to_label_signal = QtCore.pyqtSignal(dict)
     core_to_label_sub_signal = QtCore.pyqtSignal(dict)
     core_to_display_signal = QtCore.pyqtSignal(dict)
+    coreToDisplayMenuSignal = QtCore.pyqtSignal(dict)
     core_to_display_sub_rgb_change_signal = QtCore.pyqtSignal(dict)
     core_to_labeling_mode_main_signal = QtCore.pyqtSignal(dict)
     core_to_pen_signal = QtCore.pyqtSignal(dict)
@@ -71,16 +72,26 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     display_to_graph_signal = QtCore.pyqtSignal(dict)
     display_to_labeling_mode_main_signal = QtCore.pyqtSignal(dict)
     display_to_pen_style_signal = QtCore.pyqtSignal(dict)
+    displayToDisplayMenuSignal = QtCore.pyqtSignal(dict)
+
+    # display menu
+    displayMenuToDisplaySignal = QtCore.pyqtSignal(dict)
+    displayMenuToPenSignal = QtCore.pyqtSignal(dict)
+
+    # Similarity Map
+    similarityToCoreSignal = QtCore.pyqtSignal(dict)
 
     #display change
     display_sub_rgb_change_to_core_signal = QtCore.pyqtSignal(dict)
     display_sub_rgb_change_to_display_signal = QtCore.pyqtSignal(dict)
     display_sub_rgb_change_to_graph_sub_signal = QtCore.pyqtSignal(dict)
+    displaySubRgbChangeToGraphSignal = QtCore.pyqtSignal(dict)
 
     # Pen
     pen_to_core_signal = QtCore.pyqtSignal(dict)
     pen_to_display_signal = QtCore.pyqtSignal(dict)
     penToSemiAutoLabelingSignal = QtCore.pyqtSignal(dict)
+    penToDisplayMenuSignal = QtCore.pyqtSignal(dict)
 
     #Pen style
     pen_style_to_core_signal = QtCore.pyqtSignal(dict)
@@ -102,6 +113,8 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     graph_sub_to_display_signal= QtCore.pyqtSignal(dict)
     graphGroupToGraphSignal = QtCore.pyqtSignal(dict)
     graphToGraphGroupSignal = QtCore.pyqtSignal(dict)
+    graphToDisplaySubRgbChangeSignal = QtCore.pyqtSignal(dict)
+    graphOptionToGraphSignal = QtCore.pyqtSignal(dict)
 
     graphGroupDict = {}
     labelViewGraphGroupDict = {}
@@ -113,7 +126,6 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     graph_obj_dict = {}
 
     sub_widget_dict = {}
-    
 
     #function variable object
 
@@ -157,6 +169,9 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
         'temp_drawing_mode':-1,
         'key_pressed':0
     }
+    displayMenuControlDict = {
+        "opened": False
+    }
     image_control_dict ={
         'select_image_number' : -1,
         'image_control_sw' : True
@@ -187,7 +202,11 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
         'graph_view_mode' : 0
     }
 
-
+    pixelBasedLabelingDict = {
+        'similarityMode': "Area",
+        'threshold': 90.0,
+        'modeDefaultThreshold': 90.0
+    }
 
     Core_DB_Labeling = {
 

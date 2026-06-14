@@ -8,7 +8,7 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from qtwidgets import AnimatedToggle
-from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QMessageBox, QSizePolicy
 
 class custom_qtablewidget(QtWidgets.QTableWidget):
     def __init__(self, obj_name="tablewidget_obj_name" , col=3, row=4, fontsize=10):
@@ -117,6 +117,7 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
             @History
                 1. Modified by MyoungHwan(24.12.05): qtableitem 관련 코드 수정
                 2. Modified by GaEun Hwang(25.09.29): Set lineedit and select button to have no focus for label selection shortcut key
+                3. Modified by Hyunsu Kim (26.04.21): Use setSizePolicy to automatically adjust size
         """
         if obj_type == "item":
             tmp_qitem = QtWidgets.QTableWidgetItem()
@@ -125,6 +126,7 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
             return tmp_qitem
         elif obj_type== "widget":
             tmp_obj_dict_ = {}
+            self.placeHolderText = False # lineedit의 placeHolderText 설정 여부 판단하기 위한 변수, True일 경우 lineedit의 text 대신 placeHolderText로 설정, False일 경우 lineedit의 text로 설정
             # layout
             tmp_qwidget = QtWidgets.QWidget()
             if layout=="horizon":
@@ -178,7 +180,7 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
                     tmp_qlabel = QtWidgets.QLabel()
                     tmp_qlabel.setObjectName(f"{idx}_tmp_qlabel")
                     tmp_qlabel.setText(value_)
-                    tmp_qlabel.setFixedWidth(tmp_qlabel.sizeHint().width() + 60)
+                    tmp_qlabel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
                     tmp_obj_dict_["label"] = tmp_qlabel
                     tmp_qlayout.addWidget(tmp_qlabel)
                 
@@ -187,12 +189,20 @@ class custom_qtablewidget(QtWidgets.QTableWidget):
                     """
                         description : remove focus policy for lineedit because to fix bug not changing label name
                         author : GaEun Hwang (2025.10.29)
+                        History :
+                            1. Modified by Hyunsu Kim (2026.04.24): use setPlaceholderText instead of setText for lineedit when value_ is "placeHolderText" to prevent label name change bug
                     """
+                    if value_ == "placeHolderText":
+                        self.placeHolderText = True
+                        continue
                     tmp_qlineedit.setObjectName(f"{idx}_tmp_qlineedit")
                     tmp_qlineedit.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
                     tmp_qlineedit.setReadOnly(True)
                     tmp_qlineedit.setDragEnabled(True)
-                    tmp_qlineedit.setText(value_)
+                    if self.placeHolderText:
+                        tmp_qlineedit.setPlaceholderText(value_)
+                    else:
+                        tmp_qlineedit.setText(value_)
                     tmp_qlineedit.setMinimumWidth(30)
                     tmp_qlineedit.setAlignment(QtCore.Qt.AlignCenter)
                     tmp_obj_dict_["lineedit"] = tmp_qlineedit

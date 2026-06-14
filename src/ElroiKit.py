@@ -4,19 +4,12 @@
     Copyright 2024. Elroilab All rights reserved.
 """
 
-stylesheet = """
-QMainWindow#merge_MainWindow{
-    border-style: outset;
-    border-width: 1px;
-    border-color: gray;
-}
-"""
-
 import os
 import sys
 import multiprocessing
 import psutil
 import json
+import atexit
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import Qt, QTimer, QTime
 from PyQt5.QtWidgets import QApplication
@@ -29,6 +22,13 @@ from utils.shared import shared_root_path, license_path, temp_path, icon_path, f
 from utils.license import make_HW_status, check_lic_status
 from constants.constants import *
 from utils.custom_ui import messageBox
+from utils.tools import shutdownRunningProcesses
+
+from stylesheet.stylesheet_component import buildStylesheet
+from stylesheet.stylesheet_common import STYLE
+from stylesheet.stylesheet_labeling import LABELING_STYLESHEET
+from stylesheet.stylesheet_training import TRAINING_STYLESHEET
+from stylesheet.stylesheet_advanced import ADVANCED_STYLESHEET
 
 class main_sub_Sync(QtCore.QObject):
     """
@@ -137,7 +137,6 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
                 1.	merge_MainWindow(object): PyQt widget object
         """
         merge_MainWindow.setObjectName("merge_MainWindow")
-        merge_MainWindow.setStyleSheet(stylesheet)
         # merge_MainWindow.resize(800, 600)
         
         self.merge_MainWindow_centralwidget = QtWidgets.QWidget(merge_MainWindow)
@@ -277,6 +276,8 @@ class Merge_MainWindow_Form(QtWidgets.QMainWindow):
             @history
                 1. Modified by MyoungHwan (2024.10.23): Elroikit 종료 관련 코드수정
                 2. Modified by Yugyeong Hong(2026.02.24) : Refactor message box with util method and language support
+                3. Modified by Hyunsu Kim (2026.03.25): Added function to close all sub windows when main window is closed
+                4. Modified by Hyunsu Kim (2026.05.12): Added function to shutdown all running background processes when main window is closed
         """
         self.messageBoxResponse = messageBox(mode=MESSAGE_BOX_CONFIRMATION,
                                              title=self.lang.get("main", "top", "quit_title"),
@@ -380,20 +381,27 @@ if __name__ == "__main__":
         os.mkdir(temp_path)
     
     # settings
-    defaultSettingsContent = {
-        "font": FONT_DEFAULT
+    defaultSettings = {
+        "Common":{
+            "font": FONT_DEFAULT,
+        },
+        "Training":{
+            "dataLoadThread": DATA_LOAD_WORKERS
+        }
     }
 
     if not os.path.isfile(settings_path):
         # If the settings.json file does not exist, create it with default settings
         with open(settings_path, "w", encoding="utf-8") as f:
-            json.dump(defaultSettingsContent, f, indent=4)
+            json.dump(defaultSettings, f, indent=4)
 
     app = QtWidgets.QApplication(sys.argv)
     # Adjust application font size based on DPI scaling factor
     screen = app.primaryScreen()
     factor  = screen.devicePixelRatio() # Get DPI scaling factor
-
+    # Build the application stylesheet by combining global styles and specific styles
+    stylesheet = buildStylesheet(globalStyle=STYLE, specificStyle=[LABELING_STYLESHEET, TRAINING_STYLESHEET, ADVANCED_STYLESHEET])
+    app.setStyleSheet(stylesheet)
     # defaultFont is system default font, which is used when user select "Default" font option.
     # It can be different by OS and user settings.
     defaultFont = app.font()
@@ -422,12 +430,12 @@ if __name__ == "__main__":
             settingsJson = json.load(f)
     except Exception as e:
         print(f"Error loading UI settings: {e}\n Load default UI settings.")
-        settingsJson = defaultSettingsContent
+        settingsJson = defaultSettings
         # If there is an error loading the settings.json file, overwrite it with default settings to prevent errors
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(settingsJson, f, indent=4)
 
-    savedFont = settingsJson.get("font")
+    savedFont = settingsJson["Common"]["font"]
     if savedFont in fontDict:
         font = fontDict[savedFont]["font"]
         fontName = savedFont
@@ -436,7 +444,6 @@ if __name__ == "__main__":
         fontName = FONT_DEFAULT
 
     app.setFont(font)
-    merge_MainWindow = QtWidgets.QMainWindow()
     ui = Merge_MainWindow_Form()
     icon = QIcon(os.path.join(icon_path, 'E.ico'))
     app.setWindowIcon(icon)
@@ -452,7 +459,7 @@ if __name__ == "__main__":
             @author: GaEun Hwang (2026.03.10)
         """
         # Save the selected font to settings.json for persistence
-        settingsJson["font"] = fontName
+        settingsJson["Common"]["font"] = fontName
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(settingsJson, f, indent=4)
         
@@ -465,5 +472,6 @@ if __name__ == "__main__":
     
     # Connect the font change function to the font menu actions
     ui.mid_mainwindow.settingFontFunction_signal.connect(changeFont)
+    atexit.register(shutdownRunningProcesses) # Register the onExit function to be called when the application is exiting
 
     sys.exit(app.exec_())

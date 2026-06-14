@@ -5,11 +5,13 @@ import traceback
 import datetime
 import random
 import torch
+import json
 import numpy as np
 from shutil import copyfile
 from torch.utils.data import DataLoader
 from .utils import PrinterManager, AesEncryption
-from utils.shared import shared_root_path, config_path
+from constants.constants import DATA_LOAD_WORKERS, MINIMUM_WORKERS
+from utils.shared import config_path, settings_path, shared_root_path
 from .Dataset import HSIDataset, get_data, load_metaData, load_labelData
 from .trainer.PD import T_PLSDA
 from .trainer.CLS import T_CLS
@@ -120,7 +122,13 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
             calibration_path = None
 
         # Data
-        datas, labels, images = get_data(data_path_dict, current_model_params_dict, calibration_path)
+        with open(settings_path, "r", encoding="UTF-8") as f:
+            settings_dict = json.load(f)
+        threadNum = settings_dict["Training"]["dataLoadThread"]
+        if os.cpu_count() < threadNum:
+            threadNum = MINIMUM_WORKERS
+
+        dataList, labelList, imageList = get_data(data_path_dict, current_model_params_dict, calibration_path, threadNum)
 
         # Load metadata and label data
         metaData = None
@@ -140,24 +148,24 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
         # for DSAD Joint Classifier
         if "classifier" in current_model_settings_dict["params_dict"]["main_trainer"]:
             binary = not current_model_settings_dict["params_dict"]["main_trainer"]["classifier"]["value"]
-        if "train" in datas:
-            dataInputHeight = np.shape(datas["train"][0])[1]
-            dataType = datas["train"][0].dtype
-            num_bands = np.shape(datas["train"][0])[-1]
-        if not binary and "train" in labels:
-            num_classes = int(np.max([np.max(label) for label in labels["train"]]) + 1)
+        if "train" in dataList:
+            dataInputHeight = np.shape(dataList["train"][0])[1]
+            dataType = dataList["train"][0].dtype
+            num_bands = np.shape(dataList["train"][0])[-1]
+        if not binary and "train" in labelList:
+            num_classes = int(np.max([np.max(label) for label in labelList["train"]]) + 1)
 
         # Data Loaders
         loader_dict = {"train": None, "val": None}
         for k in data_path_dict.keys():
             # dataset
-            dataset = HSIDataset(datas=datas[k], labels=labels[k], patch_size=patch_size, binary=binary, ignored=ignored, dataset_type=k)
+            dataset = HSIDataset(dataList=dataList[k], labelList=labelList[k], patch_size=patch_size, binary=binary, ignored=ignored, dataset_type=k)
             
             # loader
             loader_dict[k] = DataLoader(
                 dataset=dataset, batch_size=batch_size, shuffle=True if k == "train" else False, drop_last=True if k == "train" else False, num_workers=num_workers)
             
-            # Display number of datas
+            # Display number of dataList
             if k == "train":
                 _printer.print(f"Train samples: {len(dataset)}")
             elif k == "val":
@@ -181,7 +189,7 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
         "num_bands": num_bands,
         "num_classes": num_classes,
         "binary": binary,
-        "images": images,
+        "images": imageList,
         "loader_dict": loader_dict,
         "current_model_save_path": current_model_save_path,
         "current_model_load_path": current_model_load_path,
@@ -216,19 +224,19 @@ def start(is_train, dataset_shared_dict, hyperparameter_shared_dict, shared_data
                 _printer.print(f"{len(data_path_dict['test'])}. {path} > {prop*100:.2f}%")
 
         config["data_path_dict"] = data_path_dict
-        datas, labels, images = get_data(data_path_dict, current_model_params_dict, calibration_path)
-        config["images"] = images
-        dataset = HSIDataset(datas=datas["test"], labels=labels["test"], patch_size=patch_size, binary=binary, ignored=ignored, dataset_type="test")
+        dataList, labelList, imageList = get_data(data_path_dict, current_model_params_dict, calibration_path, threadNum)
+        config["images"] = imageList
+        dataset = HSIDataset(dataList=dataList["test"], labelList=labelList["test"], patch_size=patch_size, binary=binary, ignored=ignored, dataset_type="test")
         test_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers)
         # Set test loader and is_train variable
         config["loader_dict"]["test"] = test_loader
         config["is_train"] = False
         _printer.print(f"Test samples: {len(dataset)}")
 
-        if num_bands == 0 and "test" in datas:
-            config["num_bands"] = np.shape(datas["test"][0])[-1]
-        if not binary and "test" in labels:
-            config["num_classes"] = int(np.max([np.max(label) for label in labels["test"]]) + 1)
+        if num_bands == 0 and "test" in dataList:
+            config["num_bands"] = np.shape(dataList["test"][0])[-1]
+        if not binary and "test" in labelList:
+            config["num_classes"] = int(np.max([np.max(label) for label in labelList["test"]]) + 1)
         trainer = get_trainer(config, current_model_name)
         if is_train:
             trainer.load(os.path.join(trainer.current_model_save_path, f"{trainer.current_model_type.replace(' ', '_')}.el"))

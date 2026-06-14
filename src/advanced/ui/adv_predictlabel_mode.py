@@ -24,7 +24,6 @@ from utils.worker import Threading_Worker
 from utils.viewer import Display_viewer
 from qtwidgets import AnimatedToggle
 
-from advanced.stylesheet.stylesheet_adv_predictlabel_mode import stylesheet
 from utils.custom_ui import messageBox
 from constants.constants import MESSAGE_BOX_CONFIRMATION, MESSAGE_BOX_WARNING
 
@@ -158,7 +157,6 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
         MainWindow.setObjectName("adv_setting_form")
         MainWindow.resize(840, 640)
         MainWindow.setWindowTitle("Advanced Setting")
-        MainWindow.setStyleSheet(stylesheet)
 
         self.advanced_predictlabel_main_horizon = QtWidgets.QHBoxLayout(MainWindow)
         self.advanced_predictlabel_main_horizon.setObjectName("advanced_predictlabel_main_horizon")
@@ -444,7 +442,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
                     tmp_lineedit.setObjectName(f"{idx}_tmp_lineedit")
                     tmp_lineedit.setReadOnly(True)
                     tmp_lineedit.setDragEnabled(True)
-                    tmp_lineedit.setText(value_)
+                    tmp_lineedit.setPlaceholderText(value_)
                     tmp_lineedit.setMinimumWidth(0)
                     tmp_lineedit.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
                     tmp_lineedit.setAlignment(QtCore.Qt.AlignCenter)
@@ -492,6 +490,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
 
         # 1. model path language set
         self.lang.set("advanced", "advanced_predictlabel_main", "advanced_predictlabel_modelpath_label", self.header_dict_[0]["obj_tip"]["label"])
+        self.lang.set("advanced", "advanced_predictlabel_main", "advancedPredictLabelModelPathLine", self.header_dict_[0]["obj_set"]["lineedit"])
         self.lang.set("advanced", "advanced_predictlabel_main", "advanced_predictlabel_modelpath_button", self.header_dict_[0]["obj_set"]["button"])
 
         # 2. model threshold language set
@@ -517,6 +516,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
                 if imageName not in os.listdir(file):
                     imageName = "image.png"
                 rgb_data = cv2.imread(file + "/" + imageName, cv2.IMREAD_COLOR)
+                rgb_data = cv2.cvtColor(rgb_data, cv2.COLOR_BGR2RGB)
                 rgb_data[self.label[data_name] >= self.abnormalLabel] = [255, 0, 0]  # Mark noise pixels in red
                 self.OutputImageWidget.updatePhoto(QtGui.QPixmap(QtGui.QImage(rgb_data, rgb_data.shape[1], rgb_data.shape[0], rgb_data.shape[1] * rgb_data.shape[2], QtGui.QImage.Format_RGB888)), True)
 
@@ -545,7 +545,6 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
         self.label[dataName] = np.where(self.dist[dataName] < thrValue, self.normalLabel, self.abnormalLabel)
         self.image_signal.emit(dataName)
         self.advanced_predictlabel_setting_start_btn.setEnabled(True)
-        self.advanced_predictlabel_setting_stop_btn.setEnabled(True)
         self.ThresholdButton.setEnabled(True)
         self.ThresholdButton.toggle()
 
@@ -580,10 +579,12 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
         """
             Description: 기능에 대한 signal 발동 부분
             Implement by MyoungHwan(2024.05.13)
+            History:
+                1. Hyunsu Kim (2026.04.24) - Modify the file dialog title in translation support
         """
         if mode == 0: # select model
             file_dialog = QtWidgets.QFileDialog()
-            fname = file_dialog.getOpenFileName(self,"파일 선택","","Files (*.el)")
+            fname = file_dialog.getOpenFileName(parent=self,caption=self.lang.get("advanced", "advanced_predictlabel_main", "advancedPredictLabelModelPathTitle"), filter="Files (*.el)")
             if fname[0]:
                 self.adv_model_info[mode]["value"][1] = fname[0]
                 obj["obj_set"]["lineedit"].setText(str(self.adv_model_info[mode]["value"][1]))
@@ -596,7 +597,7 @@ class advanced_predictlabel_Form(QtWidgets.QWidget):
             Implement by MyoungHwan(2024.05.13)
         """
         if mode == 0: # Search
-            file_dialog = QtWidgets.QFileDialog()
+            file_dialog = QtWidgets.QFileDialog(caption=self.lang.get("advanced", "advanced_main", "advancedAddDataTitle"))
             file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
             file_dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
             file_dialog.findChild(QtWidgets.QListView, 'listView').setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)

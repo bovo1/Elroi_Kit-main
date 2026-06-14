@@ -66,7 +66,6 @@ class Top_MainWindow_Form(QtWidgets.QMainWindow):
         """
         top_MainWindow.setObjectName("top_MainWindow")
         top_MainWindow.resize(800, self.window_height)
-        top_MainWindow.setStyleSheet(stylesheet)
 
         self.top_MainWindow_centralwidget = QtWidgets.QWidget(top_MainWindow)
         self.top_MainWindow_centralwidget.setObjectName("top_MainWindow_centralwidget")

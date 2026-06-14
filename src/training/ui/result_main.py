@@ -7,8 +7,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QTimer
 from qtwidgets import AnimatedToggle
 
-from training.stylesheet.stylesheet_result_main import stylesheet
-
 from sklearn.metrics import confusion_matrix
 
 from utils.viewer import Display_viewer
@@ -78,7 +76,6 @@ class Result_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("Result_Form")
         Form.setWindowTitle("Result_Form")
-        Form.setStyleSheet(stylesheet)
                 
         self.FormLayout = QtWidgets.QVBoxLayout(Form)
         self.FormLayout.setObjectName("FormLayout")
@@ -230,6 +227,8 @@ class Result_Form(QtWidgets.QWidget):
                 - Modified by Hyunsu Kim (2026.03.19): 
                     - Changed from GraphicsLayoutWidget to QGridLayout for smooth graph size adjustment
                     - Set the plotwidget's right-click menu to be available for View all function
+                - Modified by Hyunsu Kim (2026.04.24):
+                    - Modify the Train, Val legend names of Loss plot for translation in language file
         """
         style = {"color": "w", "font-size": "15px"}
         plotBackground = pyqtgraph.mkColor(83, 83, 83)
@@ -246,8 +245,10 @@ class Result_Form(QtWidgets.QWidget):
         self.LossPlot.setMouseEnabled(x=False, y=False)
         lossLegend = self.LossPlot.addLegend(labelTextColor=pyqtgraph.mkColor("w"))
         lossLegend.setOffset(1)
-        self.TrainLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(255, 0, 0, 250), width=2), name="Train")
-        self.ValLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(0, 255, 0, 150), width=2), name="Val")
+        self.TrainLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(255, 0, 0, 250), width=2), name=self.lang.get("training", "result_main", "LossPlotlegendTrain"))
+        self.ValLossPlot = self.LossPlot.plot(pen=pyqtgraph.mkPen(pyqtgraph.mkColor(0, 255, 0, 150), width=2), name=self.lang.get("training", "result_main", "LossPlotlegendVal"))
+        self.lang.set("training", "result_main", "LossPlotlegendTrain", self.TrainLossPlot)
+        self.lang.set("training", "result_main", "LossPlotlegendVal", self.ValLossPlot)
         
         # Feature Distance Distribution to Center C (DA/PE)
         self.trainFeatureDistPlot = pyqtgraph.PlotWidget()
@@ -258,7 +259,7 @@ class Result_Form(QtWidgets.QWidget):
         self.trainFeatureDistPlot.getAxis("bottom").setTextPen(pyqtgraph.mkPen("w", width=2))
         self.trainFeatureDistPlot.showGrid(x=True, y=True)
         self.trainFeatureDistPlot.setMenuEnabled(True)
-        self.trainFeatureDistPlot.setMouseEnabled(x=True, y=True)
+        self.trainFeatureDistPlot.setMouseEnabled(x=False, y=False)
         self.trainFeatureDistPlot.getViewBox().setLimits(yMin=0)
         self.trainFeatureDistPlot.getViewBox().setLimits(xMin=0)
         self.trainFeatureDistPlot.getViewBox().setLimits(yMax=1)
@@ -285,7 +286,7 @@ class Result_Form(QtWidgets.QWidget):
         self.testFeatureDistPlot.getAxis("bottom").setTextPen(pyqtgraph.mkPen("w", width=2))
         self.testFeatureDistPlot.showGrid(x=True, y=True)
         self.testFeatureDistPlot.setMenuEnabled(True)
-        self.testFeatureDistPlot.setMouseEnabled(x=True, y=True)
+        self.testFeatureDistPlot.setMouseEnabled(x=False, y=False)
         self.testFeatureDistPlot.getViewBox().setLimits(yMin=0)
         self.testFeatureDistPlot.getViewBox().setLimits(xMin=0)
         self.testFeatureDistPlot.getViewBox().setLimits(yMax=1)
@@ -733,6 +734,9 @@ class Result_Form(QtWidgets.QWidget):
             np.ndarray: Original image with abnormal regions (scores >= threshold) highlighted in red ([255, 0, 0]).
         
         modified by Chansik Kim 2024.12.17
+
+        History:
+            - Modified by Hyunsu Kim (2026.05.12): Modified to create a temporary mask of the correct size and overwrite the eval mask if the eval_mask size does not match.
         """
         origin_image = np.copy(self.origin_images[image_index])
         w, h, _ = origin_image.shape
@@ -740,6 +744,10 @@ class Result_Form(QtWidgets.QWidget):
         indices = np.where(np.array(indices) == image_index)
         abnormal_scores = self.abnormal_scores[indices]
         eval_mask = abnormal_scores >= threshold
+        if eval_mask.size != w * h:
+            temp = np.zeros(w * h, dtype=bool)
+            temp[self.position_indices[indices,1] * h + self.position_indices[indices,2]] = eval_mask
+            eval_mask = temp
         origin_image[eval_mask.reshape(w, h)] = [255, 0, 0]
         return origin_image
 
@@ -792,6 +800,8 @@ class Result_Form(QtWidgets.QWidget):
             self.results = _dict["results"]
         if "init" in _dict:
             self.init_params()
+            self.trainFeatureDistPlot.setMouseEnabled(x=False, y=False)
+            self.testFeatureDistPlot.setMouseEnabled(x=False, y=False)
         if "is_classification" in _dict:
             self.is_anomaly_detection = False
             self.change_control_ui(self.is_anomaly_detection) # set to specific type of task
@@ -803,6 +813,8 @@ class Result_Form(QtWidgets.QWidget):
             self.pred_thresholds = self.best_threshold
             self.init_images_anomaly_detection(self.origin_images)
             self.updateDistPlots()
+            self.trainFeatureDistPlot.setMouseEnabled(x=True, y=True)
+            self.testFeatureDistPlot.setMouseEnabled(x=True, y=True)
             self.show_selected_image(0, self.PredictionMapToggle.isChecked(), self.FpFnMapToggle.isChecked(), True)
             self.init_combobox_item_list(False)
         if ("is_classification" in _dict or "is_anomaly_detection" in _dict) and self.plot_updator.isActive():

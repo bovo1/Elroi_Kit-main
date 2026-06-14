@@ -6,8 +6,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QFileDialog, QListView, QTreeView, QAbstractItemView
 
-from training.stylesheet.stylesheet_dataset_main import stylesheet
-
 from utils.shared import config_path
 from utils.custom_ui import messageBox
 from constants.constants import MESSAGE_BOX_INFORMATION
@@ -95,7 +93,7 @@ class Dataset_Form(QtWidgets.QWidget):
     def init_ui(self, Form):
         Form.setObjectName("Dataset_Form")
         Form.setWindowTitle("Dataset_Form")
-        Form.setStyleSheet(stylesheet)
+
         self.MainFormLayout = QtWidgets.QVBoxLayout(Form)
         self.MainFormLayout.setObjectName("MainFormLayout")
 
@@ -127,6 +125,7 @@ class Dataset_Form(QtWidgets.QWidget):
 
         # =============== Training Form Area ===============
         self.TrainingFrame = DatasetFrame("train", self)
+        self.TrainingFrame.setProperty("property", "trainingFrame")
         self.TrainingFrame.setObjectName("TrainingFrame")
 
         self.TrainingFrameLayout = QtWidgets.QVBoxLayout(self.TrainingFrame)
@@ -151,6 +150,7 @@ class Dataset_Form(QtWidgets.QWidget):
         self.TrainingScrollArea.setObjectName("TrainingScrollArea")
 
         self.TrainingWidget = QtWidgets.QWidget()
+        self.TrainingWidget.setProperty("property", "trainingFrame")
         self.TrainingWidget.setObjectName("TrainingWidget")
 
         self.TrainingWidgetLayout = QtWidgets.QVBoxLayout(self.TrainingWidget)
@@ -621,7 +621,7 @@ class Dataset_Form(QtWidgets.QWidget):
     def get_path_list(self):
         path_list = []
         # execute file dialog and get the selected path list
-        file_dialog = QFileDialog(directory=self.last_path)
+        file_dialog = QFileDialog(caption=self.lang.get("training", "dataset_main", "AddDataset"), directory=self.last_path)
         file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         file_dialog.setFileMode(QFileDialog.DirectoryOnly)
         file_dialog.findChild(QListView, 'listView').setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -873,7 +873,7 @@ class Dataset_Form(QtWidgets.QWidget):
             ignore_message = True
             try:
                 if load_from_user:
-                    file_dialog = QFileDialog(directory=self.last_path)
+                    file_dialog = QFileDialog(caption=self.lang.get("training", "dataset_main", "LoadConfigTitle"), directory=self.last_path)
                     file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
                     file_dialog.setNameFilters(["json (*.json)"])
                     if file_dialog.exec_():

@@ -9,17 +9,13 @@ import sys
 if __name__ == "__main__" :
     from adv_predictlabel_mode import advanced_predictlabel_Form
     from adv_SAL_mode import advanced_sal_Form
-    from advanced.ui.adv_pixel_based_labeling_mode import advanced_pixel_based_labeling_Form
     from adv_label_correction_mode import advanced_label_correction_Form
     from adv_label_aggregation_mode import advanced_label_aggregation_Form
 else:
     from .adv_predictlabel_mode import advanced_predictlabel_Form
     from .adv_SAL_mode import advanced_sal_Form
-    from .adv_pixel_based_labeling_mode import advanced_pixel_based_labeling_Form
     from .adv_label_correction_mode import advanced_label_correction_Form
     from .adv_label_aggregation_mode import advanced_label_aggregation_Form
-
-from advanced.stylesheet.stylesheet_adv_main import stylesheet
 
 
 class Advanced_Main(QtWidgets.QWidget):
@@ -48,10 +44,10 @@ class Advanced_Main(QtWidgets.QWidget):
         """
             description
             modified by MyoungHwan(20240603): 신기능관련 UI Form 추가
+            modified by Hyunsu Kim(2026.05.29): delete pixel based labeling form
         """
         self.advanced_predictlabel_Form = advanced_predictlabel_Form(Sync=self.Sync, lang=self.lang)
         self.advanced_sal_Form = advanced_sal_Form(Sync=self.Sync, lang=self.lang)
-        self.advanced_pixel_based_labeling_Form = advanced_pixel_based_labeling_Form(Sync=self.Sync, lang=self.lang)
         self.advanced_label_correction_Form = advanced_label_correction_Form(Sync=self.Sync, lang=self.lang)
         self.advanced_label_aggregation_Form = advanced_label_aggregation_Form(Sync=self.Sync, lang=self.lang)
 
@@ -66,7 +62,6 @@ class Advanced_Main(QtWidgets.QWidget):
         MainWindow.resize(800,640)
         MainWindow.setMinimumWidth(800)
         MainWindow.setMinimumHeight(640)
-        MainWindow.setStyleSheet(stylesheet)
         
         self.Advanced_main_vertical = QtWidgets.QVBoxLayout(MainWindow)
         self.Advanced_main_vertical.setObjectName("Advanced_main_vertical")
@@ -77,16 +72,15 @@ class Advanced_Main(QtWidgets.QWidget):
             description
             modified by MyoungHwan(20240603): 신기능관련 UI Form 추가
             modified by Hyeok Yoon(2025.10.31) : Modifying Widgets to supports language function
+            modified by Hyunsu Kim(2026.05.29): delete pixel based labeling form
         """
         self.Advanced_tab_widget.addTab(self.advanced_predictlabel_Form, "")
         self.Advanced_tab_widget.addTab(self.advanced_sal_Form, "")
-        self.Advanced_tab_widget.addTab(self.advanced_pixel_based_labeling_Form, "")
         self.Advanced_tab_widget.addTab(self.advanced_label_correction_Form, "")
         self.Advanced_tab_widget.addTab(self.advanced_label_aggregation_Form, "")
 
         self.lang.set("advanced", "advanced_main", "advanced_predictlabel_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_sal_Form", self.Advanced_tab_widget)
-        self.lang.set("advanced", "advanced_main", "advanced_pixel_based_labeling_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_label_correction_Form", self.Advanced_tab_widget)
         self.lang.set("advanced", "advanced_main", "advanced_label_aggregation_Form", self.Advanced_tab_widget)
         

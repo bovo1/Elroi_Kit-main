@@ -3,7 +3,11 @@ import json
 import types
 
 from PyQt5 import QtWidgets
+from PyQt5.QtGui import QStandardItem
+from PyQt5.QtWidgets import QTreeWidgetItem
 from pyqtgraph import PlotWidget
+import pyqtgraph as pg
+from utils.custom_item import customScatterItem
 from utils.shared import resource_path
 
 class Language():
@@ -38,6 +42,21 @@ class Language():
         except:
             pass
 
+    def changePlotLegend(self, plot_item, name):
+        """
+            description : change legend of plot item
+                parameters : plot_item - plot item to change legend, name - legend name to change
+            author : Hyunsu Kim (2026.04.24)
+        """
+        plot_item.opts['name'] = name
+        view_box = plot_item.getViewBox()
+        if view_box is not None:
+            legend = getattr(view_box.parentItem(), "legend", None)
+            if legend is not None:
+                legend_label = legend.getLabel(plot_item)
+                if legend_label is not None:
+                    legend_label.setText(name)
+
     def apply(self, language: str = "en"):
         with open(os.path.join(resource_path, f"language/{language}.json"), "r", encoding="UTF-8") as f:
             self.language_dict = json.load(f)
@@ -67,7 +86,7 @@ class Language():
                                         @history :
                                             1. Yugyeong Hong(2026.03.10) : Add language parsing type for QDialog
                                     """
-                                    if isinstance(_component, QtWidgets.QToolBar) or isinstance(_component, QtWidgets.QDialog):
+                                    if (isinstance(_component, QtWidgets.QToolBar) or isinstance(_component, QtWidgets.QDialog) or (isinstance(_component, QtWidgets.QWidget) and _component.isWindow())) and isinstance(value, str):
                                         _component.setWindowTitle(value)
 
                                     if isinstance(_component, QtWidgets.QPushButton):
@@ -102,6 +121,25 @@ class Language():
 
                                     if isinstance(_component, types.MethodType):
                                         _component()
-                                    
+
+                                    """
+                                        @history :
+                                            1. Hyunsu Kim(2026.04.21) : Add language parsing option for QLineEdit, QDockWidget, PlotCurveItem, QStandardItem, QTreeWidgetItem
+                                    """
                                     if isinstance(_component, QtWidgets.QLineEdit):
                                         _component.setPlaceholderText(value)
+
+                                    if isinstance(_component, QtWidgets.QDockWidget):
+                                        _component.setWindowTitle(value)
+                                        
+                                    if isinstance(_component, pg.PlotCurveItem) or isinstance(_component, customScatterItem):
+                                        self.changePlotLegend(_component, value)
+
+                                    if isinstance(_component, QStandardItem):
+                                        _component.setText(value)
+
+                                    if isinstance(_component, QTreeWidgetItem):
+                                        _component.setText(0, value)
+
+                                    if isinstance(_component, pg.PlotDataItem):
+                                        self.changePlotLegend(_component, value)

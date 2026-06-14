@@ -47,7 +47,6 @@ class Pen_minimap_Form(QtWidgets.QMainWindow):
         """
         Mainwindow.setObjectName("pen_minimap_form")
         Mainwindow.resize(150, 150)
-        # Mainwindow.setStyleSheet(stylesheet)
 
         self.centralwidget = QtWidgets.QWidget(Mainwindow)
         self.centralwidget.setObjectName("centralwidget")

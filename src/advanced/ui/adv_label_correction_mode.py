@@ -16,7 +16,6 @@ from constants.constants import *
 
 from utils.worker import Threading_Worker
 from utils.custom_ui import messageBox
-from advanced.stylesheet.stylesheet_adv_label_correction_mode import stylesheet
 
 if __name__ == "__main__" :
     from adv_gen_module import gen_module
@@ -187,7 +186,6 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         mainWindow.setObjectName("adv_setting_form")
         mainWindow.resize(LABEL_CORRECTION_WINDOW_WIDTH, LABEL_CORRECTION_WINDOW_HEIGHT)
         mainWindow.setWindowTitle("Advanced Setting")
-        mainWindow.setStyleSheet(stylesheet)  # Custom CSS stylesheet
 
         # Main horizontal/vertical layouts
         self.advanced_label_correction_main_horizon = QtWidgets.QHBoxLayout(mainWindow)
@@ -332,7 +330,8 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.reducedPixelValue.setObjectName("reducedPixelValue")  
 
         # Image + diagnostics view (splitter)
-        self.outputImageBox = QtWidgets.QGroupBox("Image Results")
+        self.outputImageBox = QtWidgets.QGroupBox(self.lang.get("advanced", "advanced_label_correction_main", "imageResult"))
+        self.lang.set("advanced", "advanced_label_correction_main", "imageResult", self.outputImageBox)
         self.outputImageLayout = QtWidgets.QVBoxLayout(self.outputImageBox)
         self.outputImageWidget = Display_viewer(usescrollbar=False)
         self.outputImageWidget.updateDrag(True)
@@ -342,8 +341,9 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.outputSplitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.outputSplitter.setObjectName("outputSplitter")
         # Outer border around both diagnostic plots
-        self.analysisGroupBox = QtWidgets.QGroupBox("Analysis")
+        self.analysisGroupBox = QtWidgets.QGroupBox(self.lang.get("advanced", "advanced_label_correction_main", "analysis"))
         self.analysisGroupBox.setObjectName("analysisGroupBox")
+        self.lang.set("advanced", "advanced_label_correction_main", "analysis", self.analysisGroupBox)
 
         self.analysisGroupBoxLayout = QtWidgets.QVBoxLayout(self.analysisGroupBox)
         self.analysisGroupBoxLayout.setContentsMargins(4, 4, 4, 4)
@@ -389,21 +389,23 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.beforeAfterPlotViewer.setMouseEnabled(x=False, y=True)
         self.beforeAfterPlotViewer.getViewBox().setLimits(yMin=0)
 
-        self.histPlotDock = ReDockOnCloseDockWidget("Similarity Histogram", self.analysisDockHost)
-        self.histPlotDock.setObjectName("histPlotDock")
+        self.histPlotDock = ReDockOnCloseDockWidget(self.lang.get("advanced", "advanced_label_correction_main", "similarityHistogram"), self.analysisDockHost)
+        self.histPlotDock.setObjectName("similarityHistogram")
         self.histPlotDock.setFeatures(
             QtWidgets.QDockWidget.DockWidgetMovable # move widgets between dock areas
             | QtWidgets.QDockWidget.DockWidgetFloatable # detach widgets as independent widnows
             | QtWidgets.QDockWidget.DockWidgetClosable # close widgets
         )
+        self.lang.set("advanced", "advanced_label_correction_main", "similarityHistogram", self.histPlotDock)
 
-        self.beforeAfterPlotDock = ReDockOnCloseDockWidget("Before/After Distribution", self.analysisDockHost)
-        self.beforeAfterPlotDock.setObjectName("beforeAfterPlotDock")
+        self.beforeAfterPlotDock = ReDockOnCloseDockWidget(self.lang.get("advanced", "advanced_label_correction_main", "beforeAfterDistribution"), self.analysisDockHost)
+        self.beforeAfterPlotDock.setObjectName("beforeAfterDistribution")
         self.beforeAfterPlotDock.setFeatures(
             QtWidgets.QDockWidget.DockWidgetMovable # move widgets between dock areas
             | QtWidgets.QDockWidget.DockWidgetFloatable # detach widgets as independent widnows
             | QtWidgets.QDockWidget.DockWidgetClosable # dock widgets can be closed
         )
+        self.lang.set("advanced", "advanced_label_correction_main", "beforeAfterDistribution", self.beforeAfterPlotDock)
 
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setMinimum(0)
@@ -611,6 +613,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
         self.lang.set("advanced", "advanced_label_correction_main", "advanced_label_correction_labelsource_label", self.header_dict_[4]["obj_tip"]["label"])
         self.lang.set("advanced", "advanced_label_correction_main", "advanced_label_correction_labelsource_combobox", self.header_dict_[4]["obj_set"]["combobox"])
 
+        self.lang.set("advanced", "advanced_label_correction_main", "advancedLabelCorrectionClusterCountLabel", self.header_dict_[5]["obj_tip"]["label"])
     # --------------------------------------------------
     # Toggle Event Handling (Calibration Mode & Data List "Use" Toggle)
     # --------------------------------------------------
@@ -819,7 +822,7 @@ class advanced_label_correction_Form(QtWidgets.QWidget):
                 self.advanced_label_correction_datalist_global_clear_btn.setEnabled(True)
                 self.imageSelectorComboBox.setEnabled(True)
         elif mode == LABEL_CORRECTION_DATALIST:  # Directory add
-            file_dialog = QtWidgets.QFileDialog()
+            file_dialog = QtWidgets.QFileDialog(caption=self.lang.get("advanced", "advanced_main", "advancedAddDataTitle"))
             file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
             file_dialog.setFileMode(QtWidgets.QFileDialog.DirectoryOnly)
             file_dialog.findChild(QtWidgets.QListView, 'listView').setSelectionMode(

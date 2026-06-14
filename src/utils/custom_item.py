@@ -5,8 +5,12 @@
 """
 
 import numpy as np
+from io import BytesIO
 
-from pyqtgraph import ScatterPlotItem
+from pyqtgraph import ScatterPlotItem, exporters, PlotItem
+from pyqtgraph import functions as fn
+from pyqtgraph.widgets import MatplotlibWidget
+from matplotlib import rcParams
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 class customScatterItem(ScatterPlotItem):
@@ -279,7 +283,7 @@ class customPolygonItem(QtWidgets.QGraphicsItem):
             @description : complete drawing and finalize polygon
             @author : GaEun Hwang (2025.10.20)
         """
-        self.polygon = QtGui.QPolygonF(self.points[:-1])
+        self.polygon = QtGui.QPolygonF(self.points[:])
         self.isDrawing = False
         self.isSnapped = False
         self.isMatched = False
@@ -379,3 +383,228 @@ class customPolygonItem(QtWidgets.QGraphicsItem):
             points = np.unique(points, axis=0)
         
         return points
+
+
+class customGraphMatplotlibExporter(exporters.MatplotlibExporter):
+    """
+        @description : custom graph image exporter for exporting graph with custom parameter
+        @author : GaEun Hwang (2026.04.14)
+    """
+    # pyqtgraph symbol → matplotlib marker mapping
+    SYMBOL_PG_TO_MPL = {
+        'o'           : 'o',    # circle
+        's'           : 's',    # square
+        't'           : 'v',    # triangle_down
+        't1'          : '^',    # triangle_up
+        't2'          : '>',    # triangle_right
+        't3'          : '<',    # triangle_left
+        'd'           : 'd',    # thin_diamond
+        '+'           : 'P',    # plus (filled)
+        'x'           : 'X',    # x (filled)
+        'p'           : 'p',    # pentagon
+        'h'           : 'h',    # hexagon1
+        'star'        : '*',    # star
+        'arrow_up'    : 6,      # caretup
+        'arrow_right' : 5,      # caretright
+        'arrow_down'  : 7,      # caretdown
+        'arrow_left'  : 4,      # caretleft
+        'crosshair'   : 'o',    # fallback: circle
+        '|'           : '|',    # vertical line
+        '_'           : '_',    # horizontal line
+    }
+    def __init__(self, item, parent=None):
+        super().__init__(item)
+        self.params = {}    # matplotlib export parameters
+        self.matplotlibWindow = customMatplotlibWindow(parent)    # custom matplotlib window for showing exported graph and copying to clipboard
+    
+    def export(self, copy=False):
+        """
+            @description : export graph using matplotlib with custom parameters
+                           this function is redefined based on original export function of MatplotlibExporter
+            @author : GaEun Hwang (2026.04.14)
+        """
+        if not isinstance(self.item, PlotItem):
+            raise Exception("MatplotlibExporter currently only works with PlotItem")
+        
+        customGraphMatplotlibExporter.windows.append(self.matplotlibWindow)
+        fig = self.matplotlibWindow.getFigure()
+        ax = fig.add_subplot(111, title=self.item.titleLabel.text)
+        
+        # clear previous plot data
+        ax.clear()
+        # clean axis ticks and spines
+        self.cleanAxes(ax)
+
+        # plot curve data on matplotlib window
+        self.plotCurveItem(ax)
+        # apply style to matplotlib window based on export parameters
+        self.applySetting(ax, fig)
+
+        # resize the canvas to fit the specified width and height in parameters
+        self.matplotlibWindow.matplotlibWidget.getFigure().canvas.setFixedSize(self.params["width"], self.params["height"])
+        self.matplotlibWindow.draw()
+
+        if copy:
+            self.matplotlibWindow.copyToClipboard(size=(self.params["width"], self.params["height"]))
+        else:
+            self.matplotlibWindow.show()
+
+    def plotCurveItem(self, ax):
+        """
+            @description : plot data on matplotlib axis
+            @author : GaEun Hwang (2026.04.15)
+        """
+        xAxis = self.item.getAxis("bottom")
+        yAxis = self.item.getAxis("left")
+        
+        # if autoSIPrefix(default = enable) is enabled, pyqtgraph scales the display values (e.g. 1000 → 1k)
+        # we must apply the same scale factor to keep matplotlib values consistent with pyqtgraph
+        xScale = xAxis.autoSIPrefixScale if xAxis.autoSIPrefix else 1.0
+        yScale = yAxis.autoSIPrefixScale if yAxis.autoSIPrefix else 1.0
+
+        for item in self.item.curves:
+            x, y = item.getData()
+            # apply SI scale to match pyqtgraph's displayed axis values
+            ax.plot(x * xScale, y * yScale, **self.makePlotKwargs(item))
+
+            # if fillLevel and fillBrush are both set, draw a filled area under the curve
+            if item.opts["fillLevel"] is not None and item.opts["fillBrush"] is not None:
+                fillcolor = fn.mkBrush(item.opts["fillBrush"]).color().getRgbF()
+                ax.fill_between(x=x * xScale, y1=y * yScale, y2=item.opts["fillLevel"], facecolor=fillcolor)
+
+        # match the matplotlib view range exactly to pyqtgraph's current viewport
+        # without this, matplotlib auto-scales and the result looks different from pyqtgraph
+        xr, yr = self.item.viewRange()
+        ax.set_xbound(xr[0] * xScale, xr[1] * xScale)
+        ax.set_ybound(yr[0] * yScale, yr[1] * yScale)
+        ax.set_xlabel(xAxis.label.toPlainText())
+        ax.set_ylabel(yAxis.label.toPlainText())
+
+    def makePlotKwargs(self, item):
+        """
+            @description : build plot keyword arguments for matplotlib plot function based on pyqtgraph curve item options
+            @author : GaEun Hwang (2026.04.15)
+        """
+        opts = item.opts
+        pen = fn.mkPen(opts["pen"]) # convert pyqtgraph pen definition to QPen object
+        kwargs = {
+            "color": pen.color().getRgbF(),
+            "linewidth": pen.widthF(),
+            "linestyle": "" if pen.style() == QtCore.Qt.PenStyle.NoPen else '-',
+            "marker": None,
+            "markersize": None,
+            "markeredgecolor": None,
+            "markerfacecolor": None,
+        }
+
+        # add marker-related kwargs only if a symbol is defined on the curve
+        if opts.get("symbol") is not None:
+            kwargs.update({
+                # translate pyqtgraph symbol name to matplotlib marker identifier
+                "marker": self.SYMBOL_PG_TO_MPL.get(opts["symbol"], ""),
+                "markersize": opts["symbolSize"],
+                "markeredgecolor": fn.mkPen(opts["symbolPen"]).color().getRgbF() if opts["symbolPen"] else None,
+                "markerfacecolor": fn.mkBrush(opts["symbolBrush"]).color().getRgbF() if opts["symbolBrush"] else None,
+            })
+        return kwargs
+
+    def applySetting(self, ax, fig):
+        """
+            @description : apply setting to matplotlib axis and figure based on export parameters
+            @author : GaEun Hwang (2026.04.15)
+        """
+        bg = self.params["backgroundColor"].getRgbF()
+        axisColor = self.params["axisColor"].getRgbF()
+
+        # set dpi for save operations via rcParams; applies globally to all subsequent saves
+        rcParams["savefig.dpi"] = self.params["dpi"]
+        # tight_layout automatically adjusts subplot padding
+        fig.set_tight_layout(True)
+        fig.set_facecolor(bg)
+        ax.set_facecolor(bg)
+
+        ax.tick_params(colors=axisColor)
+        ax.title.set_color(axisColor)
+        ax.xaxis.label.set_color(axisColor)
+        ax.yaxis.label.set_color(axisColor)
+        ax.spines["bottom"].set_color(axisColor)
+        ax.spines["left"].set_color(axisColor)
+
+        if self.params["xGridEnabled"]:
+            ax.xaxis.grid(True, color=axisColor, alpha=self.params["gridOpacity"] / 100)
+        if self.params["yGridEnabled"]:
+            ax.yaxis.grid(True, color=axisColor, alpha=self.params["gridOpacity"] / 100)
+
+class customMatplotlibWindow(QtWidgets.QMainWindow):
+    """
+        @description : custom matplotlib window for showing exported graph and copying to clipboard
+        @author : GaEun Hwang (2026.04.15)
+    """
+    def __init__(self, parent=None):
+        QtWidgets.QMainWindow.__init__(self)
+        self.setObjectName("graphExportMatplotlibWindow")
+        self.matplotlibWidget = MatplotlibWidget.MatplotlibWidget()
+        self.matplotlibWidget.canvas.setStyleSheet("background-color: transparent;")
+        self.matplotlibWidget.toolbar.setMovable(False)
+        self.matplotlibWidget.toolbar.setFloatable(False)
+
+        # add copy action to matplotlib toolbar for copying the current figure to clipboard as image
+        copyAction = QtWidgets.QAction("Copy", self.matplotlibWidget.toolbar)
+        copyIcon = QtGui.QIcon()
+        copyIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_export_copy.png"))
+        copyAction.setIcon(copyIcon)
+        copyAction.triggered.connect(self.copyToClipboard)
+        
+        for action in self.matplotlibWidget.toolbar.actions():
+            # insert copy action before the save action in the toolbar
+            if action.text() == "Save":
+                self.matplotlibWidget.toolbar.insertAction(action, copyAction)
+                return
+        
+    def __getattr__(self, attr):
+        return getattr(self.matplotlibWidget, attr)
+        
+    def closeEvent(self, event):
+        customGraphMatplotlibExporter.windows.remove(self)
+        self.deleteLater()
+
+    def copyToClipboard(self, size=None):
+        """
+            @description : copy current matplotlib figure to clipboard as image
+            @author : GaEun Hwang (2026.04.15)
+        """
+        buffer = BytesIO()
+        fig = self.getFigure()
+        if size is not None:
+            matplotlibFigureDefaultDpi = fig.get_dpi()
+            fig.set_size_inches(size[0] / matplotlibFigureDefaultDpi, size[1] / matplotlibFigureDefaultDpi, forward=False)
+        fig.canvas.print_figure(buffer, format="png")
+        buffer.seek(0)
+        
+        pixmap = QtGui.QPixmap()
+        pixmap.loadFromData(buffer.getvalue())
+        QtWidgets.QApplication.clipboard().setPixmap(pixmap)
+
+    def show(self):
+        """
+            @description : show the matplotlib window and adjust its size and position based on the canvas size and screen size
+            @author : GaEun Hwang (2026.04.27)
+        """
+        screenGeometry = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        canvasSize = self.matplotlibWidget.canvas.size()
+        
+        if canvasSize.width() > screenGeometry.width() or canvasSize.height() > screenGeometry.height():
+            # if canvas size is larger than screen size, show the window with scroll area
+            self.addToolBar(self.matplotlibWidget.toolbar)
+            scrollArea = QtWidgets.QScrollArea()
+            scrollArea.setWidgetResizable(True)
+            scrollArea.setWidget(self.matplotlibWidget.canvas)
+            self.setCentralWidget(scrollArea)
+            super().showMaximized()
+        else:
+            # if canvas size fits within the screen, show the window without scroll area
+            # anchor the toolbar/canvas to the top so they stay in place when the window is maximized
+            self.matplotlibWidget.vbox.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+            self.setCentralWidget(self.matplotlibWidget)
+            self.adjustSize()
+            super().show()

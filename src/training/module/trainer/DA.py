@@ -740,7 +740,7 @@ class T_DSAD():
             for X, _, abnormality, _ in self.train_loader:
                 X = X[torch.where(abnormality == -1)].to(self.device)
                 c_size += X.size(0)
-                c += torch.sum(self.ae_model.encoder(X), dim=0).detach()
+                c += torch.sum(self.ae_model.encoder(X), dim=0).squeeze().detach()
         c /= c_size
 
         c[(abs(c) < 0.1) & (c < 0)] = -0.1

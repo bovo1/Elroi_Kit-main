@@ -8,16 +8,20 @@ import os
 import random
 import copy
 import numpy as np
+import cv2
 from skimage.segmentation import flood
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, pyqtSlot
-from labeling.stylesheet.stylesheet_display_main import stylesheet
+from labeling.module.pixel_based_similarity import calculateSimilarity
 from labeling.module.visualization import DLRGB, CMFRGB
+from labeling.ui.pen_sub_pixel_based_labeling import SimilarityMapWindow
 from utils.viewer import Display_viewer
 from utils.shared import background_image_path
 from constants.constants import *
 from utils.custom_item import customPolygonItem
 from utils.custom_ui import messageBox
+from utils.advanced import simplelabeling
+from labeling.ui.display_menu import displayMenu
 
 ## generate random color
 random_color = lambda : [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
@@ -48,6 +52,7 @@ class Display_Form(QtWidgets.QWidget):
         # Display UI setting
         self.init_Ui_label_main_display(self)
         self.setup_Ui_label_main_display()
+        self.displayMenu = displayMenu(self, sync=Sync, lang=lang)
 
         # Display UI moustracking mode on
         self.setMouseTracking(False)
@@ -73,6 +78,7 @@ class Display_Form(QtWidgets.QWidget):
                 5. Modified by MyoungHwan MyoungHwan (2025.03.14): 라벨데이터 저장 후 keypress 초기화 기능 제거
                 6. Modified by MyoungHwan (2025.06.13): Fixed an issue when selecting "Not Used" in the Label ComboBox
                 7. Modified by GaEun Hwang (2025.10.23): Modify about polygon drawing function for polygon refactoring
+                8. Improvemented by GaEun Hwang (2026.05.28): Added display menu signal connection
         """
         # print("recv_from_core", output)
         recv_from = output['from']
@@ -240,7 +246,7 @@ class Display_Form(QtWidgets.QWidget):
                         self.pen_obj_dict['pen_painting']['obj'].setChecked(False)
                         self.pen_obj_dict['pen_rectangle']['obj'].setChecked(False)
                         self.pen_obj_dict['pen_polygon']['obj'].setChecked(False)
-                        self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
+                        self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
                         self.pen_control_dict['pen_control_sw'] = True
 
                     #기존 label로 point 찍힌 graph pointer 변경
@@ -304,6 +310,22 @@ class Display_Form(QtWidgets.QWidget):
                         self.display_control_dict['drawing_mode'] = DRAWING_MODE_POLYGON
                         self.pen_obj_dict['pen_polygon']['obj'].setChecked(True)
 
+                    elif cur_drawing_mode == DRAWING_MODE_PIXEL_BASED_LABELING:
+                        """
+                            description: Add condition for pixel based labeling mode
+                            added by Hyunsu Kim (2026.05.19)
+                        """
+                        self.display_control_dict['drawing_mode'] = DRAWING_MODE_PIXEL_BASED_LABELING
+                        self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(True)
+
+                    elif cur_drawing_mode == DRAWING_MODE_SEMI_AUTO_LABELING:
+                        """
+                            description: Add condition for semi-auto labeling mode
+                            added by Hyunsu Kim (2026.05.19)
+                        """
+                        self.display_control_dict['drawing_mode'] = DRAWING_MODE_SEMI_AUTO_LABELING
+                        self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
+
                     else:
                         if prev_drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_DRAW_GRAPH_POINT, DRAWING_MODE_ERASE_GRAPH_POINT]:
                             self.display_control_dict['drawing_mode'] = DRAWING_MODE_LABELING
@@ -327,6 +349,22 @@ class Display_Form(QtWidgets.QWidget):
                             self.display_control_dict['drawing_mode'] = DRAWING_MODE_POLYGON
                             self.pen_obj_dict['pen_polygon']['obj'].setChecked(True)
 
+                        elif prev_drawing_mode == DRAWING_MODE_PIXEL_BASED_LABELING:
+                            """
+                                dsecription: Add condition for pixel based labeling mode
+                                added by Hyunsu Kim (2026.05.19)
+                            """
+                            self.display_control_dict['drawing_mode'] = DRAWING_MODE_PIXEL_BASED_LABELING
+                            self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(True)
+
+                        elif prev_drawing_mode == DRAWING_MODE_SEMI_AUTO_LABELING:
+                            """
+                                dsecription: Add condition for semi-auto labeling mode
+                                added by Hyunsu Kim (2026.05.19)
+                            """
+                            self.display_control_dict['drawing_mode'] = DRAWING_MODE_SEMI_AUTO_LABELING
+                            self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
+
                         self.pen_obj_dict['pen_eraser']['obj'].setChecked(False)
                     self.pen_control_dict['pen_control_sw'] = True
 
@@ -341,7 +379,7 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(False)
                     self.pen_obj_dict['pen_rectangle']['obj'].setChecked(False)
                     self.pen_obj_dict['pen_polygon']['obj'].setChecked(False)
-                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(False)
+                    self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(False)
                     self.pen_control_dict['pen_control_sw'] = True
 
             elif label_mode == 'all_hide_show':
@@ -622,7 +660,11 @@ class Display_Form(QtWidgets.QWidget):
                 if pen_mode not in [PEN_MODE_UNDO, PEN_MODE_REDO]:
                     self.disable_polygon_preview()
 
-            if pen_mode not in [PEN_MODE_ZOOM_IN, PEN_MODE_ZOOM_OUT, PEN_MODE_BRIGHT, PEN_MODE_UNDO, PEN_MODE_REDO]:
+            """
+                description: Added a mode condition to keep the graph object in an active state.
+                Modified by Hyunsu Kim (2026.05.12)
+            """
+            if pen_mode not in [PEN_MODE_ZOOM_IN, PEN_MODE_ZOOM_OUT, PEN_MODE_BRIGHT, PEN_MODE_UNDO, PEN_MODE_REDO, PEN_MODE_ROT90, PEN_MODE_HFLIP, PEN_MODE_VFLIP]:
                 self.switch_objects(['graph'], enable=False, exclude=True)
                 self.switch_objects(['graph'], enable=True, exclude=True)
             
@@ -646,8 +688,9 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(True)
                 elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_PAINTING:
                     self.pen_obj_dict['pen_painting']['obj'].setChecked(True)
-                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_SEMI_AUTO_LABELING:
-                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(True)
+                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_ADVANCED_LABELING:
+                    self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(True)
+                self.display_scrollAreaWidgetContents._modscale(mode=0)
             
             #scale down
             elif pen_mode == PEN_MODE_ZOOM_OUT:
@@ -662,8 +705,8 @@ class Display_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['pen_eraser']['obj'].setChecked(True)
                 elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_PAINTING:
                     self.pen_obj_dict['pen_painting']['obj'].setChecked(True)
-                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_SEMI_AUTO_LABELING:
-                    self.pen_obj_dict['penSemiAutoLabeling']['obj'].setChecked(True)
+                elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_ADVANCED_LABELING:
+                    self.pen_obj_dict['penAdvancedLabeling']['obj'].setChecked(True)
                 self.display_scrollAreaWidgetContents._modscale(mode=1)
 
             elif pen_mode == PEN_MODE_PARTIAL_ZOOM:
@@ -677,7 +720,7 @@ class Display_Form(QtWidgets.QWidget):
                 else:
                     self.display_control_dict['drawing_mode'] = DRAWING_MODE_NONE
                     self.update_image_display(self.image_rgb)
-            elif pen_mode in [PEN_MODE_DRAWING, PEN_MODE_PAINTING, PEN_MODE_RECTANGLE, PEN_MODE_POLYGON, PEN_MODE_SEMI_AUTO_LABELING]:
+            elif pen_mode in [PEN_MODE_DRAWING, PEN_MODE_PAINTING, PEN_MODE_RECTANGLE, PEN_MODE_POLYGON, PEN_MODE_ADVANCED_LABELING]:
                 #drawing mode
                 print("drawing mode")
                 if toggle:
@@ -700,8 +743,8 @@ class Display_Form(QtWidgets.QWidget):
                     self.label_control_dict['old_select_label_number'] = self.label_control_dict['select_main_label_number']
                     self.label_control_dict['select_main_label_number'] = LABEL_UNSELECTED
                     self.switch_objects(['label'], enable=False, exclude=True)
-                    
-                if pen_mode == PEN_MODE_DRAWING or pen_mode == PEN_MODE_SEMI_AUTO_LABELING:
+
+                if pen_mode == PEN_MODE_DRAWING or pen_mode == PEN_MODE_ADVANCED_LABELING:
                     tmp_dict = {}
                     tmp_dict['mode'] = 'select'
                     tmp_dict['type'] = 'main'
@@ -766,7 +809,14 @@ class Display_Form(QtWidgets.QWidget):
                     self.pop_redo_memory()
 
             elif pen_mode == PEN_MODE_ROT90:
-                self.display_scrollAreaWidgetContents.rotate_viewer(angle=90, clock_wise=True)
+                """
+                    description: Modified the logic to adjust the direction by checking the flip count when the pen mode is set to rotate.
+                    Author : Hyunsu Kim (2026.05.12)
+                """
+                if output['flipCount'] % 2 == 0:
+                    self.display_scrollAreaWidgetContents.rotate_viewer(angle=90, clock_wise=True)
+                else:
+                    self.display_scrollAreaWidgetContents.rotate_viewer(angle=90, clock_wise=False)
             elif pen_mode == PEN_MODE_HFLIP:
                 self.display_scrollAreaWidgetContents.flip_horizontal()
             elif pen_mode == PEN_MODE_VFLIP:
@@ -795,7 +845,7 @@ class Display_Form(QtWidgets.QWidget):
                         messageBox(mode=MESSAGE_BOX_WARNING, 
                                    title=self.lang.get("main", "messageBox", "msgWarning"),
                                    text=self.lang.get("labeling", "display_main", "displayImageSelectWarningMsg"),
-                                   buttons={self.lang.get("main", "messageBox", "msgOK"): "accept"})
+                                   buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
             
                         self.pen_obj_dict['pen_image']['obj'].setChecked(False)
                         return
@@ -805,7 +855,7 @@ class Display_Form(QtWidgets.QWidget):
                         messageBox(mode=MESSAGE_BOX_WARNING,
                                    title=self.lang.get("main", "messageBox", "msgWarning"),
                                    text=self.lang.get("labeling", "display_main", "displayImagePathNoneMsg"),
-                                   buttons={self.lang.get("main", "messageBox", "msgOK"): "accept"})
+                                   buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
                         self.pen_obj_dict['pen_image']['obj'].setChecked(False)
 
         elif recv_from == 'pen_sub':
@@ -876,6 +926,28 @@ class Display_Form(QtWidgets.QWidget):
             self.image_rgb[indice] = tmp_image_rgb.astype(np.uint8)
             self.update_graph()
             self.update_image_display(self.image_rgb)
+        
+        elif recv_from == 'displayMenu':
+            mode = output['mode']
+            if mode == 'removeLabel':
+                self.check_diff(mode=0)
+                self.removeObjectLabel(output['pos'])
+                self.check_diff(mode=1)
+
+        elif recv_from == 'similarity_map':
+            """
+                description : receive similarity map information and apply to display
+                author : Hyunsu Kim (2026.05.19)
+            """
+            mode = output['mode']
+            if mode == 'thresholdChanged':
+                self.onSimilarityThresholdChanged(output['threshold'])
+            elif mode == 'modeChanged':
+                self.onSimilarityModeChanged(output['similarity_mode'])
+            elif mode == 'applyLabeling':
+                self.onSimilarityApplyLabeling(output['threshold'])
+            elif mode == 'windowClosed':
+                self.onSimilarityWindowClosed()
 
         else:
             print("Exception recv_from:", output['from'])
@@ -910,6 +982,7 @@ class Display_Form(QtWidgets.QWidget):
         self.display_to_graph_signal = self.Sync.display_to_graph_signal
         self.displayToGraphGroupSignal = self.Sync.displayToGraphGroupSignal
         self.display_to_pen_style_signal = self.Sync.display_to_pen_style_signal
+        self.displayToDisplayMenuSignal = self.Sync.displayToDisplayMenuSignal
 
         #function object 항목, UI의 위젯 제어시 사용
         self.core_obj_dict = self.Sync.core_obj_dict
@@ -918,6 +991,7 @@ class Display_Form(QtWidgets.QWidget):
         self.graph_obj_dict = self.Sync.graph_obj_dict
 
         self.display_control_dict = self.Sync.display_control_dict
+        self.displayMenuControlDict = self.Sync.displayMenuControlDict
         self.image_control_dict = self.Sync.image_control_dict
         self.label_control_dict = self.Sync.label_control_dict
         self.graph_control_dict = self.Sync.graph_control_dict
@@ -925,6 +999,7 @@ class Display_Form(QtWidgets.QWidget):
         self.labelViewGraphGroupDict = self.Sync.labelViewGraphGroupDict
         self.pen_control_dict = self.Sync.pen_control_dict
         self.semiAutoLabelingDict = self.Sync.semiAutoLabelingDict
+        self.pixelBasedLabelingDict = self.Sync.pixelBasedLabelingDict
 
     def init_variable(self):
         """Diplay 초기 선언 시 변수 선언문이다. 각종 변수들이 이곳에서 선언된다.
@@ -992,21 +1067,13 @@ class Display_Form(QtWidgets.QWidget):
         self.image_graph_rgb_label = []
         self.image_graph_rgb_point = []
 
-        #graph list clear
-        for obj_name in list(self.graph_obj_dict.keys()):
-            if obj_name not in ["graph_color"]:
-                self.graph_obj_dict[obj_name]['obj'].setChecked(False)
-            
-        self.clear_graph_list()
-        # clear LDA graph for initialization
-        self.clearLDAGraph()
-
         # control key pressed
         self.is_ctrl_key_pressed = False
 
         #update init exclude list
+        # add graphRgb in graph objs
         self.excluded_pen_objs = ['pen_undo', 'pen_redo']
-        self.excluded_graph_objs = ['graph_linedrawing', 'graph_color', 'graph_view_mode']
+        self.excluded_graph_objs = ['graph_linedrawing', 'graph_color', 'graph_view_mode', 'graphRgb']        
         self.excluded_label_objs = []
 
         # polygon information
@@ -1219,11 +1286,130 @@ class Display_Form(QtWidgets.QWidget):
         self.pen_obj_dict['pen_eraser']['sub_form'].close()
         self.pen_obj_dict['pen_eraser']['opened'] = False
 
-    def closeSemiAutoLabelingSettingForm(self):
-        """마우스 우클릭을 통해 Semi Auto Labeling 상세 설정 창이 열린 상태에서 Display를 클릭했을 때 close하기 위한 함수이다.
+    def closePixelBasedLabelingSettingForm(self):
         """
-        self.pen_obj_dict['penSemiAutoLabeling']['sub_form'].close()
-        self.pen_obj_dict['penSemiAutoLabeling']['opened'] = False
+            description : Close the Pixel-Based Labeling detailed settings form when Display is clicked.
+            author : Hyunsu Kim (2026.05.20)
+        """
+        self.pen_obj_dict['penAdvancedLabeling']['semiAutoForm'].close()
+        self.pen_obj_dict['penAdvancedLabeling']['opened'] = False
+
+    def showSimilarityMapWindow(self, row:int, col:int):
+        """
+            description : Computes similarity map for clicked pixel and shows histogram window.
+            author : Hyunsu Kim (2026.05.20)
+        """
+        ref = self.image_raw[row, col]
+        mode = self.pixelBasedLabelingDict['similarityMode']
+        similarity = calculateSimilarity(self.image_raw, ref, mode)
+
+        # Mask already-labeled pixels — only label-0 (unlabeled) pixels participate
+        similarity[self.image_label != 0] = np.nan
+
+        # Create or reuse window
+        self.similarityMapWindow = SimilarityMapWindow(
+            lang=self.lang,
+            Sync=self.Sync,
+            pixelBasedLabelingDict=self.pixelBasedLabelingDict,
+            parent=self
+        )
+
+        # Store current pixel info for threshold updates
+        self.simMapRow = row
+        self.simMapCol = col
+        self.simMapSimilarity = similarity
+
+        # Save clean image state (existing labels, no preview overlay)
+        self.previewBaseImageRgb = self.image_rgb.copy()
+
+        self.similarityMapWindow.updateHistogram(similarity)
+        self.similarityMapWindow.show()
+        self.similarityMapWindow.raise_()
+
+    def onSimilarityThresholdChanged(self, threshold):
+        """
+            description : Show preview overlay of pixels above threshold without applying labels
+            author : Hyunsu Kim (2026.05.20)    
+        """
+        mask = self.simMapSimilarity >= threshold
+        self.image_rgb = self.previewBaseImageRgb.copy()
+        selectLabel = self.label_control_dict['select_main_label_number']
+        selectColor = self.label_obj_dict[selectLabel]['color']
+        if np.any(mask):
+            indice = np.where(mask)
+            previewColor = np.array(selectColor, dtype=np.float32)
+            self.image_rgb[indice] = (PIXEL_BASED_LABELING_OPACITY * previewColor + (1 - PIXEL_BASED_LABELING_OPACITY) * \
+                                      self.previewBaseImageRgb[indice].astype(np.float32)).astype(np.uint8)
+        self.update_image_display(self.image_rgb)
+
+    def onSimilarityApplyLabeling(self, threshold):
+        """
+            description : Apply actual labeling with current threshold
+            author : Hyunsu Kim (2026.05.20)    
+        """
+        if not hasattr(self, 'simMapSimilarity') or self.simMapSimilarity is None:
+            return
+        label_number = self.label_control_dict['select_main_label_number']
+        mask = self.simMapSimilarity >= threshold
+        if not np.any(mask):
+            return
+        indice = np.where(mask)
+        self.update_drawing(label_number=label_number, indice=indice)
+        tmp_dict = {}
+        tmp_dict['mode'] = 'modify'
+        tmp_dict['type'] = 'display'
+        tmp_dict['type_detail'] = 'drawing_label_data'
+        tmp_dict['label_number'] = label_number
+        tmp_dict['indice'] = indice
+        self.display_to_core(tmp_dict)
+        self.previewBaseImageRgb = self.image_rgb.copy()
+        self.update_image_display(self.image_rgb)
+
+    def onSimilarityWindowClosed(self):
+        """
+            description : Restore image to pre-preview state when similarity map window is closed
+            author : Hyunsu Kim (2026.05.20)    
+        """
+        self.image_rgb = self.previewBaseImageRgb.copy()
+        self.update_image_display(self.image_rgb)
+        self.previewBaseImageRgb = None
+
+    def onSimilarityModeChanged(self, mode):
+        """
+            description : Recalculate similarity map when mode changes in the window
+            author : Hyunsu Kim (2026.05.20)    
+        """
+        row, col = self.simMapRow, self.simMapCol
+        ref = self.image_raw[row, col]
+        similarity = calculateSimilarity(self.image_raw, ref, mode)
+        similarity[self.image_label != 0] = np.nan
+        self.simMapSimilarity = similarity
+        self.similarityMapWindow.updateHistogram(self.simMapSimilarity)
+
+    def closeRectangleSALSettingForm(self):
+        """
+            @ Description: A function for closing when the Rectangle Mode menu and setting window are opened through right-click of the mouse
+            @ Author: GaEun Hwang(2026.06.01)
+        """
+        self.pen_obj_dict['pen_rectangle']['sub_form'].close()
+        self.pen_obj_dict['pen_rectangle']['sub_menu'].close()
+        self.pen_obj_dict['pen_rectangle']['opened'] = False
+        self.pen_obj_dict['pen_rectangle']['menu_opened'] = False
+
+        if self.pen_obj_dict['pen_rectangle']['obj'].isChecked():
+            if self.pen_obj_dict['pen_rectangle']['sub_mode'] is None or (self.pen_obj_dict['pen_rectangle']['sub_mode'] == DRAWING_SUB_MODE_RECTANGLE_SAL and self.pen_obj_dict['pen_rectangle']['settings'] is None):
+                self.pen_obj_dict['pen_rectangle']['obj'].setChecked(False)
+                self.display_control_dict['drawing_mode'] = DRAWING_MODE_NONE
+                self.label_control_dict['old_select_label_number'] = self.label_control_dict['select_main_label_number']
+                self.label_control_dict['select_main_label_number'] = LABEL_UNSELECTED
+                self.switch_objects(['label'], enable=False, exclude=True)
+                
+                if self.pen_obj_dict['pen_rectangle']['sub_mode'] == DRAWING_SUB_MODE_RECTANGLE_SAL and self.pen_obj_dict['pen_rectangle']['settings'] is None:
+                    messageBox(
+                        mode = MESSAGE_BOX_WARNING,
+                        title = self.lang.get("main", "messageBox", "msgWarning"),
+                        text = self.lang.get("labeling", "penSubRectangle", "penRectangleModeSALWarningMsg"),
+                    )    
 
     def toggle_all_controls(self, enable:bool=None) -> None:
         """
@@ -1452,7 +1638,8 @@ class Display_Form(QtWidgets.QWidget):
                 curr_labels = np.copy(memory[resolved_memory_index]["label"])
                 
                 # remove memory for specific indices
-                if np.unique(curr_labels[prev_labels != curr_labels]) == label:
+                changeLabel = np.unique(curr_labels[prev_labels != curr_labels])
+                if changeLabel.size == 1 and changeLabel[0] == label:
                     memory.pop(resolved_memory_index)
                     relative_index += 1
                 else:
@@ -1618,6 +1805,25 @@ class Display_Form(QtWidgets.QWidget):
                 self.polygonItem.isMatched = False
         else:
             pass
+    
+    def updateDrawingFromPolygon(self, selected_label_number:int):
+        """
+            @description : A function to update the image based on the polygon drawn by the user.
+            @author : GaEun Hwang(2026.04.08)
+        """
+        self.polygonInsidePoints = self.polygonItem.getPointFromPolygon()
+        # when valid polygon
+        if len(self.polygonInsidePoints) > 0:
+            x_array, y_array = zip(*self.polygonInsidePoints)
+            indice = (np.array(y_array), np.array(x_array))
+            self.update_drawing(label_number=selected_label_number, indice=indice)
+            self.update_image_display(self.image_rgb)
+            self.polygonInsidePoints = []
+            
+            return indice
+        else:
+            print("Error, inside point in polygon is None")
+            return None
 
     def LoadImage(self, Form, path:str=None) -> None:
         """
@@ -1628,7 +1834,6 @@ class Display_Form(QtWidgets.QWidget):
         """
         Form.setObjectName("Form")
         Form.setWindowTitle("Display_Form")
-        Form.setStyleSheet(stylesheet)
 
         self.display_scrollAreaWidgetContents.setParent(None)
         self.splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal, self)
@@ -1726,12 +1931,17 @@ class Display_Form(QtWidgets.QWidget):
                 3. Improvemented by MyoungHwan (2024.12.13): label_obj_dict key 구조 수정
                 4. Improvemented by GaEun Hwang (2025.10.20): Improve polygon drawing function
                 5. Added by Yugyeong Hong(2026.02.04): Add Semi Auto Labeling drawing function
+                6. Added by GaEun Hwang(2026.05.28): Add Rectangle drawing function
         """
         x, y = cur_point
         """
             description
             Modified by MyoungHwan(20240529) : 마우스 위치에 따른 조건 추가
         """
+        if not in_pixmap and self.select_image_number != IMAGE_UNSELECTED:
+            if self.pen_obj_dict['pen_rectangle']['opened'] or self.pen_obj_dict['pen_rectangle']['menu_opened']:
+                self.sub_window_sw = True
+                self.closeRectangleSALSettingForm()  
         if in_pixmap and self.select_image_number != IMAGE_UNSELECTED:
             if self.pen_obj_dict['pen_draw_type']['opened']:
                 # close pen sub form
@@ -1740,9 +1950,19 @@ class Display_Form(QtWidgets.QWidget):
             elif self.pen_obj_dict['pen_eraser']['opened']:
                 self.sub_window_sw = True
                 self.close_eraser_setting_form()
-            elif self.pen_obj_dict['penSemiAutoLabeling']['opened']:
+            elif self.pen_obj_dict['penAdvancedLabeling']['opened']:
                 self.sub_window_sw = True
-                self.closeSemiAutoLabelingSettingForm()
+                self.closePixelBasedLabelingSettingForm()
+
+            elif self.pen_obj_dict['pen_rectangle']['opened'] or self.pen_obj_dict['pen_rectangle']['menu_opened']:
+                self.sub_window_sw = True
+                self.closeRectangleSALSettingForm()
+            
+            elif self.displayMenuControlDict['opened'] and e.button() == Qt.LeftButton:
+                self.sub_window_sw = True
+                self.displayMenu.close()
+                self.displayMenuControlDict['opened'] = False
+
             else:
                 if e.button() in [Qt.LeftButton, Qt.RightButton] : #현재상태 저장
                     """
@@ -1764,6 +1984,44 @@ class Display_Form(QtWidgets.QWidget):
                         indice = self.update_point_indice(cur_point=cur_point)
                         self.update_drawing(label_number=selected_label_number, indice=indice)
                         self.update_image_display(self.image_rgb)
+
+                    elif drawing_mode == DRAWING_MODE_ADVANCED_LABELING:
+                        """
+                            description : Processing by distinguishing between pixel-based labeling and Semi Auto Labeling modes in Advanced Labeling mode
+                            author : Hyunsu Kim (2026.05.19)
+                        """
+                        if self.pen_obj_dict['penAdvancedLabeling']['pixelBased']:
+                            # pixel-based labeling mode - show similarity map window
+                            if len(self.image_raw[self.image_label == 0]) == 0:
+                                messageBox(mode=MESSAGE_BOX_WARNING, 
+                                   title=self.lang.get("main", "messageBox", "msgWarning"),
+                                   text=self.lang.get("labeling", "display_main", "displayLabelNotFound"),
+                                   buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
+                                return
+                            self.showSimilarityMapWindow(row=y, col=x)
+                        elif self.pen_obj_dict['penAdvancedLabeling']['semiAuto']:
+                            # Semi Auto Labeling mode
+                            selected_label_number = self.label_control_dict['select_main_label_number']
+                            if selected_label_number == LABEL_UNSELECTED:
+                                raise Exception("error select label number is None... please select label number....set change default label number(0)")
+                            
+                            # Display labelled pixels
+                            if 'aMap' in self.semiAutoLabelingDict and self.semiAutoLabelingDict['aMap'] is not None:
+                                indice = self.semiAutoLabelingDict['builder'].regionGrowing(
+                                    data=self.semiAutoLabelingDict["data"],
+                                    aMap=self.semiAutoLabelingDict['aMap'],
+                                    seed=(y,x),
+                                    strictnessPercentile=self.pen_control_dict['penSemiStrictness'],
+                                    thetaIntraPercentile=self.pen_control_dict['penSemiTolerance'])
+
+                                self.update_drawing(label_number=selected_label_number, indice=indice)
+                                self.update_image_display(self.image_rgb)
+
+                            else:
+                                 messageBox(mode=MESSAGE_BOX_WARNING, 
+                                   title=self.lang.get("main", "messageBox", "msgWarning"),
+                                   text=self.lang.get("labeling", "display_main", "displayNotApplyClickedMsg"),
+                                   buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
 
                     elif drawing_mode == DRAWING_MODE_ERASING:
                         # eraser mode
@@ -1906,10 +2164,18 @@ class Display_Form(QtWidgets.QWidget):
                         if self.prev_point:
                             if self.prev_point == cur_point:
                                 self.prev_point = []
-                            indice = self.update_point_indice(cur_point=cur_point, prev_point=self.prev_point)
-                            self.update_drawing(label_number=selected_label_number, indice=indice)
-                            self.update_image_display(self.image_rgb)
-                            self.disable_rect_preview()
+                            if self.pen_obj_dict['pen_rectangle']['sub_mode'] == DRAWING_SUB_MODE_RECTANGLE_DEFAULT:
+                                indice = self.update_point_indice(cur_point=cur_point, prev_point=self.prev_point)
+                            elif self.pen_obj_dict['pen_rectangle']['sub_mode'] == DRAWING_SUB_MODE_RECTANGLE_SAL:
+                                rectangleSALSettings = self.pen_obj_dict['pen_rectangle']['settings']
+                                if self.prev_point != []:
+                                    indice, rectIndice, _ = self.applySALRectangle(self.image_raw, self.prev_point, cur_point, rectangleSALSettings)
+                                    if indice is not None and rectIndice is not None:
+                                        self.update_drawing(label_number=0, indice=rectIndice)
+                            if indice is not None:
+                                self.update_drawing(label_number=selected_label_number, indice=indice)
+                                self.update_image_display(self.image_rgb)
+                                self.disable_rect_preview()
                         else:
                             self.prev_point = cur_point
                             color = self.label_obj_dict[selected_label_number]['color']
@@ -1918,9 +2184,10 @@ class Display_Form(QtWidgets.QWidget):
                     elif drawing_mode == DRAWING_MODE_POLYGON:
                         #polygon mode
                         selected_label_number = self.label_control_dict['select_main_label_number']
-                        self.polygonItem.setStyle(QtGui.QColor(*self.label_obj_dict[selected_label_number]['color']))
                         if selected_label_number == LABEL_UNSELECTED:
                             raise Exception("error select label number is None... please select label number....set change default label number(0)")
+                        self.polygonItem.updateRadius(self.display_scrollAreaWidgetContents._zoom)
+                        self.polygonItem.setStyle(QtGui.QColor(*self.label_obj_dict[selected_label_number]['color']))
                         # draw polygon line and ellipse when self.prev_point has more than 2 points
                         self.polygonItem.addPoint(QtCore.QPointF(cur_point[0], cur_point[1]))
                         self.polygonItem.update()
@@ -1928,35 +2195,10 @@ class Display_Form(QtWidgets.QWidget):
 
                         # draw polygon when current point and first point are same
                         if self.polygonItem.polygon is not None:
-                            self.polygonInsidePoints = self.polygonItem.getPointFromPolygon()
-                            # when valid polygon
-                            if len(self.polygonInsidePoints) > 0:
-                                x_array, y_array = zip(*self.polygonInsidePoints)
-                                indice = (np.array(y_array), np.array(x_array))
-                                self.update_drawing(label_number=selected_label_number, indice=indice)
-                                self.update_image_display(self.image_rgb)
-                                self.polygonInsidePoints = []
-                            else:
-                                raise Exception("error, inside point in polygon is None")
-                    elif drawing_mode == DRAWING_MODE_SEMI_AUTO_LABELING:
-                        # Semi Auto Labeling mode
-                        selected_label_number = self.label_control_dict['select_main_label_number']
-                        if selected_label_number == LABEL_UNSELECTED:
-                            raise Exception("error select label number is None... please select label number....set change default label number(0)")
-                        
-                        # Display labelled pixels
-                        if 'aMap' in self.semiAutoLabelingDict and self.semiAutoLabelingDict['aMap'] is not None:
-                            indice = self.semiAutoLabelingDict['builder'].regionGrowing(
-                                data=self.semiAutoLabelingDict["data"],
-                                aMap=self.semiAutoLabelingDict['aMap'],
-                                seed=(y,x),
-                                strictnessPercentile=self.pen_control_dict['penSemiStrictness'], 
-                                thetaIntraPercentile=self.pen_control_dict['penSemiTolerance'])
-   
-                            self.update_drawing(label_number=selected_label_number, indice=indice)
-                            self.update_image_display(self.image_rgb)
+                            # updateDrawingFromPolygon is called after polygon is completed
+                            indice = self.updateDrawingFromPolygon(selected_label_number)
       
-                    if indice is not None and len(indice) > 0 and drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING, DRAWING_MODE_PAINTING, DRAWING_MODE_RECTANGLE, DRAWING_MODE_POLYGON, DRAWING_MODE_SEMI_AUTO_LABELING]:
+                    if indice is not None and len(indice) > 0 and drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING, DRAWING_MODE_PAINTING, DRAWING_MODE_RECTANGLE, DRAWING_MODE_POLYGON, DRAWING_MODE_ADVANCED_LABELING]:
                         tmp_dict = {}
                         tmp_dict['mode'] = 'modify'
                         tmp_dict['type'] = 'display'
@@ -1972,22 +2214,48 @@ class Display_Form(QtWidgets.QWidget):
                             self.disable_polygon_preview()
 
                 elif e.button() == Qt.RightButton:
-                    self.right_drawstart = True
+                    indice = None
                     if self.display_control_dict['drawing_mode'] == DRAWING_MODE_LABELING:
+                        self.right_drawstart = True
                         # 드로잉 모드일때 오른쪽 마우스 클릭시 sub 드로잉펜
                         selected_label_number = self.label_control_dict['select_sub_label_number']
                         if selected_label_number != LABEL_UNSELECTED:
                             indice = self.update_point_indice(cur_point=cur_point)
                             self.update_drawing(label_number=selected_label_number, indice=indice)
                             self.update_image_display(self.image_rgb)
+                        else:
+                            self.showMenu(QtGui.QCursor.pos(), cur_point)
 
-                            tmp_dict = {}
-                            tmp_dict['mode'] = 'modify'
-                            tmp_dict['type'] = 'display'
-                            tmp_dict['type_detail'] = 'drawing_label_data'
-                            tmp_dict['label_number'] = selected_label_number
-                            tmp_dict['indice'] = indice
-                            self.display_to_core(tmp_dict)
+                    elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_POLYGON:
+                        # polygon mode right click -> auto complete polygon
+                        selected_label_number = self.label_control_dict['select_main_label_number']
+                        if self.polygonItem.isDrawing and len(self.polygonItem.points) > 2:
+                            self.polygonItem.completeDrawing()
+                            indice = self.updateDrawingFromPolygon(selected_label_number)
+                        elif self.polygonItem.isDrawing and len(self.polygonItem.points) <= 2:
+                            indice = None
+                            messageBox(mode=MESSAGE_BOX_INFORMATION, 
+                                    title=self.lang.get("main", "messageBox", "msgInformation"),
+                                    text=self.lang.get("labeling", "graph_main", "polygonAutoCompleteInformationMessage"),
+                                    buttons={self.lang.get("main", "messageBox", "msgOk"): "accept"})
+                        elif not self.polygonItem.isDrawing:
+                            self.showMenu(QtGui.QCursor.pos(), cur_point)
+                    
+                    elif self.display_control_dict['drawing_mode'] == DRAWING_MODE_RECTANGLE:
+                        if not self.prev_point:
+                            self.showMenu(QtGui.QCursor.pos(), cur_point)
+                    
+                    else:
+                        self.showMenu(QtGui.QCursor.pos(), cur_point)
+
+                    if indice is not None and len(indice) > 0:
+                        tmp_dict = {}
+                        tmp_dict['mode'] = 'modify'
+                        tmp_dict['type'] = 'display'
+                        tmp_dict['type_detail'] = 'drawing_label_data'
+                        tmp_dict['label_number'] = selected_label_number
+                        tmp_dict['indice'] = indice
+                        self.display_to_core(tmp_dict)
 
             if self.pen_obj_dict['pen_minimap']['form'].isVisible():
                 start_x, start_y, end_x, end_y = self.update_point_indice_minimap(cur_point=cur_point)
@@ -2274,7 +2542,6 @@ class Display_Form(QtWidgets.QWidget):
         Form.setObjectName("Form")
         # Form.resize(1029, 738)
         Form.setWindowTitle("Display_Form")
-        Form.setStyleSheet(stylesheet)
 
         self.display_gridLayout = QtWidgets.QGridLayout(Form)
         self.display_gridLayout.setObjectName("display_gridLayout")
@@ -2312,6 +2579,93 @@ class Display_Form(QtWidgets.QWidget):
         else:
             self.update_image_display(self.image_rgb)
 
+    def applySALRectangle(self, rawData, firstCoord, secondCoord, settings):
+        """
+            @ Description : A function to set SAL in a rectangle area defined by two coordinates.
+            @ Author: GaEun Hwang (2026.05.28)
+        """
+        H, W, C = rawData.shape
+
+        # regularize rectangle coordinates protected against out of image boundary
+        y1, y2 = sorted([firstCoord[1], secondCoord[1]])
+        x1, x2 = sorted([firstCoord[0], secondCoord[0]])
+        y1 = max(0, y1); y2 = min(H, y2 + 1)
+        x1 = max(0, x1); x2 = min(W, x2 + 1)
+
+        # set only rectangle area to 1 for input in simplelabeling
+        tmpLabel = np.zeros((H, W), dtype=np.int32)
+        tmpLabel[y1:y2, x1:x2] = 1
+
+        # clustering label 1 pixels into 2 clusters
+        result = simplelabeling(rawData, tmpLabel, label_num=1, c_num=2)
+        if result[0] == 0:
+            return None, None, None
+
+        _, indices, clusterCenters, predictResult = result
+
+        # select cluster according to the settings
+        clusterZeroIsBigger = np.sum(clusterCenters[0] - clusterCenters[1] > 0) >= np.sum(clusterCenters[1] - clusterCenters[0] > 0)
+        if settings['standardNormalSpectrum'] == 0: # 0: Negative, 1: Positive
+            objClusterId = 1 if clusterZeroIsBigger else 0
+        else:  # Positive
+            objClusterId = 0 if clusterZeroIsBigger else 1
+
+        # create label mask
+        labelMask = np.zeros(H * W, dtype=np.uint8)
+        labelMask[indices] = (predictResult == objClusterId).astype(np.uint8)
+        objMask = labelMask.reshape(H, W)
+
+        # apply kernel to label mask if needed
+        if settings['kernelType'] != 0: # kernelType 0: Not Use, 1: Expand, 2: Reduce
+            k = np.ones((settings['kernelSize'], settings['kernelSize']), np.uint8)
+            if settings['kernelType'] == 1: # Expand
+                objMask = cv2.dilate(objMask, k, iterations=1)
+            elif settings['kernelType'] == 2: # Reduce
+                objMask = cv2.erode(objMask, k, iterations=1)
+
+        objYs, objXs = np.where(objMask == 1)
+        rectYs, rectXs = np.where(tmpLabel == 1)
+        return (objYs, objXs), (rectYs, rectXs), clusterCenters
+
+    def showMenu(self, globalPos, pos):
+        """
+            @ Description : A function to show the menu when the mouse is right-clicked.
+            @ Author: GaEun Hwang (2026.05.28)
+        """
+        clickedLabelNumber = self.image_label[pos[1], pos[0]]
+        clickedLabelName = self.label_obj_dict[clickedLabelNumber]['name'] if clickedLabelNumber in self.label_obj_dict else 'None'
+        clickedLabelOpacity = self.label_obj_dict[clickedLabelNumber]['label_color_alpha']
+        # send label information at the clicked position to update the display menu
+        emitDict = {'labelClass': clickedLabelNumber, 'labelName': clickedLabelName, 'labelOpacity': clickedLabelOpacity}
+        self.displayToDisplayMenuSignal.emit(emitDict)
+
+        self.displayMenu.show_(globalPos, pos)
+
+    def removeObjectLabel(self, pos):
+        """
+            @ Description : A function to remove the label of the object at a given position.
+            @ Author: GaEun Hwang (2026.05.28)
+        """
+        indice = flood(self.image_label, (pos[1], pos[0]), connectivity=1)
+        self.update_drawing(label_number=LABEL_IGNORED, indice=indice)
+        self.update_image_display(self.image_rgb)
+
+        emitDict = {}
+        emitDict['mode'] = 'modify'
+        emitDict['type'] = 'display'
+        emitDict['type_detail'] = 'drawing_label_data'
+        emitDict['label_number'] = LABEL_IGNORED
+        emitDict['indice'] = indice
+        self.display_to_core(emitDict)
+    
+    def adjustLabelOpacity(self, pos, opacity):
+        """
+            @ Description : A function to adjust the opacity of the label at a given position.
+            @ Author: GaEun Hwang (2026.05.28)
+        """
+        labelNumber = self.image_label[pos[1], pos[0]]
+        self.label_obj_dict[labelNumber]['label_color_alpha'] = opacity
+        self.update_data_list(label_number=labelNumber)
 
 if __name__ == "__main__":
     import sys
