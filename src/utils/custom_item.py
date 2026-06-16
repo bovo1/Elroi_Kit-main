@@ -468,7 +468,7 @@ class customGraphMatplotlibExporter(exporters.MatplotlibExporter):
             ax.plot(x * xScale, y * yScale, **self.makePlotKwargs(item))
 
             # if fillLevel and fillBrush are both set, draw a filled area under the curve
-            if item.opts["fillLevel"] is not None and item.opts["fillBrush"] is not None:
+            if item.opts.get("fillLevel") is not None and item.opts.get("fillBrush") is not None:
                 fillcolor = fn.mkBrush(item.opts["fillBrush"]).color().getRgbF()
                 ax.fill_between(x=x * xScale, y1=y * yScale, y2=item.opts["fillLevel"], facecolor=fillcolor)
 
@@ -502,9 +502,9 @@ class customGraphMatplotlibExporter(exporters.MatplotlibExporter):
             kwargs.update({
                 # translate pyqtgraph symbol name to matplotlib marker identifier
                 "marker": self.SYMBOL_PG_TO_MPL.get(opts["symbol"], ""),
-                "markersize": opts["symbolSize"],
-                "markeredgecolor": fn.mkPen(opts["symbolPen"]).color().getRgbF() if opts["symbolPen"] else None,
-                "markerfacecolor": fn.mkBrush(opts["symbolBrush"]).color().getRgbF() if opts["symbolBrush"] else None,
+                "markersize": opts["size"],
+                "markeredgecolor": "none" if pen.style() == QtCore.Qt.PenStyle.NoPen else pen.color().getRgbF(),
+                "markerfacecolor": fn.mkBrush(opts["brush"]).color().getRgbF() if opts["brush"] else None,
             })
         return kwargs
 
@@ -553,7 +553,7 @@ class customMatplotlibWindow(QtWidgets.QMainWindow):
         copyIcon = QtGui.QIcon()
         copyIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_export_copy.png"))
         copyAction.setIcon(copyIcon)
-        copyAction.triggered.connect(self.copyToClipboard)
+        copyAction.triggered.connect(lambda: self.copyToClipboard)
         
         for action in self.matplotlibWidget.toolbar.actions():
             # insert copy action before the save action in the toolbar
@@ -575,9 +575,13 @@ class customMatplotlibWindow(QtWidgets.QMainWindow):
         """
         buffer = BytesIO()
         fig = self.getFigure()
+        matplotlibFigureDefaultDpi = fig.get_dpi()
         if size is not None:
-            matplotlibFigureDefaultDpi = fig.get_dpi()
             fig.set_size_inches(size[0] / matplotlibFigureDefaultDpi, size[1] / matplotlibFigureDefaultDpi, forward=False)
+        else:
+            currentCanvasSize = self.matplotlibWidget.canvas.size()
+            fig.set_size_inches(currentCanvasSize.width() / matplotlibFigureDefaultDpi, currentCanvasSize.height() / matplotlibFigureDefaultDpi, forward=False)
+            
         fig.canvas.print_figure(buffer, format="png")
         buffer.seek(0)
         

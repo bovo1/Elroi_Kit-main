@@ -223,6 +223,8 @@ class Display_Form(QtWidgets.QWidget):
                     tmp_dict['color'] = self.label_obj_dict[0]['color']
                     self.display_to_graph(tmp_dict)
                     self.switch_objects(['pen'], enable=True, exclude=True)
+                    self.pen_obj_dict['penAdvancedLabeling']['pixelBased'] = False
+                    self.pen_obj_dict['penAdvancedLabeling']['semiAuto'] = False
 
                     """
                         Description: 효율적인 연산을 위한 코드 수정
@@ -2230,7 +2232,8 @@ class Display_Form(QtWidgets.QWidget):
                         # polygon mode right click -> auto complete polygon
                         selected_label_number = self.label_control_dict['select_main_label_number']
                         if self.polygonItem.isDrawing and len(self.polygonItem.points) > 2:
-                            self.polygonItem.completeDrawing()
+                            # self.polygonItem.completeDrawing()
+                            self.polygonItem.addPoint(self.polygonItem.points[0])
                             indice = self.updateDrawingFromPolygon(selected_label_number)
                         elif self.polygonItem.isDrawing and len(self.polygonItem.points) <= 2:
                             indice = None

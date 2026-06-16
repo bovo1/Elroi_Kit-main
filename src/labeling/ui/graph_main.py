@@ -71,6 +71,11 @@ class Graph_Form(QtWidgets.QWidget):
                 self.clearLDAGraph()
             else:
                 self.clear_graph_list()
+                if self.graphRgb.isChecked():
+                    self.graphRgb.setChecked(False)
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_RED])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_GREEN])
+                    self.graph_plot_widget.removeItem(self.rgbLinesWidget[SUBRGB_BLUE])
                 # when currentgraphmode is LDA, clear_graph_list function only clear the graph points that user added in LDA graph widget.
                 # create a clearLDAGraph function to reset the entire LDA graph when the image is changed or released.
                 self.clearLDAGraph()

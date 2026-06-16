@@ -16,7 +16,6 @@ class penRectangleSubMenu(QtWidgets.QMenu):
         super().__init__(parent)
         self.init(sync, lang)
         self.initUI()
-        # self.initFunction()
         self.setupUI()
         self.setLanguage()
 
@@ -202,7 +201,8 @@ class penRectangleSALForm(QtWidgets.QWidget):
         self.penObjDict['pen_rectangle']['settings'] = self.getSALSettings()
         self.close()
         self.penObjDict['pen_rectangle']['opened'] = False
-        self.penObjDict['pen_rectangle']['obj'].click()
+        if not self.penObjDict['pen_rectangle']['obj'].isChecked():
+            self.penObjDict['pen_rectangle']['obj'].click()
 
     def getSALSettings(self):
         """

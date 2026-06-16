@@ -714,7 +714,7 @@ class Pen_Form(QtWidgets.QWidget):
                     self.pen_obj_dict['penAdvancedLabeling']['opened'] = False
                 for obj in self.pen_obj_dict.keys():
                     if obj != 'penAdvancedLabeling':
-                        self.close_pen_object(obj)
+                        self.close_pen_object(obj, False)
                 return True
             elif action == self.actionSemiAuto:
                 self.advancedLabelingActionGroup.setExclusive(False)
@@ -729,7 +729,7 @@ class Pen_Form(QtWidgets.QWidget):
                 self.pen_obj_dict['penAdvancedLabeling']['pixelBased'] = False
                 for obj in self.pen_obj_dict.keys():
                     if obj != 'penAdvancedLabeling':
-                        self.close_pen_object(obj)
+                        self.close_pen_object(obj, False)
                 self.pen_sub_open(mode=PEN_SUB_MODE_SEMI_AUTO_LABELING)
                 return True
             elif action is None:
