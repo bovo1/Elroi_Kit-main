@@ -5,6 +5,13 @@
 """
 
 import os
+print(f"BEFORE LIMIT | OPENBLAS THREADS : {os.environ['OPENBLAS_NUM_THREADS']}")
+THREAD_LIMIT = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = THREAD_LIMIT
+os.environ['MKL_NUM_THREADS'] = THREAD_LIMIT
+os.environ['OMP_NUM_THREADS'] = THREAD_LIMIT
+print(f"AFTER LIMIT(1) | OPENBLAS THREADS : {os.environ['OPENBLAS_NUM_THREADS']}")
+
 import sys
 import multiprocessing
 import psutil
@@ -352,16 +359,6 @@ if __name__ == "__main__":
         runningErrorMessage()
         sys.exit(0)
     
-    # Limit BLAS/OMP/MKL threads to 1 to prevent memory error
-    try:
-        threadLimit = '1'
-        os.environ['OPENBLAS_NUM_THREADS'] = threadLimit
-        os.environ['MKL_NUM_THREADS'] = threadLimit
-        os.environ['OMP_NUM_THREADS'] = threadLimit
-
-    except Exception as e:
-        print(f"Error setting thread limits: {e}")
-
     # Must be called before creating the QApplication object
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) # Enable High DPI scaling
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) # Use High DPI icons
