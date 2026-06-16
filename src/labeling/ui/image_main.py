@@ -552,6 +552,12 @@ class Image_Form(QWidget):
             tmp_dict['select_type'] = 'all'
             self.image_to_core(tmp_dict)
 
+            tmp_dict = {}
+            tmp_dict['mode'] = 'unchecked'
+            tmp_dict['type'] = 'deleteAll'
+            tmp_dict['image_number'] = cnt
+            self.image_to_graph(tmp_dict)
+
 
         elif mode == 1:
             # Improvemented by MyoungHwan(2024.11.07): Image Main UI 코드 개선 (미사용 object 제거 및 수정)
@@ -589,6 +595,11 @@ class Image_Form(QWidget):
                 tmp_dict = {}
                 tmp_dict['mode'] = 'unchecked'
                 self.image_to_pen(tmp_dict)
+
+                tmp_dict = {}
+                tmp_dict['mode'] = 'unchecked'
+                tmp_dict['image_number'] = cnt
+                self.image_to_graph(tmp_dict)
 
             tmp_dict = {}
             tmp_dict['mode'] = 'delete'

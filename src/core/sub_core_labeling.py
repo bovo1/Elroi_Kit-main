@@ -426,12 +426,13 @@ class Sub_Core_Labeling(QObject):
     def send_image_to_graph(self, output):
         output['from'] = 'image'
         image_number = output['image_number']
-        output['data_name'] = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_name']
-        output['save_path'] = temp_path
-        if len(self.Core_DB_Labeling['image_list'][image_number]['image_info']['hsi_metadata']) != 0 :
-            output['hsi_metadata'] = self.Core_DB_Labeling['image_list'][image_number]['image_info']['hsi_metadata']
-        else:
-            output['hsi_metadata'] = {}
+        if output.get('type') != 'deleteAll':
+            output['data_name'] = self.Core_DB_Labeling['image_list'][image_number]['image_info']['image_name']
+            output['save_path'] = temp_path
+            if len(self.Core_DB_Labeling['image_list'][image_number]['image_info']['hsi_metadata']) != 0 :
+                output['hsi_metadata'] = self.Core_DB_Labeling['image_list'][image_number]['image_info']['hsi_metadata']
+            else:
+                output['hsi_metadata'] = {}
         self.send_core_to_graph(output)
 
     @pyqtSlot(dict)
