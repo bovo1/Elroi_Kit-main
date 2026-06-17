@@ -817,8 +817,10 @@ class Display_Form(QtWidgets.QWidget):
                 """
                 if output['flipCount'] % 2 == 0:
                     self.display_scrollAreaWidgetContents.rotate_viewer(angle=90, clock_wise=True)
+                    self.display_scrollAreaWidgetContents.fitInView()
                 else:
                     self.display_scrollAreaWidgetContents.rotate_viewer(angle=90, clock_wise=False)
+                    self.display_scrollAreaWidgetContents.fitInView()
             elif pen_mode == PEN_MODE_HFLIP:
                 self.display_scrollAreaWidgetContents.flip_horizontal()
             elif pen_mode == PEN_MODE_VFLIP:

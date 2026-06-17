@@ -553,7 +553,7 @@ class customMatplotlibWindow(QtWidgets.QMainWindow):
         copyIcon = QtGui.QIcon()
         copyIcon.addPixmap(QtGui.QPixmap("ico/labeling/graphBox/graph_export_copy.png"))
         copyAction.setIcon(copyIcon)
-        copyAction.triggered.connect(lambda: self.copyToClipboard)
+        copyAction.triggered.connect(lambda: self.copyToClipboard(size=None))
         
         for action in self.matplotlibWidget.toolbar.actions():
             # insert copy action before the save action in the toolbar

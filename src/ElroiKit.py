@@ -5,21 +5,6 @@
 """
 
 import os
-print(f"BEFORE LIMIT | OPENBLAS_NUM_THREADS env : {os.environ.get('OPENBLAS_NUM_THREADS', '(not set)')}")
-THREAD_LIMIT = '1'
-os.environ['OPENBLAS_NUM_THREADS'] = THREAD_LIMIT
-os.environ['MKL_NUM_THREADS'] = THREAD_LIMIT
-os.environ['OMP_NUM_THREADS'] = THREAD_LIMIT
-print(f"AFTER LIMIT  | OPENBLAS_NUM_THREADS env : {os.environ.get('OPENBLAS_NUM_THREADS')}")
-# [TEMP DEBUG] env 문자열이 '1'이어도 실제 적용 여부는 별개 → numpy 로드 후 실제 스레드 수 확인. 확인 후 이 블록 삭제.
-import numpy as _np  # noqa
-try:
-    from threadpoolctl import threadpool_info as _tpi
-    for _p in _tpi():
-        print(f"ACTUAL OpenBLAS threads : {_p['num_threads']}  (ver {_p.get('version')})")
-except ImportError:
-    print("threadpoolctl 미설치 -> pip install threadpoolctl")
-
 import sys
 import multiprocessing
 import psutil
@@ -367,6 +352,16 @@ if __name__ == "__main__":
         runningErrorMessage()
         sys.exit(0)
     
+    # Limit BLAS/OMP/MKL threads to 1 to prevent memory error
+    try:
+        threadLimit = '1'
+        os.environ['OPENBLAS_NUM_THREADS'] = threadLimit
+        os.environ['MKL_NUM_THREADS'] = threadLimit
+        os.environ['OMP_NUM_THREADS'] = threadLimit
+
+    except Exception as e:
+        print(f"Error setting thread limits: {e}")
+
     # Must be called before creating the QApplication object
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) # Enable High DPI scaling
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) # Use High DPI icons
