@@ -5,6 +5,15 @@
 """
 
 import os
+# Limit BLAS/OMP/MKL threads to 1 to prevent memory error
+try:
+    threadLimit = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = threadLimit
+    os.environ['MKL_NUM_THREADS'] = threadLimit
+    os.environ['OMP_NUM_THREADS'] = threadLimit
+
+except Exception as e:
+    print(f"Error setting thread limits: {e}")
 import sys
 import multiprocessing
 import psutil
@@ -351,16 +360,6 @@ if __name__ == "__main__":
         tempApp = QtWidgets.QApplication([]) # Create a temporary QApplication instance for QMessageBox with low resource usage
         runningErrorMessage()
         sys.exit(0)
-    
-    # Limit BLAS/OMP/MKL threads to 1 to prevent memory error
-    try:
-        threadLimit = '1'
-        os.environ['OPENBLAS_NUM_THREADS'] = threadLimit
-        os.environ['MKL_NUM_THREADS'] = threadLimit
-        os.environ['OMP_NUM_THREADS'] = threadLimit
-
-    except Exception as e:
-        print(f"Error setting thread limits: {e}")
 
     # Must be called before creating the QApplication object
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) # Enable High DPI scaling
