@@ -463,9 +463,6 @@ class customGraphMatplotlibExporter(exporters.MatplotlibExporter):
         yScale = yAxis.autoSIPrefixScale if yAxis.autoSIPrefix else 1.0
 
         for item in self.item.curves:
-            # skip curves hidden via setVisible(False) (e.g. hidden graph groups)
-            if not item.isVisible():
-                continue
             x, y = item.getData()
             # apply SI scale to match pyqtgraph's displayed axis values
             ax.plot(x * xScale, y * yScale, **self.makePlotKwargs(item))
