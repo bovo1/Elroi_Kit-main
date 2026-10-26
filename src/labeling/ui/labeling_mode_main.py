@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from utils.custom_ui import ReDockOnCloseDockWidget, customTabBar
 
 from constants.constants import QT_MAX_SIZE
+from autolabel.autoLabelController import AutoLabelController
 if __name__ == "__main__" :
     from pen_main import Pen_Form
     from label_main import Labellist_Form
@@ -178,7 +179,14 @@ class Label_Main(QtWidgets.QMainWindow):
 
         self.grid_main_window.addLayout(self.grid_sub_window, 0, 0, 1, 1)
         
-        self.hsplitter.addWidget(self.image_scrollArea)
+        # 디스플레이를 '이미지 칸' 으로 감싼다 — 오토라벨링 바와 설정 독이 이 칸에 붙는다
+        self.imageAreaWidget = QtWidgets.QWidget()
+        self.imageAreaWidget.setObjectName("imageAreaWidget")
+        self.imageAreaLayout = QVBoxLayout(self.imageAreaWidget)
+        self.imageAreaLayout.setContentsMargins(0, 0, 0, 0)
+        self.imageAreaLayout.setSpacing(0)
+        self.imageAreaLayout.addWidget(self.image_scrollArea, 1)
+        self.hsplitter.addWidget(self.imageAreaWidget)
         self.hsplitter.addWidget(self.grid_right_window_widget)
 
         self.hsplitter.setStretchFactor(0,3)
@@ -215,6 +223,8 @@ class Label_Main(QtWidgets.QMainWindow):
         self.image_scrollArea.resize(int(MainWindow.width()*0.9), int(MainWindow.height()*0.9))   
         
         self.image_scrollArea.setWidget(self.scrollAreaWidgetContents)
+        # 오토라벨링(src/autolabel)
+        self.autoLabelController = AutoLabelController(self.scrollAreaWidgetContents, self.Sync, self.lang, self.imageAreaWidget)
 
     def floatGraphDock(self, globalPos, startPos):
         """

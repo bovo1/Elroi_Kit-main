@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.cluster import MiniBatchKMeans
+from threadpoolctl import threadpool_limits
 import torch
 from torch.utils.data import Dataset
 import faiss
@@ -21,6 +22,9 @@ import time
 from utils.shared import resource_path
 from utils.encrypt import AesEncryption
 from constants.constants import commonAbnormalDict, PATCH_SIZE
+
+# SAL 의 MiniBatchKMeans 는 스레드가 많으면 Windows 에서 메모리가 샌다 — 군집화하는 동안만 스레드를 줄인다.
+SAL_THREAD_LIMIT = 1
 
 class KNN:
 	def __init__(self,n_neighbors):
@@ -250,7 +254,8 @@ def simplelabeling(data, label, label_num=0, c_num=2):
 		kmeans = MiniBatchKMeans(init ='k-means++', n_clusters = c_num, 
 						batch_size = 512, 
 						max_no_improvement = 50, verbose = 0)
-		kmeans.fit(data_f[indices])
+		with threadpool_limits(limits=SAL_THREAD_LIMIT):
+			kmeans.fit(data_f[indices])
 		"""
 			description
 			modified by MyoungHwan(20240603) : output 결과값 변경

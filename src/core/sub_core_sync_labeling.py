@@ -18,6 +18,16 @@ class Sub_Core_Sync_Labeling(QtCore.QObject):
     mainwindow_to_core_signal = QtCore.pyqtSignal(dict)
     mainwindow_to_pen_signal = QtCore.pyqtSignal(dict)
 
+    #autolabel (src/autolabel)
+    # 저장 직전에 같은 스레드에서 바로 불린다 — 미리보기를 라벨에 먼저 적용해 저장에 포함시키려고
+    autoLabelBeforeSaveSignal = QtCore.pyqtSignal(dict)
+    # 펜 툴바의 오토라벨링 켜기/끄기
+    penToAutoLabelSignal = QtCore.pyqtSignal(bool)
+    autoLabelAvailableSignal = QtCore.pyqtSignal(bool)       # 오토라벨링 → 펜: 이미지가 있는가
+    autoLabelKeepOnSignal = QtCore.pyqtSignal()              # 오토라벨링 → 펜: 끄기를 취소했다
+    autoLabelRemoveLabelsSignal = QtCore.pyqtSignal(list)    # 오토라벨링 → 라벨 탭: [번호] 픽셀이 없어진 클래스 줄을 뺀다
+    autoLabelEnsureLabelsSignal = QtCore.pyqtSignal(dict)    # 오토라벨링 → 라벨 탭: {번호: {label_name, label_color}} 없으면 만든다
+
     #image
     image_to_core_signal = QtCore.pyqtSignal(dict)
     image_to_label_signal = QtCore.pyqtSignal(dict)

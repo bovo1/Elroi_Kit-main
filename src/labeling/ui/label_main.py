@@ -48,6 +48,8 @@ class Labellist_Form(QtWidgets.QWidget):
         self.label_to_pen_style_signal = self.Sync.label_to_pen_style_signal
         self.core_to_label_signal = self.Sync.core_to_label_signal
         self.core_to_label_signal.connect(self.recv_from_core)
+        self.Sync.autoLabelEnsureLabelsSignal.connect(self.ensureAutoLabelClasses)
+        self.Sync.autoLabelRemoveLabelsSignal.connect(self.removeAutoLabelClasses)
 
         self.label_obj_dict = self.Sync.label_obj_dict
         self.label_control_dict = self.Sync.label_control_dict
@@ -383,6 +385,31 @@ class Labellist_Form(QtWidgets.QWidget):
                         return
             for k,v in add_class_dict.items():
                 self.create_label(label_num=k, label_name=v['name'], label_color=v['color'])
+
+    def ensureAutoLabelClasses(self, labels: dict) -> None:
+        """
+            @Description: 오토라벨링 결과의 라벨이 라벨 탭에 없으면 만들고, 모두 화면에 보이게 켠다.
+                이미 있으면 이름만 맞추고 색은 건드리지 않는다. mode=1(불러오기)로 만든다 — 오토라벨링이 DB 에 먼저
+                넣어 두었고, 새 라벨 생성 때의 펜 초기화를 피하려고.
+            @Author: AutoLabel
+        """
+        shownNumbers = []
+        for number, info in labels.items():
+            if number not in self.label_obj_dict:
+                self.create_label(label_num=number, label_name=info['label_name'], label_color=list(info['label_color']), mode=1)
+            elif self.label_obj_dict[number]['name'] != info['label_name']:
+                self.label_obj_dict[number]['obj_dict']['name'].setText(info['label_name'])
+                self.label_name_change(info['label_name'], number)
+            showButton = self.label_obj_dict[number]['obj_dict']['show']
+            if not showButton.isChecked():
+                # 버튼마다 화면을 다시 그리면 깜빡이므로 버튼만 켜고 화면은 아래에서 한 번 그린다
+                self.label_hide_sw = False
+                showButton.setChecked(True)
+                self.label_hide_sw = True
+                self.label_show_status.add(number)
+                shownNumbers.append(number)
+        if shownNumbers:
+            self.label_to_display({'mode': 'autoLabelShow', 'label_numbers': shownNumbers})
 
     def create_label(self, label_num = -1, label_name="", label_color = [255,255,255] ,mode= 0):
         """
@@ -929,20 +956,58 @@ class Labellist_Form(QtWidgets.QWidget):
             delete_check = False
 
         if delete_check:
-            # Improvemented by MyoungHwan (2024.12.13): label 삭제 동작 코드 수정
+            self._removeLabelRow(obj, cnt, updateCore=True)
+
+    def removeAutoLabelClasses(self, numbers: list) -> None:
+        """
+            @Description: 오토라벨링이 덮어써 픽셀이 없어진 클래스 줄을 뺀다. Core DB 에서는 오토라벨링이 이미 뺐으므로
+                Core 에 다시 알리지 않는다(KeyError). 탭 전체를 다시 만들지 않는다(선택 상태와 그래프 그룹이 어긋난다).
+            @Author: AutoLabel
+        """
+        for number in numbers:
+            if number != 0 and number in self.label_obj_dict:
+                removeButton = self.label_obj_dict[number]['obj_dict']['remove']
+                row = self._rowOfWidget(removeButton)
+                if row >= 0:                                    # 줄을 못 찾았으면 건드리지 않는다(표와 데이터가 어긋난다)
+                    self._removeLabelRow(removeButton, number, updateCore=False, row=row)
+
+    def _rowOfWidget(self, widget) -> int:
+        """
+            @Description: 표에서 widget 이 들어 있는 줄 번호(없으면 -1). 화면 위치로 찾으면 탭이 안 보일 때 실패하므로 셀 위젯으로 찾는다.
+            @Author: AutoLabel
+        """
+        for row in range(self.label_list_table.rowCount()):
+            for column in range(self.label_list_table.columnCount()):
+                cell = self.label_list_table.cellWidget(row, column)
+                if cell is not None and (cell is widget or cell.isAncestorOf(widget)):
+                    return row
+        return -1
+
+    def _removeLabelRow(self, obj, cnt, updateCore=True, row=None):
+        """
+            @Description: 라벨 한 줄 삭제. updateCore 면 Core DB 와 디스플레이에도 알린다(사용자 삭제). row 를 주면 그 줄을 지운다.
+            @Author: MyoungHwan (본문), AutoLabel (select_label_remove 에서 떼어 냄)
+        """
+        # Improvemented by MyoungHwan (2024.12.13): label 삭제 동작 코드 수정
+        if row is None:
             pos = obj.mapTo(self.label_list_table, obj.rect().topLeft())
             cur_row = self.label_list_table.indexAt(pos).row()
-            # Modified by MyoungHwan(25.06.13): Fix scroll position moves irregularly when deleting a specific row in a CustomUI table.
-            self.label_list_table.removeRow_(cur_row)
-            self.label_show_status.discard(cnt)
-            del self.label_obj_dict[cnt]
-            
-            if self.label_control_dict['select_main_label_number'] == cnt:
-                self.label_control_dict['select_main_label_number'] = -1
-                self.display_control_dict['drawing_mode'] = -1
-            if self.label_control_dict['select_sub_label_number'] == cnt:
-                self.label_control_dict['select_sub_label_number'] = -1
+        else:
+            cur_row = row
+        # Modified by MyoungHwan(25.06.13): Fix scroll position moves irregularly when deleting a specific row in a CustomUI table.
+        self.label_list_table.removeRow_(cur_row)
+        self.label_show_status.discard(cnt)
+        del self.label_obj_dict[cnt]
+        
+        if self.label_control_dict['select_main_label_number'] == cnt:
+            self.label_control_dict['select_main_label_number'] = -1
+            self.display_control_dict['drawing_mode'] = -1
+        if self.label_control_dict['select_sub_label_number'] == cnt:
+            self.label_control_dict['select_sub_label_number'] = -1
+        if self.label_control_dict.get('old_select_label_number') == cnt:
+            self.label_control_dict['old_select_label_number'] = -1
 
+        if updateCore:
             tmp_dict = {}
             tmp_dict['mode'] = 'delete'
             tmp_dict['type'] = 'label'
@@ -957,16 +1022,16 @@ class Labellist_Form(QtWidgets.QWidget):
             tmp_dict['label_number'] = cnt
             self.label_to_display(tmp_dict)
 
-            # when label removed, send signal to graph group
-            emitDict = {}
-            emitDict['mode'] = REMOVE_LABEL_CLASS
-            emitDict['labelNumber'] = cnt
-            self.labelToGraphGroupSignal.emit(emitDict)
-            
-            #pen 적용을 위한 시그널
-            tmp_dict = {}
-            tmp_dict['mode'] = 'reset'
-            self.label_to_pen_style(tmp_dict)
+        # when label removed, send signal to graph group
+        emitDict = {}
+        emitDict['mode'] = REMOVE_LABEL_CLASS
+        emitDict['labelNumber'] = cnt
+        self.labelToGraphGroupSignal.emit(emitDict)
+        
+        #pen 적용을 위한 시그널
+        tmp_dict = {}
+        tmp_dict['mode'] = 'reset'
+        self.label_to_pen_style(tmp_dict)
 
     def all_label_remove(self, mode=0):
         """
