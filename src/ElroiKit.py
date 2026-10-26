@@ -28,8 +28,6 @@ from stylesheet.stylesheet_component import buildStylesheet
 from stylesheet.stylesheet_common import STYLE
 from stylesheet.stylesheet_labeling import LABELING_STYLESHEET
 from stylesheet.stylesheet_training import TRAINING_STYLESHEET
-from stylesheet.stylesheet_notification import NOTIFICATION_STYLESHEET
-from stylesheet.stylesheet_autolabel import AUTO_LABEL_STYLESHEET
 from stylesheet.stylesheet_advanced import ADVANCED_STYLESHEET
 
 class main_sub_Sync(QtCore.QObject):
@@ -354,6 +352,16 @@ if __name__ == "__main__":
         runningErrorMessage()
         sys.exit(0)
     
+    # Limit BLAS/OMP/MKL threads to 1 to prevent memory error
+    try:
+        threadLimit = '1'
+        os.environ['OPENBLAS_NUM_THREADS'] = threadLimit
+        os.environ['MKL_NUM_THREADS'] = threadLimit
+        os.environ['OMP_NUM_THREADS'] = threadLimit
+
+    except Exception as e:
+        print(f"Error setting thread limits: {e}")
+
     # Must be called before creating the QApplication object
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) # Enable High DPI scaling
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) # Use High DPI icons
@@ -392,7 +400,7 @@ if __name__ == "__main__":
     screen = app.primaryScreen()
     factor  = screen.devicePixelRatio() # Get DPI scaling factor
     # Build the application stylesheet by combining global styles and specific styles
-    stylesheet = buildStylesheet(globalStyle=STYLE, specificStyle=[LABELING_STYLESHEET, TRAINING_STYLESHEET, ADVANCED_STYLESHEET, NOTIFICATION_STYLESHEET, AUTO_LABEL_STYLESHEET])
+    stylesheet = buildStylesheet(globalStyle=STYLE, specificStyle=[LABELING_STYLESHEET, TRAINING_STYLESHEET, ADVANCED_STYLESHEET])
     app.setStyleSheet(stylesheet)
     # defaultFont is system default font, which is used when user select "Default" font option.
     # It can be different by OS and user settings.

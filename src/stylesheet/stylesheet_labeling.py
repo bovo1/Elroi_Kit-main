@@ -227,12 +227,6 @@ LABELING_STYLESHEET = {
         "background-color": COLORS['backgroundMainColor'],
     },
 
-    # Display Menu(이미지 위 오른쪽 클릭 메뉴) — 꺼진 항목은 회색(오토라벨링 보조 라벨링 중 끈 항목이 흰색 그대로 보였다).
-    # 공용 QMenu 규칙이 글자색을 흰색으로 고정해서 꺼진 상태 색이 따로 필요하다. 올려도(selected) 강조색으로 바뀌지 않게
-    "displayMenu::item:disabled, displayMenu::item:disabled:selected": {
-        "color": COLORS['disabledColor'],
-    },
-
     # Pen Sub
     "Pen_style_Form": {
         "background-color": COLORS['backgroundMainColor'],

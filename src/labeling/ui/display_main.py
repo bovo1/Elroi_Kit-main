@@ -150,13 +150,6 @@ class Display_Form(QtWidgets.QWidget):
                 self.update_graph()
                 self.update_image_display(self.image_rgb)
             
-            elif label_mode == 'autoLabelShow':
-                # 'hide' 와 같은 갱신을 라벨마다 하고 그리기는 한 번
-                for label_number in output['label_numbers']:
-                    self.update_data_list(label_number=label_number)
-                self.update_graph()
-                self.update_image_display(self.image_rgb)
-
             elif label_mode =='color':
                 selected_label_number = output['label_number']
                 self.image_label = copy.deepcopy(output['image_label']) # label numpy
@@ -794,10 +787,6 @@ class Display_Form(QtWidgets.QWidget):
                     self.polygonItem.setUndo()
                     self.update_pen_buttons()
                     return
-                # 오토라벨링 미리보기가 있으면 그것부터 되돌린다
-                if self.autoLabelHistoryHandler is not None and self.autoLabelHistoryHandler(False, False):
-                    self.update_pen_buttons()
-                    return
                 
                 if self.undo_memory:
                     # depending on polygon drawing mode, check diff mode
@@ -811,10 +800,6 @@ class Display_Form(QtWidgets.QWidget):
                 # # if Polygon drawing, process polygon redo first
                 if self.polygonItem.isDrawing == True:
                     self.polygonItem.setRedo()
-                    self.update_pen_buttons()
-                    return
-                # 오토라벨링 미리보기부터 다시 실행
-                if self.autoLabelHistoryHandler is not None and self.autoLabelHistoryHandler(True, False):
                     self.update_pen_buttons()
                     return
                 
@@ -993,15 +978,6 @@ class Display_Form(QtWidgets.QWidget):
         """
         self.lang = lang
         self.Sync = Sync
-        # 오토라벨링 연결점. autoLabelController 가 채우며, 비어 있으면 기존 동작 그대로다.
-        # 브러시, 지우개, 되돌리기, 메뉴 처리를 오토라벨링이 가져갈지 묻고(True 면 가져감), Composer 는 그리기 직전에 미리보기를 얹는다.
-        self.autoLabelBrushHandler = None
-        self.autoLabelFrameComposer = None
-        self.autoLabelHistoryHandler = None
-        self.autoLabelEraseHandler = None
-        self.autoLabelStrokeStartHandler = None
-        self.autoLabelMenuHandler = None
-        self.autoLabelLabelChangedHandler = None
         # signal
         self.core_to_display_signal = self.Sync.core_to_display_signal
         self.core_to_display_signal.connect(self.recv_from_core)
@@ -1198,12 +1174,6 @@ class Display_Form(QtWidgets.QWidget):
             @parameters
                 1. image(numpy): 변경된 이미지 데이터
         """
-        if self.autoLabelFrameComposer is not None:
-            # 미리보기는 image_rgb 에 쓰지 않고 그릴 때만 얹는다
-            composed = self.autoLabelFrameComposer(image)
-            if composed is not image:
-                self.paintGraphPoints(composed)          # 그래프 점이 맨 위에 오게
-            image = composed
         self.pix = self.numpy_to_qpixmap(image)
         self.display_scrollAreaWidgetContents.updatePhoto(self.pix)
     
@@ -1587,50 +1557,6 @@ class Display_Form(QtWidgets.QWidget):
             self.image_label_mask_dict['show'][indice] = False
         self.update_graph()
 
-    def applyAutoLabelPixels(self, labelArray) -> bool:
-        """
-            @description : 오토라벨링 미리보기를 라벨에 한 번에 적용한다(저장 직전). labelArray 의 0 이 아닌 픽셀만 칠하고,
-                되돌리기 한 번으로 되돌릴 수 있다. 칠한 픽셀이 있었는지 돌려준다.
-            @author : AutoLabel
-        """
-        appliedAny = False
-        self.check_diff(mode=0)
-        for labelNumber in [int(value) for value in np.unique(labelArray) if value != 0]:
-            if labelNumber not in self.label_obj_dict:
-                continue
-            indice = np.where(labelArray == labelNumber)
-            self.update_drawing(label_number=labelNumber, indice=indice)
-            self.display_to_core({'mode': 'modify', 'type': 'display', 'type_detail': 'drawing_label_data',
-                                  'label_number': labelNumber, 'indice': indice})
-            appliedAny = True
-        if appliedAny:
-            self.check_diff(mode=1)
-            self.redo_memory = []
-            self.update_pen_buttons()
-        self.update_image_display(self.image_rgb)
-        return appliedAny
-
-    def replaceAutoLabel(self, labelArray) -> None:
-        """
-            @description : 오토라벨링 추론 결과로 선택 이미지의 라벨 전체를 바꾼다. 되돌리기 한 번으로 돌아간다.
-                마스크는 새로 만든다(이전 라벨의 색이 남지 않게).
-            @author : AutoLabel
-        """
-        self.check_diff(mode=0)
-        freshMask = {
-            "show": np.full(self.image_label.shape, False, dtype=np.bool_),
-            "mask": np.full(self.image_rgb.shape, 0, dtype=np.uint8),
-            "alpha": np.full(self.image_label.shape + (1,), 1.0, dtype=np.float16),
-        }
-        self.update_undo_redo_data({'label': np.asarray(labelArray).astype(int), 'image': self.image_origin,
-                                    'image_label_mask_dict': freshMask}, mode='autolabel')
-        self.display_to_core({'mode': 'modify', 'type': 'display', 'type_detail': 'label_data_from_memory',
-                              'label': copy.deepcopy(self.image_label)})
-        self.check_diff(mode=1)
-        self.redo_memory = []
-        self.update_pen_buttons()
-        self.update_image_display(self.image_rgb)
-
     def update_undo_redo_data(self, data:dict, mode:str) -> None:
         """
             @description: 실행 취소/복구기능 이용에 대한 데이터 정보를 임시로 저장하기 위한 함수
@@ -1758,12 +1684,8 @@ class Display_Form(QtWidgets.QWidget):
         """
             @description: Undo와 Redo 버튼의 활성화 상태를 업데이트합니다.
         """
-        canUndoAutoLabel = self.autoLabelHistoryHandler is not None and self.autoLabelHistoryHandler(False, True)
-        canRedoAutoLabel = self.autoLabelHistoryHandler is not None and self.autoLabelHistoryHandler(True, True)
-        self.pen_obj_dict['pen_undo']['obj'].setEnabled(bool(self.undo_memory) or bool(self.polygonItem.undo) or canUndoAutoLabel)
-        self.pen_obj_dict['pen_redo']['obj'].setEnabled(bool(self.redo_memory) or bool(self.polygonItem.redo) or canRedoAutoLabel)
-        if self.autoLabelLabelChangedHandler is not None:
-            self.autoLabelLabelChangedHandler()
+        self.pen_obj_dict['pen_undo']['obj'].setEnabled(bool(self.undo_memory) or bool(self.polygonItem.undo))
+        self.pen_obj_dict['pen_redo']['obj'].setEnabled(bool(self.redo_memory) or bool(self.polygonItem.redo))
 
     def update_graph(self) -> None:
         """
@@ -1773,18 +1695,17 @@ class Display_Form(QtWidgets.QWidget):
                 2024.09.06: remove unnecessary variable for efficient operation by MyoungHwan
                 2025.12.08: modify code about random color information in image_graph_rgb_point/image_graph_rgb_label and logic by GaEun Hwang
         """
-        self.paintGraphPoints(self.image_rgb)
-
-    def paintGraphPoints(self, target) -> None:
-        """보이는 그래프 점의 색을 target 이미지에 칠한다."""
-        viewMode = self.graph_control_dict['graph_view_mode']
-        groups = self.graphGroupDict if viewMode == GRAPH_VIEW_MODE_SELECTIVE_COLOR else self.labelViewGraphGroupDict
-        for key, graphGroup in groups.items():
-            if graphGroup['hide'] == True:
-                showGraphIndice = np.where(self.image_graph_rgb_label[viewMode] == key)
-                target[showGraphIndice] = self.image_graph_rgb_point[viewMode][showGraphIndice]
-
-
+        if self.graph_control_dict['graph_view_mode'] == GRAPH_VIEW_MODE_SELECTIVE_COLOR:
+            for key, graphGroup in self.graphGroupDict.items():
+                if graphGroup['hide'] == True:
+                    showGraphIndice = np.where(self.image_graph_rgb_label[self.graph_control_dict['graph_view_mode']] == key)
+                    self.image_rgb[showGraphIndice] = self.image_graph_rgb_point[self.graph_control_dict['graph_view_mode']][showGraphIndice]
+        else:
+            for key, graphGroup in self.labelViewGraphGroupDict.items():
+                if graphGroup['hide'] == True:
+                    showGraphIndice = np.where(self.image_graph_rgb_label[self.graph_control_dict['graph_view_mode']] == key)
+                    self.image_rgb[showGraphIndice] = self.image_graph_rgb_point[self.graph_control_dict['graph_view_mode']][showGraphIndice]
+    
     def hide_graph(self, partial:bool=False, index:int=None, hideState:bool=False, labelView=False) -> None:
         """
             description: function for hide graph
@@ -1964,8 +1885,6 @@ class Display_Form(QtWidgets.QWidget):
             else:
                 if e.button() == Qt.LeftButton:
                     self.left_drawstart = False
-                    if self.autoLabelLabelChangedHandler is not None:
-                        self.autoLabelLabelChangedHandler()
                 if e.button() == Qt.RightButton:
                     self.right_drawstart = False
                 """
@@ -2054,8 +1973,6 @@ class Display_Form(QtWidgets.QWidget):
                         description
                         Modified by MyoungHwan(20240529) : 현재 작업 상태를 변경하기 위한 변수 선언
                     """
-                    isSubPenBlocked = self.autoLabelStrokeStartHandler is not None and \
-                        self.autoLabelStrokeStartHandler(self.display_control_dict['drawing_mode'], e.button() == Qt.LeftButton)
                     self.memory_record_status = True
                     self.check_diff(mode=0)
 
@@ -2068,13 +1985,9 @@ class Display_Form(QtWidgets.QWidget):
                         selected_label_number = self.label_control_dict['select_main_label_number']
                         if selected_label_number == LABEL_UNSELECTED:
                             raise Exception("error select label number is None... please select label number....set change default label number(0)")
-                        if self.autoLabelBrushHandler is not None and self.autoLabelBrushHandler(y, x, selected_label_number):
-                            # 오토라벨링이 가져간 클릭 — 끌어서 칠하기도 시작하지 않는다
-                            self.left_drawstart = False
-                        else:
-                            indice = self.update_point_indice(cur_point=cur_point)
-                            self.update_drawing(label_number=selected_label_number, indice=indice)
-                            self.update_image_display(self.image_rgb)
+                        indice = self.update_point_indice(cur_point=cur_point)
+                        self.update_drawing(label_number=selected_label_number, indice=indice)
+                        self.update_image_display(self.image_rgb)
 
                     elif drawing_mode == DRAWING_MODE_ADVANCED_LABELING:
                         """
@@ -2118,11 +2031,8 @@ class Display_Form(QtWidgets.QWidget):
                         # eraser mode
                         selected_label_number = LABEL_IGNORED
                         indice = self.update_point_indice(cur_point=cur_point)
-                        # 오토라벨링 미리보기가 있으면 미리보기만 지운다(indice 를 비워 DB 로도 안 보낸다)
-                        if self.autoLabelEraseHandler is not None and self.autoLabelEraseHandler(indice):
-                            indice = None
-                        else:
-                            self.update_drawing(label_number=selected_label_number, indice=indice)
+                        # indice = self.update_point_indice(cur_point=[self.cal_x, self.cal_y])
+                        self.update_drawing(label_number=selected_label_number, indice=indice)
                         self.update_image_display(self.image_rgb)
 
                     elif drawing_mode == DRAWING_MODE_DRAW_GRAPH_POINT:
@@ -2310,11 +2220,10 @@ class Display_Form(QtWidgets.QWidget):
                 elif e.button() == Qt.RightButton:
                     indice = None
                     if self.display_control_dict['drawing_mode'] == DRAWING_MODE_LABELING:
-                        # 오토라벨링이 막은 보조 펜은 칠하지 않고 메뉴를 연다
-                        self.right_drawstart = not isSubPenBlocked
+                        self.right_drawstart = True
                         # 드로잉 모드일때 오른쪽 마우스 클릭시 sub 드로잉펜
                         selected_label_number = self.label_control_dict['select_sub_label_number']
-                        if selected_label_number != LABEL_UNSELECTED and not isSubPenBlocked:
+                        if selected_label_number != LABEL_UNSELECTED:
                             indice = self.update_point_indice(cur_point=cur_point)
                             self.update_drawing(label_number=selected_label_number, indice=indice)
                             self.update_image_display(self.image_rgb)
@@ -2422,11 +2331,7 @@ class Display_Form(QtWidgets.QWidget):
                         # eraser mode
                         selected_label_number = LABEL_IGNORED
                         indice = self.update_point_indice(cur_point=cur_point)
-                        # 오토라벨링 미리보기가 있으면 미리보기만 지운다(indice 를 비워 DB 로도 안 보낸다)
-                        if self.autoLabelEraseHandler is not None and self.autoLabelEraseHandler(indice):
-                            indice = None
-                        else:
-                            self.update_drawing(label_number=selected_label_number, indice=indice)
+                        self.update_drawing(label_number=selected_label_number, indice=indice)
                         self.update_image_display(self.image_rgb)
 
                     elif drawing_mode == DRAWING_MODE_DRAW_GRAPH_POINT:
@@ -2440,7 +2345,7 @@ class Display_Form(QtWidgets.QWidget):
                     elif drawing_mode == DRAWING_MODE_ZOOM_IN:
                         pass
 
-                    if drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING] and indice is not None:
+                    if drawing_mode in [DRAWING_MODE_LABELING, DRAWING_MODE_ERASING]:
                         tmp_dict = {}
                         tmp_dict['mode'] = 'modify'
                         tmp_dict['type'] = 'display'
@@ -2739,11 +2644,6 @@ class Display_Form(QtWidgets.QWidget):
         emitDict = {'labelClass': clickedLabelNumber, 'labelName': clickedLabelName, 'labelOpacity': clickedLabelOpacity}
         self.displayToDisplayMenuSignal.emit(emitDict)
 
-        # 오토라벨링이 정한 항목만 켠다
-        canEditLabels, canChangeRectangle = self.autoLabelMenuHandler() if self.autoLabelMenuHandler is not None else (True, True)
-        self.displayMenu.removeLabelAction.setEnabled(canEditLabels)
-        self.displayMenu.controlLabelOpacityAction.setEnabled(canEditLabels)
-        self.displayMenu.rectangleModeMenu.menuAction().setEnabled(canChangeRectangle)
         self.displayMenu.show_(globalPos, pos)
 
     def removeObjectLabel(self, pos):

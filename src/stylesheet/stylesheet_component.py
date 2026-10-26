@@ -66,8 +66,6 @@ COLORS = {
     "disabledColor": "gray",
     "textColor": "rgb(255, 255, 255)",
     "labelTitleColor": "rgb(40, 39, 40)",
-    # Secondary text (notification body/time, auto-labeling hints): dimmer than textColor so status reads by brightness
-    "textSubColor": "rgb(185, 185, 185)",
 }
 
 IMAGES = {

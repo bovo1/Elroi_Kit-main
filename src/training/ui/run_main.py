@@ -11,7 +11,6 @@ from .video_window import Video_Form
 
 from constants.constants import MESSAGE_BOX_WARNING, MESSAGE_BOX_CONFIRMATION
 from utils.custom_ui import messageBox
-from notification.notificationCenter import getNotificationCenter, NOTIFICATION_FAILURE, NOTIFICATION_INFO, NOTIFICATION_SUCCESS
 
 class ProgressBar(QtWidgets.QProgressBar):
     def text(self):
@@ -270,7 +269,6 @@ class Run_Form(QtWidgets.QWidget):
 
             # start new thread
             self.training_thread.start()
-            self.notifyRun(NOTIFICATION_INFO, "notifyStarted")
 
             # play video
             if self.hyperparameter_shared_dict["show_video"]:
@@ -296,7 +294,6 @@ class Run_Form(QtWidgets.QWidget):
 
             self.enable_ui()
             self.RemainTimeLabel.setText(self.lang.get("training", "run_main", "RemainTimeLabel_stop"))
-            self.notifyRun(NOTIFICATION_INFO, "notifyCanceled")
             return True
         return False
     
@@ -321,7 +318,6 @@ class Run_Form(QtWidgets.QWidget):
         self.enable_ui()
         self.RemainTimeLabel.setText(self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"))
         self.Sync.core_obj_dict["status_training_status"].setText(self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"))
-        self.notifyRun(NOTIFICATION_FAILURE, "notifyFailed")   # 확인창보다 먼저 남긴다
 
         messageBox(mode=MESSAGE_BOX_WARNING,
                    title=self.lang.get("training", "run_main", "RemainTimeLabel_runtime_error"),
@@ -340,16 +336,6 @@ class Run_Form(QtWidgets.QWidget):
         self.enable_ui()
         self.RemainTimeLabel.setText(f"{self.lang.get('training', 'run_main', 'RemainTimeLabel')}: 0{self.lang.get('training','run_main', 'RemainTimeLabel_time_hour')} 0{self.lang.get('training', 'run_main', 'RemainTimeLabel_time_minute')} 0{self.lang.get('training', 'run_main', 'RemainTimeLabel_time_second')}")
         self.Sync.core_obj_dict["status_training_status"].setText("")
-        self.notifyRun(NOTIFICATION_SUCCESS, "notifyDone")
-
-    def notifyRun(self, kind: str, key: str) -> None:
-        """
-            @Description: 학습, 평가의 시작, 끝, 중지, 에러를 알림 센터에 남긴다. 문구 키는 '<key>_train', '<key>_eval'.
-            @Author: AutoLabel
-        """
-        fullKey = "%s_%s" % (key, "train" if self.is_train else "eval")
-        if self.lang.get("training", "run_main", fullKey):   # 문구가 없으면 알리지 않는다(빈 제목은 예외)
-            getNotificationCenter().notify(kind, lambda: self.lang.get("training", "run_main", fullKey) or fullKey)
 
     def set_is_train(self, current_index):
         if current_index == 0:

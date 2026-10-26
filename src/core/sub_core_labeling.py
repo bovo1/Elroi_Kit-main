@@ -17,7 +17,6 @@ import time
 from .db_labeling import DB_Control_Labeling
 from constants.constants import MESSAGE_BOX_WARNING, PEN_MODE_IMAGE, AGGREGATION_DATA, MESSAGE_BOX_INFORMATION, PEN_MODE_ROT90, PEN_MODE_ADVANCED_LABELING
 from utils.custom_ui import messageBox
-from notification.notificationCenter import getNotificationCenter, NOTIFICATION_SUCCESS
 
 from utils.shared import temp_path
 
@@ -232,8 +231,6 @@ class Sub_Core_Labeling(QObject):
     def recv_mainwindow_to_core(self, input):
         """mainwindow로부터 signal을 받기 위한 함수이다.
         """
-        # 오토라벨링 미리보기를 라벨에 먼저 적용한다(직접 연결이라 저장보다 먼저 끝난다)
-        self.Sub_Core_Sync_Labeling.autoLabelBeforeSaveSignal.emit(input)
         self.save_data(input)
 
     @pyqtSlot(dict)
@@ -1046,7 +1043,10 @@ class Sub_Core_Labeling(QObject):
             with open(folder_path+'/data.json', 'w', encoding='utf-8') as fp:
                 json.dump(tmp_dict, fp,indent="\t", ensure_ascii=False)
             
-            savedFileName = "label.npy" if mode == 1 else os.path.basename(input['save_as_path'])
+            messageBox(mode = MESSAGE_BOX_INFORMATION, 
+                        title = self.lang.get("labeling", "core", "labelSaveTitle"),
+                        text = self.lang.get("labeling", "core", "labelSavedMessage"),
+                        buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
         # Modified by MyoungHwan(2024.03.14): Add Exception(ValueError) and delete signal code
         except ValueError as ve:
             print(ve)
@@ -1056,17 +1056,6 @@ class Sub_Core_Labeling(QObject):
                         title = self.lang.get("labeling", "core", "labelSavedFailedMessageTitle"),
                         text = f'{self.lang.get("labeling", "core", "labelSavedFailedMessage")} {e}',
                         buttons = {self.lang.get("main", "messageBox", "msgOk"):"accept"})
-        else:
-            self.notifyLabelSaved(file_name, savedFileName)
-
-    def notifyLabelSaved(self, imageName: str, savedFileName: str) -> None:
-        """라벨 저장 성공을 토스트로 알린다(종 목록에는 쌓지 않는다).
-        저장 try 블록 밖에서 부른다 — 알림 문제로 성공한 저장이 실패로 보이면 안 된다. 제목 문구가 없으면 알리지 않는다.
-        """
-        title = self.lang.get("main", "notification", "labelSavedTitle") or ""
-        body = (self.lang.get("main", "notification", "labelSavedBody") or "").replace("{name}", imageName).replace("{file}", savedFileName)
-        if title:
-            getNotificationCenter().notify(NOTIFICATION_SUCCESS, title, body, keepInList=False)
             
 
     def save_class_data(self):

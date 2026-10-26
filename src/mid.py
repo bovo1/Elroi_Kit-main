@@ -81,7 +81,6 @@ from constants.constants import FONT_DEFAULT, FONT_PRETENDARD, FONT_NANUM_SQUARE
 
 from license_term import License_Form
 from utils.custom_ui import messageBox
-from notification.notificationUi import installNotificationUi
 from constants.constants import MESSAGE_BOX_INFORMATION
 """
     description
@@ -205,8 +204,6 @@ class Mid_MainWindow_Form(QtWidgets.QMainWindow):
         self.statusbar.addWidget(VLine())
         self.statusbar.addPermanentWidget(self.core_obj_dict['status_training_status'])
         self.statusbar.addPermanentWidget(VLine())
-        # 종이 맨 오른쪽에 오도록 다른 permanent 위젯을 다 붙인 뒤에 설치한다
-        installNotificationUi(Mid_MainWindow, self.statusbar, self.lang)
         
         
         self.toolBar = QtWidgets.QToolBar(Mid_MainWindow)
