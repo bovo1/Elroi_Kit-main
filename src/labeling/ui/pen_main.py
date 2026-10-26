@@ -192,6 +192,17 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_eraser.setShortcut("E")
         self.lang.set("labeling", "pen_main", "pen_eraser", self.pen_eraser)
 
+        # 오토라벨링 켜기/끄기 — 펜 모드를 바꾸지 않는 독립 스위치(src/autolabel)
+        self.pen_autolabel = QtWidgets.QPushButton()
+        iconAutoLabel = QtGui.QIcon()
+        iconAutoLabel.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_autolabel_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        iconAutoLabel.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_autolabel_yellow.png"), QtGui.QIcon.Normal, QtGui.QIcon.On)
+        iconAutoLabel.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_autolabel_disabled.png"), QtGui.QIcon.Disabled)
+        self.pen_autolabel.setIcon(iconAutoLabel)
+        self.pen_autolabel.setCheckable(True)
+        self.pen_autolabel.setObjectName("pen_autolabel")
+        self.lang.set("labeling", "pen_main", "pen_autolabel", self.pen_autolabel)
+
         self.pen_bright = QtWidgets.QPushButton()
         icon6 = QtGui.QIcon()
         icon6.addPixmap(QtGui.QPixmap("ico/labeling/penbox/pen_bright_white.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
@@ -325,6 +336,7 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_opacity.setIconSize(QtCore.QSize(20, 20))
         self.pen_image.setIconSize(QtCore.QSize(20, 20))
         self.penAdvancedLabeling.setIconSize(QtCore.QSize(20, 20))
+        self.pen_autolabel.setIconSize(QtCore.QSize(20, 20))   # 다른 펜 아이콘과 같은 크기
         self.pen_list_vertical.addStretch()
         self.pen_list_vertical.addWidget(self.pen_scale_up)
         self.pen_list_vertical.addWidget(self.pen_scale_down)
@@ -336,6 +348,7 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_list_vertical.addWidget(self.pen_polygon)
         # self.pen_list_vertical.addWidget(self.pen_part_move)
         self.pen_list_vertical.addWidget(self.pen_eraser)
+        self.pen_list_vertical.addWidget(self.pen_autolabel)
         self.pen_list_vertical.addWidget(self.pen_rot90)
         self.pen_list_vertical.addWidget(self.pen_hflip)
         self.pen_list_vertical.addWidget(self.pen_vflip)
@@ -449,6 +462,9 @@ class Pen_Form(QtWidgets.QWidget):
         self.pen_vflip.clicked.connect(lambda ch=self.pen_vflip: self.pen_mode(ch = ch, mode=PEN_MODE_VFLIP))
         self.pen_part_move.clicked.connect(lambda ch=self.pen_part_move: self.pen_mode(ch = ch, mode=PEN_MODE_IMAGE_MOVING))
         self.pen_eraser.clicked.connect(lambda ch=self.pen_eraser: self.pen_mode(ch = ch, mode=PEN_MODE_ERASER))
+        self.pen_autolabel.toggled.connect(self.Sync.penToAutoLabelSignal.emit)
+        self.Sync.autoLabelAvailableSignal.connect(self.setAutoLabelAvailable)
+        self.Sync.autoLabelKeepOnSignal.connect(self.keepAutoLabelOn)
         self.pen_bright.clicked.connect(lambda ch=self.pen_bright: self.pen_mode(ch = ch, mode=PEN_MODE_BRIGHT))
         self.pen_undo.clicked.connect(lambda : self.pen_mode(mode=PEN_MODE_UNDO))
         self.pen_redo.clicked.connect(lambda : self.pen_mode(mode=PEN_MODE_REDO))
@@ -876,6 +892,27 @@ class Pen_Form(QtWidgets.QWidget):
             self.pen_obj_dict['penAdvancedLabeling']['semiAutoForm'].move(x + 45, y - 80)
             self.pen_obj_dict['penAdvancedLabeling']['opened'] = True
     
+    def keepAutoLabelOn(self) -> None:
+        """
+            @Description: 오토라벨링이 끄기를 취소했다 — 신호 없이 켠 모양으로 되돌린다.
+            @Author: AutoLabel
+        """
+        self.pen_autolabel.blockSignals(True)
+        self.pen_autolabel.setChecked(True)
+        self.pen_autolabel.blockSignals(False)
+
+    def setAutoLabelAvailable(self, isAvailable: bool) -> None:
+        """
+            @Description: 이미지가 없으면 오토라벨링을 끄고 잠근다. 끄기는 기존 길(toggled → penToAutoLabelSignal)로 한다.
+            @Author: AutoLabel
+        """
+        if not isAvailable and self.pen_autolabel.isChecked():
+            self.pen_autolabel.setChecked(False)
+        if not isAvailable and self.pen_autolabel.hasFocus():
+            # 포커스를 가진 채 끄면 Qt 가 다음 위젯으로 넘겨 점선 테두리가 생기므로 창에 넘긴다
+            self.pen_autolabel.window().setFocus(QtCore.Qt.OtherFocusReason)
+        self.pen_autolabel.setEnabled(isAvailable)
+
     def rectangleModeChangeEvent(self, mode, open=True):
         """
             @ Description: A function to handle the event when the rectangle mode is changed.
